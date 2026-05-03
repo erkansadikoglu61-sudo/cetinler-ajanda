@@ -69,7 +69,7 @@ function TaskSheet({
 
   const [pid, setPid] = useState(task?.pid ?? currentProfile.id)
   const [date, setDate] = useState(task?.date ?? format(selectedDate, 'yyyy-MM-dd'))
-  const [time, setTime] = useState(task?.time ?? '')
+  const [time, setTime] = useState(task?.time ?? '09:00')
   const [type, setType] = useState(task?.type ?? TASK_TYPES[0])
   const [customer, setCustomer] = useState(task?.customer ?? '')
   const [description, setDescription] = useState(task?.description ?? '')
@@ -429,53 +429,42 @@ function Sidebar({ currentProfile, team, visibleIds, bsyLinks, filterPid, taskCo
           {filterPid === null && <div className="w-1.5 h-1.5 rounded-full bg-brand-500 flex-shrink-0" />}
         </button>
 
-        {/* Admin rolündeyse hiyerarşik göster: BSY → SUP → Jr */}
+        {/* Admin rolündeyse 2 grup: 1-BSY, 2-SUP+Jr */}
         {currentProfile.role === 'admin' && (
           <>
-            {admins.length > 0 && (
-              <div className="pt-1">
-                <p className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Yönetici</p>
-                {admins.map(p => renderRow(p))}
-              </div>
-            )}
+            {/* GRUP 1: BSY'ler */}
             {bsys.length > 0 && (
               <div className="pt-1">
-                <p className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">BSY</p>
-                {bsys.map(bsy => {
-                  // Bu BSY'ye bağlı tüm ID'ler (SUP + Jr direkt linkler)
-                  const linkedIds = bsyLinks
-                    .filter(l => l.bsy_id === bsy.id)
-                    .map(l => l.sup_id)
-                  // Bağlı SUP'lar
-                  const linkedSups = team.filter(p => p.role === 'sup' && linkedIds.includes(p.id))
-                  // SUP altındaki Jr'lar (bağlı olanlardan)
-                  const jrUnderSup = (sup: Profile) =>
-                    team.filter(p => p.role === 'jr' && p.manager_id === sup.id && linkedIds.includes(p.id))
-                  // Direkt bağlı Jr'lar (herhangi bir bağlı SUP'un altında olmayan)
-                  const linkedSupIds = linkedSups.map(s => s.id)
-                  const directJrs = team.filter(p =>
-                    p.role === 'jr' && linkedIds.includes(p.id) &&
-                    !linkedSupIds.some(sid => p.manager_id === sid)
-                  )
-                  return (
-                    <div key={bsy.id}>
-                      {renderRow(bsy)}
-                      <div className="ml-2 border-l-2 border-gray-100 pl-1 space-y-0.5">
-                        {linkedSups.map(sup => (
-                          <div key={sup.id}>
-                            {renderRow(sup)}
-                            {jrUnderSup(sup).map(jr => (
-                              <div key={jr.id} className="ml-2 border-l-2 border-gray-50 pl-1">
-                                {renderRow(jr)}
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                        {directJrs.map(jr => renderRow(jr))}
+                <p className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                  1 · Bölge Satış Yöneticileri
+                </p>
+                {bsys.map(p => renderRow(p))}
+              </div>
+            )}
+
+            {/* Ayraç */}
+            {bsys.length > 0 && sups.length > 0 && (
+              <div className="mx-3 my-2 border-t border-gray-200" />
+            )}
+
+            {/* GRUP 2: Süpervizörler + Jr'ları */}
+            {sups.length > 0 && (
+              <div>
+                <p className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                  2 · Süpervizörler
+                </p>
+                {sups.map(sup => (
+                  <div key={sup.id}>
+                    {renderRow(sup)}
+                    {team.filter(jr => jr.role === 'jr' && jr.manager_id === sup.id).map(jr => (
+                      <div key={jr.id} className="ml-2 border-l-2 border-gray-100 pl-1">
+                        {renderRow(jr)}
                       </div>
-                    </div>
-                  )
-                })}
+                    ))}
+                  </div>
+                ))}
+                {/* Herhangi bir süpervizöre bağlı olmayan Jr'lar */}
+                {team.filter(jr => jr.role === 'jr' && !sups.find(s => s.id === jr.manager_id)).map(jr => renderRow(jr))}
               </div>
             )}
           </>
