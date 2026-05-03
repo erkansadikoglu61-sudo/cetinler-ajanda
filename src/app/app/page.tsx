@@ -122,26 +122,26 @@ function TaskSheet({
   const noteInputRef = useRef<HTMLInputElement>(null)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center md:justify-center p-0 md:p-4">
       {/* Overlay */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
       {/* Sheet */}
-      <div className="relative w-full bg-white rounded-t-2xl max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full md:w-[480px] md:max-w-full bg-white rounded-t-2xl md:rounded-2xl max-h-[80vh] overflow-y-auto shadow-2xl">
         {/* Handle */}
-        <div className="sticky top-0 bg-white pt-3 pb-2 z-10">
-          <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-3" />
+        <div className="sticky top-0 bg-white pt-3 pb-2 z-10 border-b border-gray-100">
+          <div className="w-8 h-1 bg-gray-200 rounded-full mx-auto mb-2 md:hidden" />
           <div className="flex items-center justify-between px-4">
-            <h2 className="font-semibold text-lg text-gray-800">
+            <h2 className="font-semibold text-base text-gray-800">
               {isNew ? 'Yeni Görev' : 'Görev Detayı'}
             </h2>
-            <button onClick={onClose} className="p-2 text-gray-400">
-              <X size={20} />
+            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+              <X size={18} />
             </button>
           </div>
         </div>
 
-        <div className="px-4 pb-8 space-y-4">
+        <div className="px-4 pb-4 pt-3 space-y-3">
           {/* Kişi */}
           {(isNew && canAddForOthers) && (
             <div>
@@ -149,7 +149,7 @@ function TaskSheet({
               <select
                 value={pid}
                 onChange={e => setPid(e.target.value)}
-                className="w-full border border-gray-300 rounded-xl px-3 py-3 outline-none focus:ring-2 focus:ring-brand-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500"
               >
                 {selectablePids.map(id => {
                   const p = team.find(t => t.id === id)
@@ -168,7 +168,7 @@ function TaskSheet({
                 value={date}
                 onChange={e => setDate(e.target.value)}
                 disabled={!canEdit}
-                className="w-full border border-gray-300 rounded-xl px-3 py-3 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
               />
             </div>
             <div>
@@ -178,7 +178,7 @@ function TaskSheet({
                 value={time}
                 onChange={e => setTime(e.target.value)}
                 disabled={!canEdit}
-                className="w-full border border-gray-300 rounded-xl px-3 py-3 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
               />
             </div>
           </div>
@@ -190,7 +190,7 @@ function TaskSheet({
               value={type}
               onChange={e => setType(e.target.value)}
               disabled={!canEdit}
-              className="w-full border border-gray-300 rounded-xl px-3 py-3 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
             >
               {TASK_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -205,7 +205,7 @@ function TaskSheet({
               onChange={e => setCustomer(e.target.value)}
               disabled={!canEdit}
               placeholder="Müşteri veya şube adı"
-              className="w-full border border-gray-300 rounded-xl px-3 py-3 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
             />
           </div>
 
@@ -218,7 +218,7 @@ function TaskSheet({
               disabled={!canEdit}
               rows={3}
               placeholder="Notlar, açıklama..."
-              className="w-full border border-gray-300 rounded-xl px-3 py-3 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500 resize-none"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500 resize-none"
             />
           </div>
 
@@ -244,7 +244,7 @@ function TaskSheet({
                 <button
                   onClick={handleCheckIn}
                   disabled={checkingIn}
-                  className="w-full flex items-center justify-center gap-2 bg-brand-500 text-white rounded-xl py-3 font-medium min-h-[46px] btn-active disabled:opacity-60"
+                  className="w-full flex items-center justify-center gap-2 bg-brand-500 text-white rounded-lg py-2.5 font-medium min-h-[40px] btn-active disabled:opacity-60"
                 >
                   {checkingIn ? (
                     <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Konum alınıyor...</>
@@ -310,21 +310,21 @@ function TaskSheet({
                   <button
                     onClick={handleDelete}
                     disabled={deleting}
-                    className="flex-none flex items-center justify-center gap-1 border border-red-200 text-red-500 rounded-xl px-4 py-3 min-h-[46px] btn-active disabled:opacity-60"
+                    className="flex-none flex items-center justify-center gap-1 border border-red-200 text-red-500 rounded-lg px-4 py-2.5 min-h-[40px] btn-active disabled:opacity-60"
                   >
                     <Trash2 size={16} /> Sil
                   </button>
                 )}
                 <button
                   onClick={onClose}
-                  className="flex-1 border border-gray-300 text-gray-600 rounded-xl py-3 min-h-[46px] btn-active"
+                  className="flex-1 border border-gray-300 text-gray-600 rounded-lg py-2.5 min-h-[40px] btn-active"
                 >
                   İptal
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex-1 bg-brand-500 text-white rounded-xl py-3 font-semibold min-h-[46px] btn-active disabled:opacity-60"
+                  className="flex-1 bg-brand-500 text-white rounded-lg py-2.5 font-semibold min-h-[40px] btn-active disabled:opacity-60"
                 >
                   {saving ? (
                     <span className="inline-flex items-center justify-center gap-2">
@@ -337,13 +337,174 @@ function TaskSheet({
             ) : (
               <button
                 onClick={onClose}
-                className="flex-1 border border-gray-300 text-gray-600 rounded-xl py-3 min-h-[46px] btn-active"
+                className="flex-1 border border-gray-300 text-gray-600 rounded-lg py-2.5 min-h-[40px] btn-active"
               >
                 Kapat
               </button>
             )}
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────
+// SOL SIDEBAR (masaüstü)
+// ─────────────────────────────────────────────────────
+interface SidebarProps {
+  currentProfile: Profile
+  team: Profile[]
+  visibleIds: string[]
+  bsyLinks: { bsy_id: string; sup_id: string }[]
+  filterPid: string | null
+  taskCounts: Record<string, number>
+  onSelect: (pid: string | null) => void
+}
+
+function Sidebar({ currentProfile, team, visibleIds, bsyLinks, filterPid, taskCounts, onSelect }: SidebarProps) {
+  const [search, setSearch] = useState('')
+
+  const visible = team.filter(p => visibleIds.includes(p.id))
+  const filtered = search
+    ? visible.filter(p => p.full_name.toLowerCase().includes(search.toLowerCase()))
+    : visible
+
+  const bsys = filtered.filter(p => p.role === 'bsy')
+  const sups = filtered.filter(p => p.role === 'sup')
+  const jrs = filtered.filter(p => p.role === 'jr')
+  const admins = filtered.filter(p => p.role === 'admin')
+
+  const renderRow = (p: Profile, indent = false) => (
+    <button
+      key={p.id}
+      onClick={() => onSelect(filterPid === p.id ? null : p.id)}
+      className={clsx(
+        'w-full flex items-center gap-2 px-3 py-2 text-left rounded-lg transition-colors text-sm',
+        indent && 'ml-4',
+        filterPid === p.id
+          ? 'bg-brand-50 text-brand-700 font-medium'
+          : 'text-gray-700 hover:bg-gray-100'
+      )}
+    >
+      <Avatar profile={p} size={28} />
+      <div className="flex-1 min-w-0">
+        <p className="truncate text-xs font-medium leading-tight">{p.full_name}</p>
+        <p className="text-[10px] text-gray-400 leading-tight">{taskCounts[p.id] ?? 0} görev</p>
+      </div>
+      {filterPid === p.id && <div className="w-1.5 h-1.5 rounded-full bg-brand-500 flex-shrink-0" />}
+    </button>
+  )
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Başlık */}
+      <div className="px-3 py-3 border-b border-gray-200">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Ekip</p>
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="İsim ara..."
+          className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-brand-500 bg-white"
+        />
+      </div>
+
+      {/* Liste */}
+      <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
+        {/* Tümü */}
+        <button
+          onClick={() => onSelect(null)}
+          className={clsx(
+            'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors',
+            filterPid === null
+              ? 'bg-brand-50 text-brand-700 font-medium'
+              : 'text-gray-600 hover:bg-gray-100'
+          )}
+        >
+          <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-[9px] flex-shrink-0">
+            TÜM
+          </div>
+          <span className="text-xs font-medium flex-1 text-left">Tüm Ekip</span>
+          {filterPid === null && <div className="w-1.5 h-1.5 rounded-full bg-brand-500 flex-shrink-0" />}
+        </button>
+
+        {/* Admin rolündeyse hiyerarşik göster */}
+        {currentProfile.role === 'admin' && (
+          <>
+            {admins.length > 0 && (
+              <div className="pt-1">
+                <p className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Yönetici</p>
+                {admins.map(p => renderRow(p))}
+              </div>
+            )}
+            {bsys.length > 0 && (
+              <div className="pt-1">
+                <p className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">BSY</p>
+                {bsys.map(bsy => {
+                  const linkedSupIds = bsyLinks
+                    .filter(l => l.bsy_id === bsy.id)
+                    .map(l => l.sup_id)
+                  const linkedSups = sups.filter(s => linkedSupIds.includes(s.id))
+                  return (
+                    <div key={bsy.id}>
+                      {renderRow(bsy)}
+                      {linkedSups.map(sup => (
+                        <div key={sup.id} className="ml-3 border-l border-gray-200 pl-1">
+                          {renderRow(sup)}
+                          {jrs.filter(jr => jr.manager_id === sup.id).map(jr => (
+                            <div key={jr.id} className="ml-3 border-l border-gray-100 pl-1">
+                              {renderRow(jr)}
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* BSY rolündeyse */}
+        {currentProfile.role === 'bsy' && (
+          <div className="pt-1">
+            {renderRow(currentProfile)}
+            {filtered.filter(p => p.id !== currentProfile.id).length > 0 && (
+              <div className="ml-3 border-l border-gray-200 pl-1">
+                <p className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Ekibim</p>
+                {sups.filter(p => p.id !== currentProfile.id).map(sup => (
+                  <div key={sup.id}>
+                    {renderRow(sup)}
+                    {jrs.filter(jr => jr.manager_id === sup.id).map(jr => (
+                      <div key={jr.id} className="ml-3 border-l border-gray-100 pl-1">
+                        {renderRow(jr)}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+                {jrs.filter(p => p.id !== currentProfile.id && !sups.find(s => s.id === p.manager_id)).map(jr => renderRow(jr))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Süpervizör rolündeyse */}
+        {currentProfile.role === 'sup' && (
+          <div className="pt-1">
+            {renderRow(currentProfile)}
+            {jrs.filter(jr => jr.manager_id === currentProfile.id).length > 0 && (
+              <div className="ml-3 border-l border-gray-200 pl-1">
+                <p className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Jr. Ekibim</p>
+                {jrs.filter(jr => jr.manager_id === currentProfile.id).map(jr => renderRow(jr))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Jr. Süpervizör */}
+        {currentProfile.role === 'jr' && renderRow(currentProfile)}
       </div>
     </div>
   )
@@ -1071,19 +1232,45 @@ export default function AppPage() {
   if (!currentProfile) return null
 
   return (
-    <div className="flex flex-col h-screen bg-white safe-top">
-      {/* Top Bar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b bg-white sticky top-0 z-20">
-        <button
-          onClick={() => setShowPersonSheet(true)}
-          className="p-2 text-gray-600 min-h-[44px] min-w-[44px] flex items-center justify-center"
-        >
-          <Menu size={20} />
-        </button>
+    <div className="flex h-screen bg-white safe-top">
+
+      {/* Sol Sidebar – sadece masaüstü */}
+      <aside className="hidden md:flex flex-col w-56 border-r border-gray-200 bg-gray-50 shrink-0">
+        <div className="px-3 py-3 border-b border-gray-200 flex items-center gap-2">
+          <Avatar profile={currentProfile} size={28} />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-gray-800 truncate">{currentProfile.full_name}</p>
+            <p className="text-[10px] text-gray-400">{ROLE_LABELS[currentProfile.role]}</p>
+          </div>
+          <button onClick={async () => { await signOut(); router.replace('/login') }} className="p-1 text-gray-400 hover:text-gray-600" title="Çıkış">
+            <LogOut size={14} />
+          </button>
+        </div>
+        <Sidebar
+          currentProfile={currentProfile}
+          team={team}
+          visibleIds={ids}
+          bsyLinks={bsyLinks}
+          filterPid={filterPid}
+          taskCounts={taskCounts}
+          onSelect={setFilterPid}
+        />
+      </aside>
+
+      {/* Sağ: Ana içerik */}
+      <div className="flex flex-col flex-1 min-w-0">
+        {/* Top Bar */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b bg-white sticky top-0 z-20">
+          <button
+            onClick={() => setShowPersonSheet(true)}
+            className="p-2 text-gray-600 min-h-[44px] min-w-[44px] flex items-center justify-center md:hidden"
+          >
+            <Menu size={20} />
+          </button>
 
         <button
           onClick={() => setShowPersonSheet(true)}
-          className="flex-1 text-left text-sm font-medium text-gray-700 truncate"
+          className="flex-1 text-left text-sm font-medium text-gray-700 truncate md:hidden"
         >
           {filterPid ? profileById(filterPid)?.full_name : 'Tüm Ekip'}
         </button>
@@ -1148,15 +1335,14 @@ export default function AppPage() {
       {tab !== 'report' && (
         <button
           onClick={handleAddTask}
-          className="fixed bottom-24 right-4 w-14 h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
-          style={{ bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }}
+          className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
         >
-          <Plus size={24} />
+          <Plus size={22} />
         </button>
       )}
 
       {/* Bottom Nav */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t z-20 safe-bottom">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-20 safe-bottom">
         <div className="grid grid-cols-5 h-16">
           {([
             { key: 'month', icon: Calendar, label: 'Ay' },
@@ -1224,6 +1410,7 @@ export default function AppPage() {
           onCheckIn={handleCheckIn}
         />
       )}
+      </div>
     </div>
   )
 }
