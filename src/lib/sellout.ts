@@ -43,6 +43,18 @@ export const PRIM_JR: Record<SelloutGroup, number> = {
   'Mutfak ve Diğer Gruplar': 2000,
 }
 
+// Çetinler Merch seviyesi Kategori Primi (₺)
+// Not: Gerçek değerleri öğrenince güncelleyin
+export const PRIM_MERCH: Record<SelloutGroup, number> = {
+  'IPL Grubu':               3750,
+  'Üflemeli Grubu':          3250,
+  'Düzleştirici&Maşa Grubu': 2000,
+  'Epilatör&Baskül&Mutfak':  1250,
+  'Erkek Bakım Grubu':       1250,
+  'Süpürge Grubu':           3750,
+  'Mutfak ve Diğer Gruplar': 1250,
+}
+
 export const PRIM_ESIGI = 0.80 // %80 eşik
 
 /** İsim normalizasyonu: küçük harf, "SV" kaldır, Türkçe → Latin */

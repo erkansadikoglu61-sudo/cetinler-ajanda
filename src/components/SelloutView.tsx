@@ -8,7 +8,7 @@ import { useSellout } from '@/hooks/useSellout'
 import { useSelloutTargets, ProfileTarget, MerchTarget } from '@/hooks/useSelloutTargets'
 import {
   SELLOUT_GROUPS, GRUP_NORMALIZE,
-  PRIM_SUP, PRIM_JR,
+  PRIM_SUP, PRIM_JR, PRIM_MERCH,
   calcPrim, namesMatch, normalizeName,
   fmtCur, currentDonem, donemOptions, donemLabel,
 } from '@/lib/sellout'
@@ -214,33 +214,39 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     [periodRows]
   )
 
-  // ── Unique merch list ────────────────────────────────────────
+  // ── Unique Çetinler Merch listesi ────────────────────────────
+  // Sadece Jr. Süpervizörlerin altındaki merchleri dikkate al
+  const allJrNames = useMemo(
+    () => visibleJrs.map(j => j.full_name),
+    [visibleJrs]
+  )
+
   const uniqueMerch = useMemo(() => {
     const map = new Map<string, string>()
     allRows.forEach(r => {
-      if (r.merch_personel && r.supervisor_adi) {
+      if (!r.merch_personel || !r.supervisor_adi) return
+      // Sadece supervisor_adi bir Jr. Süpervizör ismiyle eşleşiyorsa ekle
+      const isJrSup = allJrNames.some(jn => namesMatch(jn, r.supervisor_adi))
+      if (isJrSup) {
         map.set(r.merch_personel, r.supervisor_adi)
       }
     })
     return Array.from(map.entries())
       .map(([name, supApiName]) => ({ name, supApiName }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
-  }, [allRows])
+      .sort((a, b) => a.supApiName.localeCompare(b.supApiName, 'tr') || a.name.localeCompare(b.name, 'tr'))
+  }, [allRows, allJrNames])
 
   // Merch visible to current user
-  const mySupApiNames = useMemo(() => {
-    if (isAdmin) return uniqueMerch.map(m => m.supApiName)
-    if (isSup) {
-      const myJrNames = jrsOf(currentProfile.id).map(j => j.full_name)
-      return [currentProfile.full_name, ...myJrNames]
-    }
+  const myJrApiNames = useMemo(() => {
+    if (isAdmin) return allJrNames
+    if (isSup) return jrsOf(currentProfile.id).map(j => j.full_name)
     if (isJr) return [currentProfile.full_name]
     return []
-  }, [isAdmin, isSup, isJr, currentProfile, uniqueMerch, jrsOf])
+  }, [isAdmin, isSup, isJr, currentProfile, allJrNames, jrsOf])
 
   const visibleMerch = useMemo(
-    () => uniqueMerch.filter(m => mySupApiNames.some(n => namesMatch(n, m.supApiName))),
-    [uniqueMerch, mySupApiNames]
+    () => uniqueMerch.filter(m => myJrApiNames.some(n => namesMatch(n, m.supApiName))),
+    [uniqueMerch, myJrApiNames]
   )
 
   // ── Sup table data ───────────────────────────────────────────
@@ -326,12 +332,14 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
         const v = periodRows
           .filter(r => r.merch_personel === m.name && GRUP_NORMALIZE[r.grup_aciklama] === g)
           .reduce((s, r) => s + r.satilan_adet, 0)
-        const p = pct(h, v)
-        return { g, h, v, p }
+        const p    = pct(h, v)
+        const prim = calcPrim(h, v, PRIM_MERCH[g])
+        return { g, h, v, p, prim }
       })
-      const tH = groups.reduce((s, x) => s + x.h, 0)
-      const tV = groups.reduce((s, x) => s + x.v, 0)
-      return { name: m.name, supApiName: m.supApiName, groups, tH, tV, tP: pct(tH, tV) }
+      const tH    = groups.reduce((s, x) => s + x.h, 0)
+      const tV    = groups.reduce((s, x) => s + x.v, 0)
+      const tPrim = groups.reduce((s, x) => s + x.prim, 0)
+      return { name: m.name, supApiName: m.supApiName, groups, tH, tV, tP: pct(tH, tV), tPrim }
     }),
   [filteredMerch, getMerchHedef, periodRows])
 
@@ -504,23 +512,37 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
         {!selloutLoading && subTab === 'merch' && (
           <>
-            <div className="mb-2">
+            <div className="mb-2 flex items-center gap-2">
               <input
                 type="text"
-                placeholder="Merch veya süpervizör ara…"
+                placeholder="Merch veya Jr. Süpervizör ara…"
                 value={merchSearch}
                 onChange={e => setMerchSearch(e.target.value)}
                 className="w-full max-w-xs text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-brand-400"
               />
+              <span className="text-[10px] text-gray-400">{filteredMerch.length} merch</span>
             </div>
             <SelloutTable
               rows={merchRows.map(r => ({
                 label: r.name,
                 sublabel: r.supApiName,
-                groups: r.groups.map(g => ({ h: g.h, v: g.v, p: g.p })),
-                tH: r.tH, tV: r.tV, tP: r.tP,
+                groups: r.groups.map(g => ({ h: g.h, v: g.v, p: g.p, prim: g.prim })),
+                tH: r.tH, tV: r.tV, tP: r.tP, tPrim: r.tPrim,
               }))}
-              showPrim={false}
+              footer={(() => {
+                const totH    = merchRows.reduce((s, r) => s + r.tH, 0)
+                const totV    = merchRows.reduce((s, r) => s + r.tV, 0)
+                const totPrim = merchRows.reduce((s, r) => s + r.tPrim, 0)
+                const groupTotals = SELLOUT_GROUPS.map((_, i) => ({
+                  h:    merchRows.reduce((s, r) => s + r.groups[i].h, 0),
+                  v:    merchRows.reduce((s, r) => s + r.groups[i].v, 0),
+                  p:    pct(merchRows.reduce((s, r) => s + r.groups[i].h, 0), merchRows.reduce((s, r) => s + r.groups[i].v, 0)),
+                  prim: merchRows.reduce((s, r) => s + r.groups[i].prim, 0),
+                }))
+                return { groups: groupTotals, tH: totH, tV: totV, tP: pct(totH, totV), tPrim: totPrim }
+              })()}
+              showPrim
+              kategoriPrimi={PRIM_MERCH}
             />
           </>
         )}
