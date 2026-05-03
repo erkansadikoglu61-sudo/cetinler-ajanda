@@ -159,30 +159,30 @@ function TaskSheet({
             </div>
           )}
 
-          {/* Tarih + Saat */}
-          <div className="flex gap-3 items-end">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tarih</label>
+          {/* Tarih + Saat – tek satır */}
+          <div>
+            <div className="flex justify-between mb-1">
+              <label className="text-sm font-medium text-gray-700">Tarih</label>
+              <label className="text-sm font-medium text-gray-700">Saat</label>
+            </div>
+            <div className="flex gap-2 items-center">
               <input
                 type="date"
                 value={date}
                 onChange={e => setDate(e.target.value)}
                 disabled={!canEdit}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
+                className="border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
               />
               {date && (
-                <p className="mt-1 text-xs text-brand-600 font-medium">
+                <span className="text-sm text-brand-600 font-medium flex-1 truncate">
                   {format(new Date(date + 'T12:00:00'), 'EEEE', { locale: tr })}
-                </p>
+                </span>
               )}
-            </div>
-            <div className="w-24 flex-shrink-0">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Saat</label>
               <select
                 value={time}
                 onChange={e => setTime(e.target.value)}
                 disabled={!canEdit}
-                className="w-full border border-gray-300 rounded-lg px-2 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
+                className="w-24 flex-shrink-0 border border-gray-300 rounded-lg px-2 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
               >
                 {Array.from({ length: 14 }, (_, h) => h + 7).flatMap(h =>
                   [0, 15, 30, 45].map(m => {
