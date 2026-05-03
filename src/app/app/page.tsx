@@ -184,7 +184,7 @@ function TaskSheet({
                 disabled={!canEdit}
                 className="w-24 flex-shrink-0 border border-gray-300 rounded-lg px-2 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
               >
-                {Array.from({ length: 14 }, (_, h) => h + 7).flatMap(h =>
+                {Array.from({ length: 17 }, (_, h) => h + 7).flatMap(h =>
                   [0, 15, 30, 45].map(m => {
                     const val = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
                     return <option key={val} value={val}>{val}</option>
