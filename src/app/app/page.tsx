@@ -429,7 +429,7 @@ function Sidebar({ currentProfile, team, visibleIds, bsyLinks, filterPid, taskCo
           {filterPid === null && <div className="w-1.5 h-1.5 rounded-full bg-brand-500 flex-shrink-0" />}
         </button>
 
-        {/* Admin rolündeyse hiyerarşik göster */}
+        {/* Admin rolündeyse hiyerarşik göster: BSY → SUP → Jr */}
         {currentProfile.role === 'admin' && (
           <>
             {admins.length > 0 && (
@@ -442,23 +442,37 @@ function Sidebar({ currentProfile, team, visibleIds, bsyLinks, filterPid, taskCo
               <div className="pt-1">
                 <p className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">BSY</p>
                 {bsys.map(bsy => {
-                  const linkedSupIds = bsyLinks
+                  // Bu BSY'ye bağlı tüm ID'ler (SUP + Jr direkt linkler)
+                  const linkedIds = bsyLinks
                     .filter(l => l.bsy_id === bsy.id)
                     .map(l => l.sup_id)
-                  const linkedSups = sups.filter(s => linkedSupIds.includes(s.id))
+                  // Bağlı SUP'lar
+                  const linkedSups = team.filter(p => p.role === 'sup' && linkedIds.includes(p.id))
+                  // SUP altındaki Jr'lar (bağlı olanlardan)
+                  const jrUnderSup = (sup: Profile) =>
+                    team.filter(p => p.role === 'jr' && p.manager_id === sup.id && linkedIds.includes(p.id))
+                  // Direkt bağlı Jr'lar (herhangi bir bağlı SUP'un altında olmayan)
+                  const linkedSupIds = linkedSups.map(s => s.id)
+                  const directJrs = team.filter(p =>
+                    p.role === 'jr' && linkedIds.includes(p.id) &&
+                    !linkedSupIds.some(sid => p.manager_id === sid)
+                  )
                   return (
                     <div key={bsy.id}>
                       {renderRow(bsy)}
-                      {linkedSups.map(sup => (
-                        <div key={sup.id} className="ml-3 border-l border-gray-200 pl-1">
-                          {renderRow(sup)}
-                          {jrs.filter(jr => jr.manager_id === sup.id).map(jr => (
-                            <div key={jr.id} className="ml-3 border-l border-gray-100 pl-1">
-                              {renderRow(jr)}
-                            </div>
-                          ))}
-                        </div>
-                      ))}
+                      <div className="ml-2 border-l-2 border-gray-100 pl-1 space-y-0.5">
+                        {linkedSups.map(sup => (
+                          <div key={sup.id}>
+                            {renderRow(sup)}
+                            {jrUnderSup(sup).map(jr => (
+                              <div key={jr.id} className="ml-2 border-l-2 border-gray-50 pl-1">
+                                {renderRow(jr)}
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                        {directJrs.map(jr => renderRow(jr))}
+                      </div>
                     </div>
                   )
                 })}
@@ -467,26 +481,36 @@ function Sidebar({ currentProfile, team, visibleIds, bsyLinks, filterPid, taskCo
           </>
         )}
 
-        {/* BSY rolündeyse */}
+        {/* BSY rolündeyse: kendisi → bağlı SUP'lar → onların Jr'ları */}
         {currentProfile.role === 'bsy' && (
           <div className="pt-1">
             {renderRow(currentProfile)}
-            {filtered.filter(p => p.id !== currentProfile.id).length > 0 && (
-              <div className="ml-3 border-l border-gray-200 pl-1">
-                <p className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Ekibim</p>
-                {sups.filter(p => p.id !== currentProfile.id).map(sup => (
-                  <div key={sup.id}>
-                    {renderRow(sup)}
-                    {jrs.filter(jr => jr.manager_id === sup.id).map(jr => (
-                      <div key={jr.id} className="ml-3 border-l border-gray-100 pl-1">
-                        {renderRow(jr)}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-                {jrs.filter(p => p.id !== currentProfile.id && !sups.find(s => s.id === p.manager_id)).map(jr => renderRow(jr))}
-              </div>
-            )}
+            {(() => {
+              const linkedIds = bsyLinks
+                .filter(l => l.bsy_id === currentProfile.id)
+                .map(l => l.sup_id)
+              const linkedSups = team.filter(p => p.role === 'sup' && linkedIds.includes(p.id))
+              const linkedSupIds = linkedSups.map(s => s.id)
+              const directJrs = team.filter(p =>
+                p.role === 'jr' && linkedIds.includes(p.id) &&
+                !linkedSupIds.some(sid => p.manager_id === sid)
+              )
+              return linkedIds.length > 0 ? (
+                <div className="ml-2 border-l-2 border-gray-100 pl-1 space-y-0.5">
+                  {linkedSups.map(sup => (
+                    <div key={sup.id}>
+                      {renderRow(sup)}
+                      {team.filter(p => p.role === 'jr' && p.manager_id === sup.id && linkedIds.includes(p.id)).map(jr => (
+                        <div key={jr.id} className="ml-2 border-l-2 border-gray-50 pl-1">
+                          {renderRow(jr)}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                  {directJrs.map(jr => renderRow(jr))}
+                </div>
+              ) : null
+            })()}
           </div>
         )}
 
