@@ -1186,7 +1186,7 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
               .map(p => ({
                 profile: p,
                 target: VISIT_TARGETS[p.full_name],
-                actual: visibleTasks.filter(t => t.pid === p.id).length,
+                actual: visibleTasks.filter(t => t.pid === p.id && !!t.checkin_ts).length,
               }))
               .sort((a, b) => b.actual - a.actual)
 
