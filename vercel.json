@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/sellout",
+      "schedule": "*/30 * * * *"
+    }
+  ]
+}
