@@ -251,7 +251,7 @@ function TaskSheet({
                     }
                   </p>
                 </div>
-              ) : task?.pid === currentProfile.id ? (
+              ) : task?.pid === currentProfile.id && (currentProfile.role === 'sup' || currentProfile.role === 'jr') ? (
                 <button
                   onClick={handleCheckIn}
                   disabled={checkingIn}
@@ -1088,6 +1088,20 @@ function ReportView({
 // ─────────────────────────────────────────────────────
 // İSTATİSTİK SHEET
 // ─────────────────────────────────────────────────────
+// Hedef ziyaret noktaları (isim → hedef)
+const VISIT_TARGETS: Record<string, number> = {
+  'Nagihan Erdönmez': 60,
+  'Duygu Duman':      60,
+  'Tuğba Ayata':      60,
+  'Merve İnci':       60,
+  'Atilla YILMAZ':    40,
+  'Burak Alagöz':     60,
+  'Gülcan Bayer':     60,
+  'Songül Durukan':   60,
+  'Sinem Bektaş':     60,
+  'Pınar Güler':      60,
+}
+
 function StatsSheet({ tasks, team, visibleIds, onClose }: {
   tasks: Task[]; team: Profile[]; visibleIds: string[]; onClose: () => void;
 }) {
@@ -1197,6 +1211,64 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
               </div>
             </div>
           )}
+
+          {/* Hedef Ziyaret Noktası Tablosu */}
+          {(() => {
+            const targetRows = team
+              .filter(p => VISIT_TARGETS[p.full_name] !== undefined && visibleIds.includes(p.id))
+              .map(p => ({
+                profile: p,
+                target: VISIT_TARGETS[p.full_name],
+                actual: visibleTasks.filter(t => t.pid === p.id).length,
+              }))
+              .sort((a, b) => b.actual - a.actual)
+
+            if (targetRows.length === 0) return null
+
+            return (
+              <div>
+                <h3 className="font-semibold text-gray-700 mb-3 text-sm">Hedef Ziyaret Noktası</h3>
+                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left px-3 py-2 text-gray-500 font-medium">Kişi</th>
+                        <th className="text-center px-3 py-2 text-gray-500 font-medium">Hedef</th>
+                        <th className="text-center px-3 py-2 text-gray-500 font-medium">Gerçekleşen</th>
+                        <th className="text-center px-3 py-2 text-gray-500 font-medium">%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {targetRows.map(({ profile: p, target, actual }) => {
+                        const pct = Math.min(Math.round((actual / target) * 100), 100)
+                        const isOk = pct >= 80
+                        return (
+                          <tr key={p.id} className="border-b border-gray-100 last:border-0">
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <Avatar profile={p} size={22} />
+                                <span className="text-gray-700 truncate">{p.full_name}</span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-center text-gray-500">{target}</td>
+                            <td className="px-3 py-2 text-center font-semibold text-gray-800">{actual}</td>
+                            <td className="px-3 py-2 text-center">
+                              <span className={clsx(
+                                'px-1.5 py-0.5 rounded-full font-medium text-[10px]',
+                                isOk ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                              )}>
+                                %{pct}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })()}
         </div>
       </div>
     </div>
