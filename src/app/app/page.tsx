@@ -1106,6 +1106,7 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
   tasks: Task[]; team: Profile[]; visibleIds: string[]; onClose: () => void;
 }) {
   const [activeFilter, setActiveFilter] = useState<string | null>(null)
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
 
   const visibleTasks = tasks.filter(t => visibleIds.includes(t.pid))
   const checkinTasks = visibleTasks.filter(t => t.checkin_ts)
@@ -1128,14 +1129,6 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
     : activeFilter
       ? visibleTasks.filter(t => t.type === activeFilter)
       : visibleTasks
-
-  const visibleProfiles = team.filter(p => visibleIds.includes(p.id))
-  const tasksByPerson = visibleProfiles.map(p => ({
-    profile: p,
-    count: filteredTasks.filter(t => t.pid === p.id).length,
-  })).sort((a, b) => b.count - a.count)
-
-  const maxCount = Math.max(...tasksByPerson.map(t => t.count), 1)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center md:justify-center md:p-4">
@@ -1186,32 +1179,6 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
             </div>
           )}
 
-          {/* Kişi bazlı bar chart */}
-          {tasksByPerson.length > 0 && (
-            <div>
-              <h3 className="font-semibold text-gray-700 mb-3 text-sm">Kişi Bazlı Görev Dağılımı</h3>
-              <div className="space-y-3">
-                {tasksByPerson.map(({ profile: p, count }) => (
-                  <div key={p.id} className="flex items-center gap-3">
-                    <Avatar profile={p} size={28} />
-                    <div className="flex-1">
-                      <div className="flex justify-between mb-1">
-                        <span className="text-xs text-gray-600 truncate">{p.full_name}</span>
-                        <span className="text-xs font-bold text-gray-700 ml-2">{count}</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-300"
-                          style={{ width: `${(count / maxCount) * 100}%`, backgroundColor: p.color }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Hedef Ziyaret Noktası Tablosu */}
           {(() => {
             const targetRows = team
@@ -1225,8 +1192,19 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
 
             if (targetRows.length === 0) return null
 
+            const selectedProfile = selectedPersonId
+              ? team.find(p => p.id === selectedPersonId) ?? null
+              : null
+            const personTasks = selectedPersonId
+              ? visibleTasks
+                  .filter(t => t.pid === selectedPersonId)
+                  .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
+              : []
+
+            const DAY_NAMES = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt']
+
             return (
-              <div>
+              <div className="space-y-3">
                 <h3 className="font-semibold text-gray-700 mb-3 text-sm">Hedef Ziyaret Noktası</h3>
                 <div className="rounded-xl border border-gray-200 overflow-hidden">
                   <table className="w-full text-xs">
@@ -1242,12 +1220,20 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
                       {targetRows.map(({ profile: p, target, actual }) => {
                         const pct = Math.min(Math.round((actual / target) * 100), 100)
                         const isOk = pct >= 80
+                        const isSelected = selectedPersonId === p.id
                         return (
-                          <tr key={p.id} className="border-b border-gray-100 last:border-0">
+                          <tr
+                            key={p.id}
+                            onClick={() => setSelectedPersonId(isSelected ? null : p.id)}
+                            className={clsx(
+                              'border-b border-gray-100 last:border-0 cursor-pointer transition-colors',
+                              isSelected ? 'bg-brand-50' : 'hover:bg-gray-50'
+                            )}
+                          >
                             <td className="px-3 py-2">
                               <div className="flex items-center gap-2">
                                 <Avatar profile={p} size={22} />
-                                <span className="text-gray-700 truncate">{p.full_name}</span>
+                                <span className={clsx('truncate', isSelected ? 'text-brand-700 font-semibold' : 'text-gray-700')}>{p.full_name}</span>
                               </div>
                             </td>
                             <td className="px-3 py-2 text-center text-gray-500">{target}</td>
@@ -1266,6 +1252,58 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Seçili kişinin görev detayları */}
+                {selectedProfile && (
+                  <div className="rounded-xl border border-brand-200 overflow-hidden">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-brand-50 border-b border-brand-100">
+                      <Avatar profile={selectedProfile} size={20} />
+                      <span className="text-xs font-semibold text-brand-800">{selectedProfile.full_name} — Görevler</span>
+                      <button
+                        onClick={() => setSelectedPersonId(null)}
+                        className="ml-auto text-brand-400 hover:text-brand-700"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    {personTasks.length === 0 ? (
+                      <p className="text-xs text-gray-400 px-3 py-3 text-center">Bu ay görev yok.</p>
+                    ) : (
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-100">
+                            <th className="text-left px-3 py-2 text-gray-500 font-medium">Tarih</th>
+                            <th className="text-left px-3 py-2 text-gray-500 font-medium">Saat</th>
+                            <th className="text-left px-3 py-2 text-gray-500 font-medium">Tür</th>
+                            <th className="text-left px-2 py-2 text-gray-500 font-medium">Müşteri/Şube</th>
+                            <th className="text-center px-2 py-2 text-gray-500 font-medium">Check-in</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {personTasks.map(t => {
+                            const d = new Date(t.date + 'T00:00:00')
+                            const dayName = DAY_NAMES[d.getDay()]
+                            const dateLabel = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')} ${dayName}`
+                            return (
+                              <tr key={t.id} className="border-b border-gray-100 last:border-0">
+                                <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{dateLabel}</td>
+                                <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{t.time ?? '—'}</td>
+                                <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{t.type}</td>
+                                <td className="px-2 py-2 text-gray-600 max-w-[90px] truncate">{t.customer ?? '—'}</td>
+                                <td className="px-2 py-2 text-center">
+                                  {t.checkin_ts
+                                    ? <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-100"><Check size={10} className="text-green-600" /></span>
+                                    : <span className="text-gray-300">—</span>
+                                  }
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })()}
