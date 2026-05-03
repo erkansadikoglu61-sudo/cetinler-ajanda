@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import {
   Menu, ChevronLeft, ChevronRight, BarChart2, Plus, X, Trash2,
   MapPin, MessageSquare, Calendar, CalendarDays, CalendarRange,
-  FileText, LogOut, Check
+  FileText, LogOut, Check, TrendingUp
 } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, isToday } from 'date-fns'
 import { tr } from 'date-fns/locale'
@@ -19,8 +19,9 @@ import { useTasks, useNotes } from '@/hooks/useTasks'
 import { Profile, Task } from '@/lib/supabase'
 import { TASK_TYPES, VISIT_TYPES, MONTHS_TR, DAYS_SHORT, ROLE_LABELS } from '@/lib/constants'
 import { generateVisitReport } from '@/lib/pdf'
+import { SelloutView } from '@/components/SelloutView'
 
-type TabType = 'month' | 'week' | 'day' | 'report'
+type TabType = 'month' | 'week' | 'day' | 'report' | 'sellout'
 
 // Renk hex'ine alpha ekle
 function hexWithAlpha(hex: string, alpha: string) {
@@ -1449,6 +1450,7 @@ export default function AppPage() {
               { key: 'week', icon: CalendarRange, label: 'Hafta' },
               { key: 'day', icon: CalendarDays, label: 'Gün' },
               { key: 'report', icon: FileText, label: 'Rapor' },
+              { key: 'sellout', icon: TrendingUp, label: 'Sellout' },
             ] as const).map(({ key, icon: Icon, label }) => (
               <button
                 key={key}
@@ -1467,7 +1469,7 @@ export default function AppPage() {
           </div>
 
           {/* Ay navigasyon */}
-          {tab !== 'report' && (
+          {tab !== 'report' && tab !== 'sellout' && (
             <div className="flex items-center gap-1">
               <button onClick={prevMonth} className="p-2 text-gray-500 min-h-[44px] min-w-[44px] flex items-center justify-center">
                 <ChevronLeft size={18} />
@@ -1520,11 +1522,21 @@ export default function AppPage() {
               filterPid={filterPid} filterName={filterName}
             />
           )}
+          {tab === 'sellout' && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <SelloutView
+                currentProfile={currentProfile}
+                team={team}
+                visibleIds={ids}
+                active={tab === 'sellout'}
+              />
+            </div>
+          )}
         </>
       )}
 
       {/* FAB */}
-      {tab !== 'report' && (
+      {tab !== 'report' && tab !== 'sellout' && (
         <button
           onClick={handleAddTask}
           className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
@@ -1535,12 +1547,13 @@ export default function AppPage() {
 
       {/* Bottom Nav */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-20 safe-bottom">
-        <div className="grid grid-cols-5 h-16">
+        <div className="grid grid-cols-6 h-16">
           {([
             { key: 'month', icon: Calendar, label: 'Ay' },
             { key: 'week', icon: CalendarRange, label: 'Hafta' },
             { key: 'day', icon: CalendarDays, label: 'Gün' },
             { key: 'report', icon: FileText, label: 'Rapor' },
+            { key: 'sellout', icon: TrendingUp, label: 'Sellout' },
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
