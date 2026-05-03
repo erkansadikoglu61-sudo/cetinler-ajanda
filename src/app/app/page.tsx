@@ -81,7 +81,7 @@ function TaskSheet({
   const canEdit = isNew || currentProfile.role === 'admin' || task?.pid === currentProfile.id
   const canAddForOthers = currentProfile.role === 'admin' ||
     currentProfile.role === 'bsy' || currentProfile.role === 'sup'
-  const isVisitType = VISIT_TYPES.includes(type)
+  const isVisitType = true // tüm türlerde check-in aktif
 
   const selectablePids = isNew && canAddForOthers
     ? visibleIds
