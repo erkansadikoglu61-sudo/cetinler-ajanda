@@ -1,13 +1,11 @@
 export const TASK_TYPES = [
-  'Bayi Ziyareti', 'Mağaza Ziyareti', 'Tahsilat', 'Sipariş',
-  'Tezgah Takibi', 'Merch Kontrolü', 'Toplantı', 'Ofis', 'Eğitim', 'Diğer'
+  'Bayi Ziyareti', 'Şube Ziyareti', 'Toplantı',
+  'Eğitim', 'Teşhir Çalışması', 'Sipariş&Tahsilat', 'Diğer'
 ] as const
 
 export type TaskType = typeof TASK_TYPES[number]
 
-export const VISIT_TYPES: string[] = [
-  'Bayi Ziyareti', 'Mağaza Ziyareti', 'Tezgah Takibi', 'Merch Kontrolü'
-]
+export const VISIT_TYPES: string[] = [...TASK_TYPES]
 
 export const MONTHS_TR = [
   'Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',

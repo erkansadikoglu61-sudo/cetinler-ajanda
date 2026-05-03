@@ -1091,55 +1091,91 @@ function ReportView({
 function StatsSheet({ tasks, team, visibleIds, onClose }: {
   tasks: Task[]; team: Profile[]; visibleIds: string[]; onClose: () => void;
 }) {
+  const [activeFilter, setActiveFilter] = useState<string | null>(null)
+
   const visibleTasks = tasks.filter(t => visibleIds.includes(t.pid))
-  const visitTasks = visibleTasks.filter(t => VISIT_TYPES.includes(t.type))
-  const bayiTasks = visibleTasks.filter(t => t.type === 'Bayi Ziyareti')
-  const tezgahTasks = visibleTasks.filter(t => t.type === 'Tezgah Takibi')
   const checkinTasks = visibleTasks.filter(t => t.checkin_ts)
 
+  // KPI: Toplam + Check-in + her görev türü
   const kpis = [
-    { label: 'Toplam Görev', value: visibleTasks.length },
-    { label: 'Check-in', value: checkinTasks.length },
-    { label: 'Bayi Ziyareti', value: bayiTasks.length },
-    { label: 'Tezgah Takibi', value: tezgahTasks.length },
+    { label: 'Toplam Görev', value: visibleTasks.length, filter: null, color: 'bg-brand-700' },
+    { label: 'Check-in', value: checkinTasks.length, filter: '__checkin__', color: 'bg-brand-600' },
+    ...TASK_TYPES.map(type => ({
+      label: type,
+      value: visibleTasks.filter(t => t.type === type).length,
+      filter: type,
+      color: 'bg-brand-700',
+    })),
   ]
 
-  const profileMap = new Map(team.map(p => [p.id, p]))
-  const visibleProfiles = team.filter(p => visibleIds.includes(p.id))
+  // Aktif filtreye göre görev listesi
+  const filteredTasks = activeFilter === '__checkin__'
+    ? checkinTasks
+    : activeFilter
+      ? visibleTasks.filter(t => t.type === activeFilter)
+      : visibleTasks
 
+  const visibleProfiles = team.filter(p => visibleIds.includes(p.id))
   const tasksByPerson = visibleProfiles.map(p => ({
     profile: p,
-    count: visibleTasks.filter(t => t.pid === p.id).length,
+    count: filteredTasks.filter(t => t.pid === p.id).length,
   })).sort((a, b) => b.count - a.count)
 
   const maxCount = Math.max(...tasksByPerson.map(t => t.count), 1)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center md:justify-center md:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full bg-white rounded-t-2xl max-h-[80vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white pt-3 pb-2 z-10">
-          <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-3" />
+      <div className="relative w-full md:w-[600px] bg-white rounded-t-2xl md:rounded-2xl max-h-[85vh] overflow-y-auto shadow-2xl">
+        <div className="sticky top-0 bg-white pt-3 pb-2 z-10 border-b border-gray-100">
+          <div className="w-8 h-1 bg-gray-200 rounded-full mx-auto mb-2 md:hidden" />
           <div className="flex items-center justify-between px-4">
-            <h2 className="font-semibold text-lg">İstatistikler</h2>
-            <button onClick={onClose} className="p-2 text-gray-400"><X size={20} /></button>
+            <h2 className="font-semibold text-base">İstatistikler</h2>
+            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+              <X size={18} />
+            </button>
           </div>
         </div>
-        <div className="px-4 pb-8 space-y-6">
-          {/* KPI */}
-          <div className="grid grid-cols-2 gap-3">
-            {kpis.map(k => (
-              <div key={k.label} className="bg-brand-700 rounded-xl p-4 text-white">
-                <p className="text-2xl font-bold">{k.value}</p>
-                <p className="text-xs opacity-80 mt-1">{k.label}</p>
-              </div>
-            ))}
+
+        <div className="px-4 pt-3 pb-6 space-y-5">
+          {/* KPI grid — tıklanabilir filtreler */}
+          <div className="grid grid-cols-2 gap-2">
+            {kpis.map(k => {
+              const isActive = activeFilter === k.filter
+              return (
+                <button
+                  key={k.label}
+                  onClick={() => setActiveFilter(isActive ? null : k.filter)}
+                  className={clsx(
+                    'rounded-xl p-3 text-left transition-all border-2',
+                    isActive
+                      ? 'bg-brand-600 text-white border-brand-400 shadow-md scale-[0.98]'
+                      : 'bg-brand-700 text-white border-transparent hover:border-brand-400'
+                  )}
+                >
+                  <p className="text-2xl font-bold leading-none">{k.value}</p>
+                  <p className="text-xs opacity-75 mt-1 leading-tight">{k.label}</p>
+                </button>
+              )
+            })}
           </div>
 
-          {/* Bar chart */}
+          {/* Aktif filtre etiketi */}
+          {activeFilter && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs bg-brand-50 text-brand-700 font-medium px-2 py-1 rounded-full">
+                {activeFilter === '__checkin__' ? 'Check-in yapılanlar' : activeFilter}
+              </span>
+              <button onClick={() => setActiveFilter(null)} className="text-xs text-gray-400 hover:text-gray-600">
+                × Filtreyi kaldır
+              </button>
+            </div>
+          )}
+
+          {/* Kişi bazlı bar chart */}
           {tasksByPerson.length > 0 && (
             <div>
-              <h3 className="font-semibold text-gray-700 mb-3">Kişi Bazlı Görev Dağılımı</h3>
+              <h3 className="font-semibold text-gray-700 mb-3 text-sm">Kişi Bazlı Görev Dağılımı</h3>
               <div className="space-y-3">
                 {tasksByPerson.map(({ profile: p, count }) => (
                   <div key={p.id} className="flex items-center gap-3">
@@ -1151,11 +1187,8 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
                       </div>
                       <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
                         <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${(count / maxCount) * 100}%`,
-                            backgroundColor: p.color,
-                          }}
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{ width: `${(count / maxCount) * 100}%`, backgroundColor: p.color }}
                         />
                       </div>
                     </div>
