@@ -173,13 +173,19 @@ function TaskSheet({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Saat</label>
-              <input
-                type="time"
+              <select
                 value={time}
                 onChange={e => setTime(e.target.value)}
                 disabled={!canEdit}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
-              />
+              >
+                {Array.from({ length: 14 }, (_, h) => h + 7).flatMap(h =>
+                  [0, 15, 30, 45].map(m => {
+                    const val = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+                    return <option key={val} value={val}>{val}</option>
+                  })
+                )}
+              </select>
             </div>
           </div>
 
