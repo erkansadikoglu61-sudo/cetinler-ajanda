@@ -9,6 +9,7 @@ import { useSelloutTargets, ProfileTarget, MerchTarget } from '@/hooks/useSellou
 import {
   SELLOUT_GROUPS, GRUP_NORMALIZE,
   PRIM_SUP, PRIM_JR, PRIM_MERCH,
+  CETINLER_MERCH,
   calcPrim, namesMatch, normalizeName,
   fmtCur, currentDonem, donemOptions, donemLabel,
 } from '@/lib/sellout'
@@ -215,38 +216,51 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   )
 
   // ── Unique Çetinler Merch listesi ────────────────────────────
-  // Sadece Jr. Süpervizörlerin altındaki merchleri dikkate al
   const allJrNames = useMemo(
     () => visibleJrs.map(j => j.full_name),
     [visibleJrs]
   )
 
+  // Tüm süpervizörlerin isimlerini hesapla (sup + jr)
+  const allSupNames = useMemo(
+    () => team.filter(p => visibleIds.includes(p.id)).map(p => p.full_name),
+    [team, visibleIds]
+  )
+
   const uniqueMerch = useMemo(() => {
+    const cetinlerNorm = Array.from(CETINLER_MERCH).map(n => normalizeName(n))
     const map = new Map<string, string>()
     allRows.forEach(r => {
-      if (!r.merch_personel || !r.supervisor_adi) return
-      // Sadece supervisor_adi bir Jr. Süpervizör ismiyle eşleşiyorsa ekle
-      const isJrSup = allJrNames.some(jn => namesMatch(jn, r.supervisor_adi))
-      if (isJrSup) {
-        map.set(r.merch_personel, r.supervisor_adi)
+      if (!r.merch_personel) return
+      // Sadece CETINLER_MERCH listesindeki kişileri al
+      const normMerch = normalizeName(r.merch_personel)
+      const isCtMerch = cetinlerNorm.some(n => n === normMerch)
+      if (isCtMerch) {
+        map.set(r.merch_personel, r.supervisor_adi ?? '')
       }
     })
     return Array.from(map.entries())
       .map(([name, supApiName]) => ({ name, supApiName }))
       .sort((a, b) => a.supApiName.localeCompare(b.supApiName, 'tr') || a.name.localeCompare(b.name, 'tr'))
-  }, [allRows, allJrNames])
+  }, [allRows])
 
-  // Merch visible to current user
-  const myJrApiNames = useMemo(() => {
-    if (isAdmin) return allJrNames
-    if (isSup) return jrsOf(currentProfile.id).map(j => j.full_name)
+  // Merch visible to current user: supervisor_adi'si mevcut kullanıcının görebileceği
+  // bir süpervizör/jr. ismiyle eşleşenler
+  const myVisibleSupNames = useMemo(() => {
+    if (isAdmin) return allSupNames
+    if (isSup) {
+      const myJrs = jrsOf(currentProfile.id).map(j => j.full_name)
+      return [currentProfile.full_name, ...myJrs]
+    }
     if (isJr) return [currentProfile.full_name]
     return []
-  }, [isAdmin, isSup, isJr, currentProfile, allJrNames, jrsOf])
+  }, [isAdmin, isSup, isJr, currentProfile, allSupNames, jrsOf])
 
   const visibleMerch = useMemo(
-    () => uniqueMerch.filter(m => myJrApiNames.some(n => namesMatch(n, m.supApiName))),
-    [uniqueMerch, myJrApiNames]
+    () => uniqueMerch.filter(m =>
+      !m.supApiName || myVisibleSupNames.some(n => namesMatch(n, m.supApiName))
+    ),
+    [uniqueMerch, myVisibleSupNames]
   )
 
   // ── Sup table data ───────────────────────────────────────────

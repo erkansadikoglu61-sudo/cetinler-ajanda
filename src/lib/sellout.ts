@@ -57,6 +57,35 @@ export const PRIM_MERCH: Record<SelloutGroup, number> = {
 
 export const PRIM_ESIGI = 0.80 // %80 eşik
 
+// Çetinler Merch whitelist (Grubu = "Çetinler Merch" olanlar)
+export const CETINLER_MERCH = new Set([
+  // Songül Durukan → Tuğba Ayata
+  'Ecem Buse Toprak', 'Azize Çizmeci', 'Sonay Polat', 'Gonca Kaya',
+  'Sema Karadeniz', 'Cahide Salman', 'Cansu Akkaya', 'Serpil Aydın', 'Nurcan Çeliksu',
+  // Songül Durukan → Tuğba Ayata (Pursaklar)
+  'Burcu Evren',
+  // Songül Durukan → direkt
+  'Abide Küççük', 'Damla Doğan', 'Esra Gül', 'Nursena Öğücü', 'Irmak Morboncuk',
+  'Gizem Kazak', 'Gül Dilara Gündüz', 'Semanur ateşoğlu', 'Fadime Baran',
+  // Atilla Yılmaz
+  'Aleyna Bartan', 'Aslı Gökmen', 'Betül Keser', 'Beyhan Bülbül Özlü', 'Dilan Yıkılmaz',
+  'Emine Sen', 'Hafize Gökçe', 'Hanife Yüksel', 'Neslihan Bulut', 'Özen Özdil',
+  'Şerife Karaahmetoğlu',
+  // Burak Alagöz
+  'Çiler Dikmenoğulları', 'Duygu Özen', 'Hülya Dönmez', 'Hatice Avcı',
+  'Kiraz Mernekli', 'Yasemin Bozalan', 'Damla Pehlivan',
+  // Sinem Bektaş → Merve İnci
+  'Elmas Susuz', 'Tuba Çap', 'Fahriye Öz',
+  // Sinem Bektaş → direkt
+  'Gözde Nur Kuşoğlu', 'Mehtap Sönmez', 'Betül Yüce',
+  // Pınar Güler
+  'Nihal Aydın',
+  // Sinem Bektaş → HEDEFİM AVM GÖLCÜK
+  'Merve Çetin',
+  // Sinem Bektaş → YÖN - Kadriye Erman
+  'Kadriye Erman',
+])
+
 /** İsim normalizasyonu: küçük harf, "SV" kaldır, Türkçe → Latin */
 export function normalizeName(name: string): string {
   return (name ?? '')
