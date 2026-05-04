@@ -20,6 +20,18 @@ export interface SelloutRow {
   tarih: string
 }
 
+/** Yaygın HTML entity'lerini decode et (&amp; → & vb.) */
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+}
+
 function parseHtmlTable(html: string): SelloutRow[] {
   const rows: SelloutRow[] = []
 
@@ -30,9 +42,9 @@ function parseHtmlTable(html: string): SelloutRow[] {
   for (let i = 1; i < trMatches.length; i++) {
     const rowHtml = trMatches[i][1]
 
-    // Her <td>…</td> içeriğini çıkar
+    // Her <td>…</td> içeriğini çıkar, HTML tag'lerini ve entity'leri temizle
     const cells = [...rowHtml.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(
-      (m) => m[1].replace(/<[^>]+>/g, '').trim()
+      (m) => decodeHtmlEntities(m[1].replace(/<[^>]+>/g, '')).trim()
     )
 
     if (cells.length < 14) continue

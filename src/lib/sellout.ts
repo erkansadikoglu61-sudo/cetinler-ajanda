@@ -86,9 +86,12 @@ export const CETINLER_MERCH = new Set([
   'Kadriye Erman',
 ])
 
-/** İsim normalizasyonu: küçük harf, "SV" kaldır, Türkçe → Latin */
+/** İsim normalizasyonu: küçük harf, "SV" kaldır, Türkçe → Latin
+ *  Not: JS'de 'İ'.toLowerCase() = 'i̇' (i + birleştirici nokta), bu yüzden
+ *  önce İ→I dönüşümü yapıp sonra toLowerCase çağırıyoruz. */
 export function normalizeName(name: string): string {
   return (name ?? '')
+    .replace(/İ/g, 'I')   // Türkçe büyük dotlu I → ASCII I (toLowerCase sonrası 'i' olur)
     .toLowerCase()
     .replace(/\bsv\b/gi, '')
     .replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ş/g, 's')
