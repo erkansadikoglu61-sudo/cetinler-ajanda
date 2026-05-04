@@ -652,12 +652,8 @@ function SelloutTable({
                   Kat. Primi: ₺{(kategoriPrimi[g] ?? 0).toLocaleString('tr-TR')}
                 </th>
               ))}
-              <th colSpan={showPrim ? 4 : 3} className="text-center px-2 py-1">
-                {showPrim && (footer?.tPrim ?? 0) > 0 && (
-                  <span className="text-base font-bold text-brand-700">
-                    ₺{fmtCur(footer!.tPrim!)}
-                  </span>
-                )}
+              <th colSpan={showPrim ? 4 : 3} className="text-center px-2 py-1 text-[11px] font-bold text-gray-600 border-l border-gray-200">
+                Kat. Primi: ₺{SELLOUT_GROUPS.reduce((s, g) => s + (kategoriPrimi[g] ?? 0), 0).toLocaleString('tr-TR')}
               </th>
             </tr>
           </thead>
