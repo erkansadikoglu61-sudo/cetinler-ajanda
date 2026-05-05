@@ -232,7 +232,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     })
     return Array.from(map.entries())
       .map(([name, supApiName]) => ({ name, supApiName }))
-      .sort((a, b) => a.supApiName.localeCompare(b.supApiName, 'tr') || a.name.localeCompare(b.name, 'tr'))
+      .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
   }, [allRows])
 
   // Merch visible to current user: supervisor_adi'si mevcut kullanıcının görebileceği
@@ -629,11 +629,12 @@ function SelloutTable({
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
       <table className="text-xs border-collapse min-w-max w-full">
-        {/* ─ Header Row 1: Kategori Primi ─ */}
-        {showPrim && kategoriPrimi && (
-          <thead>
+        {/* ─ Tüm header satırları tek <thead> içinde → sticky top-0 çalışır ─ */}
+        <thead className="sticky top-0 z-20">
+          {/* Row 1: Kategori Primi */}
+          {showPrim && kategoriPrimi && (
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="sticky left-0 z-10 bg-gray-50 border-r border-gray-200 px-3 py-1" />
+              <th className="sticky left-0 z-30 bg-gray-50 border-r border-gray-200 px-3 py-1" />
               {SELLOUT_GROUPS.map(g => (
                 <th
                   key={g}
@@ -647,13 +648,10 @@ function SelloutTable({
                 Kat. Primi: ₺{SELLOUT_GROUPS.reduce((s, g) => s + (kategoriPrimi[g] ?? 0), 0).toLocaleString('tr-TR')}
               </th>
             </tr>
-          </thead>
-        )}
-
-        <thead>
-          {/* ─ Header Row 2: Group names ─ */}
+          )}
+          {/* Row 2: Group names */}
           <tr className="bg-brand-700 text-white">
-            <th className="sticky left-0 z-10 bg-brand-700 text-left px-3 py-2 border-r border-brand-600 min-w-[140px]">Kişi</th>
+            <th className="sticky left-0 z-30 bg-brand-700 text-left px-3 py-2 border-r border-brand-600 min-w-[140px]">Kişi</th>
             {SELLOUT_GROUPS.map(g => (
               <th key={g} colSpan={COLS_PER_GROUP} className="text-center px-2 py-2 border-r border-brand-600 whitespace-nowrap">
                 {g}
@@ -661,9 +659,9 @@ function SelloutTable({
             ))}
             <th colSpan={showPrim ? 4 : 3} className="text-center px-2 py-2 whitespace-nowrap">Toplam</th>
           </tr>
-          {/* ─ Header Row 3: column labels ─ */}
+          {/* Row 3: Column labels */}
           <tr className="bg-brand-600/80 text-white text-[10px]">
-            <th className="sticky left-0 z-10 bg-brand-600 border-r border-brand-500 px-3 py-1" />
+            <th className="sticky left-0 z-30 bg-brand-600 border-r border-brand-500 px-3 py-1" />
             {SELLOUT_GROUPS.map(g => (
               <>
                 <th key={`${g}-h`} className="text-center px-2 py-1 border-r border-brand-500 min-w-[45px]">Hed.</th>
