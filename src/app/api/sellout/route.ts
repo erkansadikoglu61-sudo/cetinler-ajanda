@@ -18,6 +18,7 @@ export interface SelloutRow {
   sube_kod: string
   donem: string
   tarih: string
+  merch_tipi: string   // [14] 'Çetinler Merch' | diğer
 }
 
 /** Yaygın HTML entity'lerini decode et (&amp; → & vb.) */
@@ -47,7 +48,7 @@ function parseHtmlTable(html: string): SelloutRow[] {
       (m) => decodeHtmlEntities(m[1].replace(/<[^>]+>/g, '')).trim()
     )
 
-    if (cells.length < 14) continue
+    if (cells.length < 15) continue
 
     rows.push({
       merch_personel: cells[0],
@@ -64,6 +65,7 @@ function parseHtmlTable(html: string): SelloutRow[] {
       sube_kod:       cells[11],
       donem:          cells[12],
       tarih:          cells[13],
+      merch_tipi:     cells[14],
     })
   }
 

@@ -17,6 +17,7 @@ export interface SelloutRow {
   sube_kod:       string
   donem:          string
   tarih:          string
+  merch_tipi:     string   // 'Çetinler Merch' | diğer
 }
 
 const REFRESH_MS = 30 * 60 * 1000 // 30 dakika

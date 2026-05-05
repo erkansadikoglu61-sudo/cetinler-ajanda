@@ -215,33 +215,25 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   )
 
   // ── Unique Çetinler Merch listesi ────────────────────────────
-  // Tüm ekip üyelerinin normalize edilmiş isim listesi
-  const allTeamNorm = useMemo(
-    () => team.map(p => normalizeName(p.full_name)),
-    [team]
-  )
-
   // Tüm süpervizörlerin isimlerini hesapla (sup + jr)
   const allSupNames = useMemo(
     () => team.filter(p => visibleIds.includes(p.id)).map(p => p.full_name),
     [team, visibleIds]
   )
 
-  // Dinamik filtre: supervisor_adi'si Çetinler ekibindeki herhangi biriyle
-  // eşleşen merchleri Çetinler Merch say. Whitelist'e gerek yok.
+  // Filtre: MERCH_TIPI === 'Çetinler Merch' olan satırlardan unique kişi listesi
   const uniqueMerch = useMemo(() => {
     const map = new Map<string, string>()
     allRows.forEach(r => {
-      if (!r.merch_personel || !r.supervisor_adi) return
-      const normSup = normalizeName(r.supervisor_adi)
-      if (allTeamNorm.some(n => n === normSup)) {
-        map.set(r.merch_personel, r.supervisor_adi)
+      if (!r.merch_personel) return
+      if (r.merch_tipi === 'Çetinler Merch') {
+        map.set(r.merch_personel, r.supervisor_adi ?? '')
       }
     })
     return Array.from(map.entries())
       .map(([name, supApiName]) => ({ name, supApiName }))
       .sort((a, b) => a.supApiName.localeCompare(b.supApiName, 'tr') || a.name.localeCompare(b.name, 'tr'))
-  }, [allRows, allTeamNorm])
+  }, [allRows])
 
   // Merch visible to current user: supervisor_adi'si mevcut kullanıcının görebileceği
   // bir süpervizör/jr. ismiyle eşleşenler
