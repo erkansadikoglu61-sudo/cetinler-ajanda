@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import {
   Menu, ChevronLeft, ChevronRight, BarChart2, Plus, X, Trash2,
   MapPin, MessageSquare, Calendar, CalendarDays, CalendarRange,
-  FileText, LogOut, Check, TrendingUp
+  FileText, LogOut, Check, TrendingUp, Target
 } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, isToday } from 'date-fns'
 import { tr } from 'date-fns/locale'
@@ -20,8 +20,9 @@ import { Profile, Task } from '@/lib/supabase'
 import { TASK_TYPES, VISIT_TYPES, MONTHS_TR, DAYS_SHORT, ROLE_LABELS } from '@/lib/constants'
 import { generateVisitReport } from '@/lib/pdf'
 import { SelloutView } from '@/components/SelloutView'
+import { BsyView } from '@/components/BsyView'
 
-type TabType = 'month' | 'week' | 'day' | 'report' | 'sellout'
+type TabType = 'month' | 'week' | 'day' | 'report' | 'sellout' | 'bsy'
 
 // Renk hex'ine alpha ekle
 function hexWithAlpha(hex: string, alpha: string) {
@@ -1336,6 +1337,10 @@ export default function AppPage() {
   const [showStats, setShowStats] = useState(false)
   const [taskSheet, setTaskSheet] = useState<{ task: Task | null; isNew: boolean } | null>(null)
 
+  // BSY Hedef Takip sekmesi sadece admin/bsy rollerine görünür
+  const isBsyOrAdmin = currentProfile?.role === 'admin'
+    || currentProfile?.role === 'bsy'
+
   // Auth redirect
   useEffect(() => {
     if (!authLoading && !currentProfile) {
@@ -1446,11 +1451,12 @@ export default function AppPage() {
           {/* Masaüstü: Tab sekmeleri */}
           <div className="hidden md:flex items-center gap-1 mr-2">
             {([
-              { key: 'month', icon: Calendar, label: 'Ay' },
-              { key: 'week', icon: CalendarRange, label: 'Hafta' },
-              { key: 'day', icon: CalendarDays, label: 'Gün' },
-              { key: 'report', icon: FileText, label: 'Rapor' },
-              { key: 'sellout', icon: TrendingUp, label: 'Sellout' },
+              { key: 'month',   icon: Calendar,      label: 'Ay' },
+              { key: 'week',    icon: CalendarRange,  label: 'Hafta' },
+              { key: 'day',     icon: CalendarDays,   label: 'Gün' },
+              { key: 'report',  icon: FileText,       label: 'Rapor' },
+              { key: 'sellout', icon: TrendingUp,     label: 'Sellout' },
+              ...(isBsyOrAdmin ? [{ key: 'bsy' as const, icon: Target, label: 'BSY' }] : []),
             ] as const).map(({ key, icon: Icon, label }) => (
               <button
                 key={key}
@@ -1469,7 +1475,7 @@ export default function AppPage() {
           </div>
 
           {/* Ay navigasyon */}
-          {tab !== 'report' && tab !== 'sellout' && (
+          {tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && (
             <div className="flex items-center gap-1">
               <button onClick={prevMonth} className="p-2 text-gray-500 min-h-[44px] min-w-[44px] flex items-center justify-center">
                 <ChevronLeft size={18} />
@@ -1532,11 +1538,16 @@ export default function AppPage() {
               />
             </div>
           )}
+          {tab === 'bsy' && isBsyOrAdmin && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <BsyView />
+            </div>
+          )}
         </>
       )}
 
       {/* FAB */}
-      {tab !== 'report' && tab !== 'sellout' && (
+      {tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && (
         <button
           onClick={handleAddTask}
           className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
@@ -1547,13 +1558,14 @@ export default function AppPage() {
 
       {/* Bottom Nav */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-20 safe-bottom">
-        <div className="grid grid-cols-6 h-16">
+        <div className={clsx('grid h-16', isBsyOrAdmin ? 'grid-cols-7' : 'grid-cols-6')}>
           {([
-            { key: 'month', icon: Calendar, label: 'Ay' },
-            { key: 'week', icon: CalendarRange, label: 'Hafta' },
-            { key: 'day', icon: CalendarDays, label: 'Gün' },
-            { key: 'report', icon: FileText, label: 'Rapor' },
-            { key: 'sellout', icon: TrendingUp, label: 'Sellout' },
+            { key: 'month',   icon: Calendar,     label: 'Ay' },
+            { key: 'week',    icon: CalendarRange, label: 'Hafta' },
+            { key: 'day',     icon: CalendarDays,  label: 'Gün' },
+            { key: 'report',  icon: FileText,      label: 'Rapor' },
+            { key: 'sellout', icon: TrendingUp,    label: 'Sellout' },
+            ...(isBsyOrAdmin ? [{ key: 'bsy' as const, icon: Target, label: 'BSY' }] : []),
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
