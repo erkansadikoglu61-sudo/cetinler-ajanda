@@ -8,11 +8,8 @@ import { GRUP_NORMALIZE, SELLOUT_GROUPS } from '@/lib/sellout'
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 const fmtTL = (n: number): string => {
-  const abs  = Math.abs(n)
   const sign = n < 0 ? '-' : ''
-  if (abs >= 1_000_000) return sign + '₺' + (abs / 1_000_000).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + 'M'
-  if (abs >= 1_000)     return sign + '₺' + (abs / 1_000).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + 'B'
-  return sign + '₺' + abs.toLocaleString('tr-TR')
+  return sign + '₺' + Math.abs(Math.round(n)).toLocaleString('tr-TR')
 }
 const fmtN   = (n: number): string => n.toLocaleString('tr-TR')
 const fmtPct = (n: number): string => (n * 100).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'
