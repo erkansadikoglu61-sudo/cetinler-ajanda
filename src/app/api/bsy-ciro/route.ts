@@ -73,7 +73,7 @@ export async function GET(req: Request) {
       const grupKodu     = String(r[16] ?? '').toUpperCase().trim()
       const gc           = String(r[18] ?? '').toUpperCase().trim()
       const tur          = String(r[10] ?? '').toUpperCase().trim()
-      const netTutar     = typeof r[11] === 'number' ? r[11] : parseFloat(String(r[11] ?? '0').replace(',', '.'))
+      const netTutar     = typeof r[11] === 'number' ? r[11] : (parseFloat(String(r[11] ?? '').replace(',', '.')) || 0)
       const rowYil       = typeof r[21] === 'number' ? r[21] : parseInt(String(r[21] ?? '0'))
       const rowAy        = typeof r[20] === 'number' ? r[20] : parseInt(String(r[20] ?? '0'))
       const plasiyerKodu = String(r[31] ?? '').trim()  // r[31] = Plasiyer Kodu (KB1, MB1 vb.)
