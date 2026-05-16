@@ -1,0 +1,468 @@
+'use client'
+
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { RefreshCw, Info, Wallet } from 'lucide-react'
+import type { DashboardResponse, DashboardCiroRow, DashboardTahsilat, DashboardCariRow } from '@/app/api/dashboard/route'
+import type { SelloutRow } from '@/app/api/sellout/route'
+import { GRUP_NORMALIZE, SELLOUT_GROUPS } from '@/lib/sellout'
+
+// ── Formatters ────────────────────────────────────────────────────────────────
+const fmtTL = (n: number): string => {
+  const abs  = Math.abs(n)
+  const sign = n < 0 ? '-' : ''
+  if (abs >= 1_000_000) return sign + '₺' + (abs / 1_000_000).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + 'M'
+  if (abs >= 1_000)     return sign + '₺' + (abs / 1_000).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + 'B'
+  return sign + '₺' + abs.toLocaleString('tr-TR')
+}
+const fmtN   = (n: number): string => n.toLocaleString('tr-TR')
+const fmtPct = (n: number): string => (n * 100).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'
+
+const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
+
+// ── Ciro Table ────────────────────────────────────────────────────────────────
+interface CiroTableProps {
+  title: string
+  rows: DashboardCiroRow[]
+  headerColor: string  // tailwind bg class
+  loading: boolean
+}
+
+function CiroTable({ title, rows, headerColor, loading }: CiroTableProps) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
+      <div className={`px-3 py-2 ${headerColor}`}>
+        <p className="text-xs font-semibold text-white">{title}</p>
+      </div>
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center py-6">
+          <div className="w-5 h-5 border-2 border-gray-300 border-t-brand-500 rounded-full animate-spin" />
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="text-left px-2 py-1.5 text-gray-500 font-medium">BSY</th>
+                <th className="text-right px-2 py-1.5 text-gray-500 font-medium">Electrolux</th>
+                <th className="text-right px-2 py-1.5 text-gray-500 font-medium">Relux</th>
+                <th className="text-right px-2 py-1.5 text-gray-500 font-medium">Toplam</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => {
+                const isTotal = row.bsyAdi === 'TOPLAM'
+                return (
+                  <tr
+                    key={row.bsyAdi}
+                    className={
+                      isTotal
+                        ? 'bg-gray-800 border-t-2 border-gray-400'
+                        : i % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                    }
+                  >
+                    <td className={`px-2 py-1 truncate max-w-[90px] ${isTotal ? 'text-white font-bold' : 'text-gray-700'}`}>
+                      {row.bsyAdi}
+                    </td>
+                    <td className={`px-2 py-1 text-right tabular-nums ${isTotal ? 'text-white font-bold' : 'text-gray-600'}`}>
+                      {row.elux !== 0 ? fmtTL(row.elux) : '—'}
+                    </td>
+                    <td className={`px-2 py-1 text-right tabular-nums ${isTotal ? 'text-white font-bold' : 'text-gray-600'}`}>
+                      {row.relux !== 0 ? fmtTL(row.relux) : '—'}
+                    </td>
+                    <td className={`px-2 py-1 text-right tabular-nums font-semibold ${isTotal ? 'text-white' : 'text-gray-800'}`}>
+                      {row.toplam !== 0 ? fmtTL(row.toplam) : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="text-center text-gray-400 py-4 text-xs">Veri yok</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
+export default function DashboardView() {
+  const now = new Date()
+  const [yil, setYil] = useState(now.getFullYear())
+  const [ay,  setAy]  = useState(now.getMonth() + 1)
+  const [data, setData]         = useState<DashboardResponse | null>(null)
+  const [selloutRows, setSelloutRows] = useState<SelloutRow[]>([])
+  const [loading, setLoading]   = useState(false)
+
+  const donem = `${yil}-${String(ay).padStart(2, '0')}`
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [dashRes, soRes] = await Promise.all([
+        fetch(`/api/dashboard?yil=${yil}&ay=${ay}`),
+        fetch('/api/sellout'),
+      ])
+      const dashJson = await dashRes.json() as DashboardResponse
+      const soJson   = await soRes.json() as { rows: SelloutRow[] }
+      setData(dashJson)
+      setSelloutRows(soJson.rows ?? [])
+    } catch (err) {
+      console.error('[DashboardView] fetch hatası:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [yil, ay])
+
+  useEffect(() => { void fetchAll() }, [fetchAll])
+
+  // ── Sellout computed ─────────────────────────────────────────────
+  const filteredSellout = useMemo(
+    () => selloutRows.filter(r => r.donem === donem),
+    [selloutRows, donem]
+  )
+
+  const selloutByBrand = useMemo(() => {
+    let elux = 0; let relux = 0
+    filteredSellout.forEach(r => {
+      const gk = (r.grup_kodu ?? '').toUpperCase().trim()
+      if (gk === 'EKEA')  elux  += r.satilan_adet
+      if (gk === 'RELUX') relux += r.satilan_adet
+    })
+    return { elux, relux }
+  }, [filteredSellout])
+
+  const cariByGrup = useMemo(() => {
+    const counts: Record<string, number> = {}
+    SELLOUT_GROUPS.forEach(g => { counts[g] = 0 })
+    filteredSellout.forEach(r => {
+      const normalized = GRUP_NORMALIZE[r.grup_aciklama] ?? r.grup_aciklama
+      if (!SELLOUT_GROUPS.includes(normalized as typeof SELLOUT_GROUPS[number])) return
+      const key = `${r.cari_isim}|${r.sube_adi}`
+      // We count unique cari+sube per group using a Set per group
+    })
+    // Use Sets for proper unique counting
+    const sets: Record<string, Set<string>> = {}
+    SELLOUT_GROUPS.forEach(g => { sets[g] = new Set() })
+    filteredSellout.forEach(r => {
+      const normalized = GRUP_NORMALIZE[r.grup_aciklama] ?? r.grup_aciklama
+      if (!SELLOUT_GROUPS.includes(normalized as typeof SELLOUT_GROUPS[number])) return
+      sets[normalized as typeof SELLOUT_GROUPS[number]].add(`${r.cari_isim}|${r.sube_adi}`)
+    })
+    SELLOUT_GROUPS.forEach(g => { counts[g] = sets[g].size })
+    return counts
+  }, [filteredSellout])
+
+  const totalFatKesilenByGrup = useMemo(
+    () => Object.values(cariByGrup).reduce((s, v) => s + v, 0),
+    [cariByGrup]
+  )
+
+  // ── Tahmini Ciro (gercCiro + bekleyenCiro per BSY) ────────────────
+  const tahminiRows = useMemo((): DashboardCiroRow[] => {
+    if (!data) return []
+    const map = new Map<string, { elux: number; relux: number }>()
+    const addRows = (rows: DashboardCiroRow[]) => {
+      rows.filter(r => r.bsyAdi !== 'TOPLAM').forEach(r => {
+        const e = map.get(r.bsyAdi) ?? { elux: 0, relux: 0 }
+        e.elux  += r.elux
+        e.relux += r.relux
+        map.set(r.bsyAdi, e)
+      })
+    }
+    addRows(data.gercCiro)
+    addRows(data.bekleyenCiro)
+    const rows: DashboardCiroRow[] = [...map.entries()]
+      .map(([bsyAdi, v]) => ({ bsyAdi, elux: v.elux, relux: v.relux, toplam: v.elux + v.relux }))
+      .sort((a, b) => a.bsyAdi.localeCompare(b.bsyAdi, 'tr'))
+    if (rows.length > 0) {
+      const totE = rows.reduce((s, r) => s + r.elux,  0)
+      const totR = rows.reduce((s, r) => s + r.relux, 0)
+      rows.push({ bsyAdi: 'TOPLAM', elux: totE, relux: totR, toplam: totE + totR })
+    }
+    return rows
+  }, [data])
+
+  const years = [2025, 2026]
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden bg-gray-50">
+      {/* Header */}
+      <div className="flex-none flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-[#1a8a8a] to-[#1aacac] text-white shadow-md">
+        <span className="font-bold text-base tracking-tight">Dashboard</span>
+        <div className="flex items-center gap-2 ml-auto">
+          <select
+            value={ay}
+            onChange={e => setAy(parseInt(e.target.value))}
+            className="text-xs bg-white/20 text-white border border-white/30 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-white/60"
+          >
+            {MONTHS_TR.map((m, i) => (
+              <option key={i + 1} value={i + 1} className="text-gray-800">{m}</option>
+            ))}
+          </select>
+          <select
+            value={yil}
+            onChange={e => setYil(parseInt(e.target.value))}
+            className="text-xs bg-white/20 text-white border border-white/30 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-white/60"
+          >
+            {years.map(y => (
+              <option key={y} value={y} className="text-gray-800">{y}</option>
+            ))}
+          </select>
+          <button
+            onClick={fetchAll}
+            disabled={loading}
+            className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 transition-colors disabled:opacity-50"
+            title="Yenile"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
+      </div>
+
+      {/* Body: flex row */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+
+        {/* LEFT: Ciro tables */}
+        <div className="md:w-[38%] flex-none flex flex-col gap-3 p-3 overflow-y-auto">
+          <CiroTable
+            title="Gerçekleşen Ciro"
+            rows={data?.gercCiro ?? []}
+            headerColor="bg-[#1a8a8a]"
+            loading={loading}
+          />
+          <CiroTable
+            title="Bekleyen Sipariş"
+            rows={data?.bekleyenCiro ?? []}
+            headerColor="bg-amber-600"
+            loading={loading}
+          />
+          <CiroTable
+            title="Tahmini Ciro (Gerç. + Bekleyen)"
+            rows={tahminiRows}
+            headerColor="bg-gray-700"
+            loading={loading}
+          />
+        </div>
+
+        {/* RIGHT: 2×2 grid */}
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 p-3 overflow-y-auto md:overflow-hidden md:content-start">
+
+          {/* Sell-In / Sell-Out */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col self-start">
+            <div className="px-3 py-2 bg-indigo-600">
+              <p className="text-xs font-semibold text-white">Sell-In / Sell-Out</p>
+            </div>
+            {loading ? (
+              <div className="flex-1 flex items-center justify-center py-6">
+                <div className="w-5 h-5 border-2 border-gray-300 border-t-indigo-500 rounded-full animate-spin" />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="text-left px-3 py-1.5 text-gray-500 font-medium">Marka</th>
+                      <th className="text-right px-3 py-1.5 text-gray-500 font-medium">Sell-In</th>
+                      <th className="text-right px-3 py-1.5 text-gray-500 font-medium">Sell-Out</th>
+                      <th className="text-right px-3 py-1.5 text-gray-500 font-medium">Oran</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const brandRows = [
+                        { label: 'Electrolux', si: data?.sellinByBrand.elux ?? 0,  so: selloutByBrand.elux  },
+                        { label: 'Relux',      si: data?.sellinByBrand.relux ?? 0, so: selloutByBrand.relux },
+                      ]
+                      const totSi = brandRows.reduce((s, r) => s + r.si, 0)
+                      const totSo = brandRows.reduce((s, r) => s + r.so, 0)
+                      const totOran = totSi > 0 ? totSo / totSi : null
+                      return (
+                        <>
+                          {brandRows.map(({ label, si, so }) => {
+                            const oran = si > 0 ? so / si : null
+                            const oranColor = oran === null ? 'text-gray-400' : oran >= 0.7 ? 'text-green-600' : oran >= 0.4 ? 'text-amber-600' : 'text-red-600'
+                            return (
+                              <tr key={label} className="border-b border-gray-50">
+                                <td className="px-3 py-1.5 font-medium text-gray-700">{label}</td>
+                                <td className="px-3 py-1.5 text-right tabular-nums text-gray-600">{fmtN(si)}</td>
+                                <td className="px-3 py-1.5 text-right tabular-nums text-gray-600">{fmtN(so)}</td>
+                                <td className={`px-3 py-1.5 text-right font-semibold tabular-nums ${oranColor}`}>
+                                  {oran === null ? '—' : fmtPct(oran)}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                          <tr className="bg-gray-800">
+                            <td className="px-3 py-1.5 text-white font-bold">Toplam</td>
+                            <td className="px-3 py-1.5 text-right tabular-nums text-white font-bold">{fmtN(totSi)}</td>
+                            <td className="px-3 py-1.5 text-right tabular-nums text-white font-bold">{fmtN(totSo)}</td>
+                            <td className={`px-3 py-1.5 text-right font-bold tabular-nums ${totOran === null ? 'text-gray-400' : totOran >= 0.7 ? 'text-green-300' : totOran >= 0.4 ? 'text-amber-300' : 'text-red-300'}`}>
+                              {totOran === null ? '—' : fmtPct(totOran)}
+                            </td>
+                          </tr>
+                        </>
+                      )
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Müşteri Bazında Cirolar */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
+            <div className="px-3 py-2 bg-teal-700 flex items-center justify-between">
+              <p className="text-xs font-semibold text-white">Müşteri Bazında Cirolar</p>
+              {!loading && (
+                <span className="text-[10px] bg-white/20 text-white rounded-full px-2 py-0.5">
+                  {fmtN(data?.fatKesilenSayi ?? 0)} faturalı müşteri
+                </span>
+              )}
+            </div>
+            {loading ? (
+              <div className="flex-1 flex items-center justify-center py-6">
+                <div className="w-5 h-5 border-2 border-gray-300 border-t-teal-500 rounded-full animate-spin" />
+              </div>
+            ) : (
+              <div className="overflow-y-auto flex-1" style={{ maxHeight: '260px' }}>
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 z-10 bg-gray-50">
+                    <tr className="border-b border-gray-100">
+                      <th className="text-center px-2 py-1.5 text-gray-400 font-medium w-6">#</th>
+                      <th className="text-left px-2 py-1.5 text-gray-500 font-medium">Müşteri</th>
+                      <th className="text-right px-2 py-1.5 text-gray-500 font-medium">Ciro</th>
+                      <th className="text-right px-2 py-1.5 text-gray-500 font-medium">Pay</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data?.allCari ?? []).map((row: DashboardCariRow, i: number) => (
+                      <tr key={row.cariIsim} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="px-2 py-1 text-center text-gray-400 font-medium">{i + 1}</td>
+                        <td className="px-2 py-1 truncate max-w-[110px] text-gray-700">{row.cariIsim}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-gray-700 font-medium">{fmtTL(row.ciro)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-gray-600">{fmtPct(row.pay)}</td>
+                      </tr>
+                    ))}
+                    {(data?.allCari ?? []).length === 0 && (
+                      <tr><td colSpan={4} className="text-center text-gray-400 py-4">Veri yok</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Kategori Bazında Adetler */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
+            <div className="px-3 py-2 bg-purple-700">
+              <p className="text-xs font-semibold text-white">Kategori Bazında Adetler</p>
+            </div>
+            {loading ? (
+              <div className="flex-1 flex items-center justify-center py-6">
+                <div className="w-5 h-5 border-2 border-gray-300 border-t-purple-500 rounded-full animate-spin" />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="text-left px-2 py-1.5 text-gray-500 font-medium">Kategori</th>
+                      <th className="text-right px-2 py-1.5 text-gray-500 font-medium">Adet</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {SELLOUT_GROUPS.map((g, i) => (
+                      <tr key={g} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="px-2 py-1.5 text-gray-700 truncate max-w-[130px]">{g}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums text-gray-600 font-medium">{fmtN(cariByGrup[g] ?? 0)}</td>
+                      </tr>
+                    ))}
+                    <tr className="bg-gray-800 border-t-2 border-gray-400">
+                      <td className="px-2 py-1.5 text-white font-bold">Toplam</td>
+                      <td className="px-2 py-1.5 text-right text-white font-bold tabular-nums">{fmtN(totalFatKesilenByGrup)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Tahsilat */}
+          {(() => {
+            const t: DashboardTahsilat = data?.tahsilat ?? { hedef: 0, byTur: [], toplam: 0 }
+            const pct = t.hedef > 0 ? Math.min((t.toplam / t.hedef) * 100, 100) : 0
+            const TUR_LABEL: Record<string, string> = {
+              'Banka-KK': 'Kredi Kartı',
+              'Çek-Senet': 'Çek / Senet',
+              'Nakit': 'Nakit',
+              'EFT/Havale': 'EFT / Havale',
+            }
+            return (
+              <div className="bg-white rounded-xl border border-gray-100 overflow-hidden flex flex-col shadow-sm">
+                {/* Kart başlığı */}
+                <div className="px-3 py-2 flex items-center gap-2" style={{ background: 'linear-gradient(135deg,#0f766e,#0d9488)' }}>
+                  <Wallet size={13} className="text-white/80" />
+                  <p className="text-xs font-semibold text-white">Tahsilat</p>
+                </div>
+
+                <div className="flex-1 px-3 py-2.5 flex flex-col gap-2.5 overflow-auto">
+                  {/* Hedef + progress */}
+                  <div>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[10px] text-gray-400 uppercase tracking-wide">Açık Hesap Hedefi</span>
+                      <span className="text-[10px] font-semibold text-gray-500">{fmtTL(t.hedef)}</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-2 rounded-full transition-all duration-700"
+                        style={{
+                          width: `${pct}%`,
+                          background: pct >= 80 ? '#16a34a' : pct >= 50 ? '#d97706' : '#0d9488',
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-0.5">
+                      <span className="text-[10px] text-gray-400">Gerçekleşen</span>
+                      <span className="text-[10px] font-bold text-gray-700">{pct.toLocaleString('tr-TR', { maximumFractionDigits: 1 })}%</span>
+                    </div>
+                  </div>
+
+                  {/* Tür bazlı breakdown */}
+                  <div className="border border-gray-100 rounded-lg overflow-hidden">
+                    <table className="w-full text-xs">
+                      <tbody>
+                        {t.byTur.length === 0 ? (
+                          <tr>
+                            <td colSpan={2} className="text-center py-3 text-gray-300 text-[10px]">Bu dönemde tahsilat verisi yok</td>
+                          </tr>
+                        ) : (
+                          t.byTur.map(({ tur, tutar }) => (
+                            <tr key={tur} className="border-b border-gray-50 last:border-0">
+                              <td className="px-2.5 py-1.5 text-gray-600">{TUR_LABEL[tur] ?? tur}</td>
+                              <td className="px-2.5 py-1.5 text-right font-semibold text-gray-800 tabular-nums">{fmtTL(tutar)}</td>
+                            </tr>
+                          ))
+                        )}
+                        {t.byTur.length > 0 && (
+                          <tr className="bg-teal-50">
+                            <td className="px-2.5 py-1.5 font-semibold text-teal-800">Toplam Tahsilat</td>
+                            <td className="px-2.5 py-1.5 text-right font-bold text-teal-700 tabular-nums">{fmtTL(t.toplam)}</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+        </div>
+      </div>
+    </div>
+  )
+}
