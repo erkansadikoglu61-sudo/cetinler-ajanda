@@ -117,7 +117,11 @@ export default function DashboardView() {
     }
   }, [yil, ay])
 
-  useEffect(() => { void fetchAll() }, [fetchAll])
+  useEffect(() => {
+    void fetchAll()
+    const id = setInterval(fetchAll, 30 * 60 * 1000) // 30 dakikada bir otomatik yenile
+    return () => clearInterval(id)
+  }, [fetchAll])
 
   // ── Sellout computed ─────────────────────────────────────────────
   const filteredSellout = useMemo(
@@ -135,30 +139,21 @@ export default function DashboardView() {
     return { elux, relux }
   }, [filteredSellout])
 
-  const cariByGrup = useMemo(() => {
-    const counts: Record<string, number> = {}
-    SELLOUT_GROUPS.forEach(g => { counts[g] = 0 })
+  // Kategori bazında satilan_adet toplamı (b2b.cetinlerltd.com.tr kaynağı)
+  const adetByGrup = useMemo(() => {
+    const totals: Record<string, number> = {}
+    SELLOUT_GROUPS.forEach(g => { totals[g] = 0 })
     filteredSellout.forEach(r => {
       const normalized = GRUP_NORMALIZE[r.grup_aciklama] ?? r.grup_aciklama
       if (!SELLOUT_GROUPS.includes(normalized as typeof SELLOUT_GROUPS[number])) return
-      const key = `${r.cari_isim}|${r.sube_adi}`
-      // We count unique cari+sube per group using a Set per group
+      totals[normalized as typeof SELLOUT_GROUPS[number]] += r.satilan_adet
     })
-    // Use Sets for proper unique counting
-    const sets: Record<string, Set<string>> = {}
-    SELLOUT_GROUPS.forEach(g => { sets[g] = new Set() })
-    filteredSellout.forEach(r => {
-      const normalized = GRUP_NORMALIZE[r.grup_aciklama] ?? r.grup_aciklama
-      if (!SELLOUT_GROUPS.includes(normalized as typeof SELLOUT_GROUPS[number])) return
-      sets[normalized as typeof SELLOUT_GROUPS[number]].add(`${r.cari_isim}|${r.sube_adi}`)
-    })
-    SELLOUT_GROUPS.forEach(g => { counts[g] = sets[g].size })
-    return counts
+    return totals
   }, [filteredSellout])
 
-  const totalFatKesilenByGrup = useMemo(
-    () => Object.values(cariByGrup).reduce((s, v) => s + v, 0),
-    [cariByGrup]
+  const totalAdet = useMemo(
+    () => Object.values(adetByGrup).reduce((s, v) => s + v, 0),
+    [adetByGrup]
   )
 
   // ── Tahmini Ciro (gercCiro + bekleyenCiro per BSY) ────────────────
@@ -378,12 +373,12 @@ export default function DashboardView() {
                     {SELLOUT_GROUPS.map((g, i) => (
                       <tr key={g} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="px-2 py-1.5 text-gray-700 truncate max-w-[130px]">{g}</td>
-                        <td className="px-2 py-1.5 text-right tabular-nums text-gray-600 font-medium">{fmtN(cariByGrup[g] ?? 0)}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums text-gray-600 font-medium">{fmtN(adetByGrup[g] ?? 0)}</td>
                       </tr>
                     ))}
                     <tr className="bg-gray-800 border-t-2 border-gray-400">
                       <td className="px-2 py-1.5 text-white font-bold">Toplam</td>
-                      <td className="px-2 py-1.5 text-right text-white font-bold tabular-nums">{fmtN(totalFatKesilenByGrup)}</td>
+                      <td className="px-2 py-1.5 text-right text-white font-bold tabular-nums">{fmtN(totalAdet)}</td>
                     </tr>
                   </tbody>
                 </table>
