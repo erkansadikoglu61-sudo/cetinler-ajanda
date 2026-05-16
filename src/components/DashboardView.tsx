@@ -219,10 +219,11 @@ export default function DashboardView() {
       </div>
 
       {/* Body: flex row */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+      {/* Body: 4 kolon grid */}
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3 p-3 overflow-y-auto min-h-0 items-start">
 
-        {/* LEFT: Ciro tables */}
-        <div className="md:w-[38%] flex-none flex flex-col gap-3 p-3 overflow-y-auto">
+        {/* KOL 1: Ciro tabloları */}
+        <div className="flex flex-col gap-3">
           <CiroTable
             title="Gerçekleşen Ciro"
             rows={data?.gercCiro ?? []}
@@ -243,16 +244,127 @@ export default function DashboardView() {
           />
         </div>
 
-        {/* RIGHT: 2×2 grid */}
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 p-3 overflow-y-auto md:overflow-hidden md:content-start">
+        {/* KOL 2: Müşteri Bazında Cirolar */}
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
+          <div className="px-3 py-2 bg-teal-700 flex items-center justify-between">
+            <p className="text-xs font-semibold text-white">Müşteri Bazında Cirolar</p>
+            {!loading && (
+              <span className="text-[10px] bg-white/20 text-white rounded-full px-2 py-0.5">
+                {fmtN(data?.fatKesilenSayi ?? 0)} faturalı müşteri
+              </span>
+            )}
+          </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-6">
+              <div className="w-5 h-5 border-2 border-gray-300 border-t-teal-500 rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="overflow-y-auto" style={{ maxHeight: '520px' }}>
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 z-10 bg-gray-50">
+                  <tr className="border-b border-gray-100">
+                    <th className="text-center px-2 py-1.5 text-gray-400 font-medium w-6">#</th>
+                    <th className="text-left px-2 py-1.5 text-gray-500 font-medium">Müşteri</th>
+                    <th className="text-right px-2 py-1.5 text-gray-500 font-medium">Ciro</th>
+                    <th className="text-right px-2 py-1.5 text-gray-500 font-medium">Pay</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data?.allCari ?? []).map((row: DashboardCariRow, i: number) => (
+                    <tr key={row.cariIsim} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-2 py-1 text-center text-gray-400 font-medium">{i + 1}</td>
+                      <td className="px-2 py-1 truncate max-w-[110px] text-gray-700">{row.cariIsim}</td>
+                      <td className="px-2 py-1 text-right tabular-nums text-gray-700 font-medium">{fmtTL(row.ciro)}</td>
+                      <td className="px-2 py-1 text-right tabular-nums text-gray-600">{fmtPct(row.pay)}</td>
+                    </tr>
+                  ))}
+                  {(data?.allCari ?? []).length === 0 && (
+                    <tr><td colSpan={4} className="text-center text-gray-400 py-4">Veri yok</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* KOL 3: Tahsilat */}
+        {(() => {
+          const t: DashboardTahsilat = data?.tahsilat ?? { hedef: 0, byTur: [], toplam: 0 }
+          const pct = t.hedef > 0 ? Math.min((t.toplam / t.hedef) * 100, 100) : 0
+          const TUR_LABEL: Record<string, string> = {
+            'Banka-KK': 'Kredi Kartı',
+            'Çek-Senet': 'Çek / Senet',
+            'Nakit': 'Nakit',
+            'EFT/Havale': 'EFT / Havale',
+          }
+          return (
+            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden flex flex-col shadow-sm">
+              <div className="px-3 py-2 flex items-center gap-2" style={{ background: 'linear-gradient(135deg,#0f766e,#0d9488)' }}>
+                <Wallet size={13} className="text-white/80" />
+                <p className="text-xs font-semibold text-white">Tahsilat</p>
+              </div>
+              {loading ? (
+                <div className="flex items-center justify-center py-6">
+                  <div className="w-5 h-5 border-2 border-gray-300 border-t-teal-500 rounded-full animate-spin" />
+                </div>
+              ) : (
+                <div className="px-3 py-2.5 flex flex-col gap-2.5">
+                  <div>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[10px] text-gray-400 uppercase tracking-wide">Açık Hesap Hedefi</span>
+                      <span className="text-[10px] font-semibold text-gray-500">{fmtTL(t.hedef)}</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-2 rounded-full transition-all duration-700"
+                        style={{ width: `${pct}%`, background: pct >= 80 ? '#16a34a' : pct >= 50 ? '#d97706' : '#0d9488' }}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-0.5">
+                      <span className="text-[10px] text-gray-400">Gerçekleşen</span>
+                      <span className="text-[10px] font-bold text-gray-700">{pct.toLocaleString('tr-TR', { maximumFractionDigits: 1 })}%</span>
+                    </div>
+                  </div>
+                  <div className="border border-gray-100 rounded-lg overflow-hidden">
+                    <table className="w-full text-xs">
+                      <tbody>
+                        {t.byTur.length === 0 ? (
+                          <tr>
+                            <td colSpan={2} className="text-center py-3 text-gray-300 text-[10px]">Bu dönemde tahsilat verisi yok</td>
+                          </tr>
+                        ) : (
+                          t.byTur.map(({ tur, tutar }) => (
+                            <tr key={tur} className="border-b border-gray-50 last:border-0">
+                              <td className="px-2.5 py-1.5 text-gray-600">{TUR_LABEL[tur] ?? tur}</td>
+                              <td className="px-2.5 py-1.5 text-right font-semibold text-gray-800 tabular-nums">{fmtTL(tutar)}</td>
+                            </tr>
+                          ))
+                        )}
+                        {t.byTur.length > 0 && (
+                          <tr className="bg-teal-50">
+                            <td className="px-2.5 py-1.5 font-semibold text-teal-800">Toplam Tahsilat</td>
+                            <td className="px-2.5 py-1.5 text-right font-bold text-teal-700 tabular-nums">{fmtTL(t.toplam)}</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })()}
+
+        {/* KOL 4: Sell-In/Sell-Out + Kategori Bazında Adetler */}
+        <div className="flex flex-col gap-3">
 
           {/* Sell-In / Sell-Out */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col self-start">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
             <div className="px-3 py-2 bg-indigo-600">
               <p className="text-xs font-semibold text-white">Sell-In / Sell-Out</p>
             </div>
             {loading ? (
-              <div className="flex-1 flex items-center justify-center py-6">
+              <div className="flex items-center justify-center py-6">
                 <div className="w-5 h-5 border-2 border-gray-300 border-t-indigo-500 rounded-full animate-spin" />
               </div>
             ) : (
@@ -308,56 +420,13 @@ export default function DashboardView() {
             )}
           </div>
 
-          {/* Müşteri Bazında Cirolar */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
-            <div className="px-3 py-2 bg-teal-700 flex items-center justify-between">
-              <p className="text-xs font-semibold text-white">Müşteri Bazında Cirolar</p>
-              {!loading && (
-                <span className="text-[10px] bg-white/20 text-white rounded-full px-2 py-0.5">
-                  {fmtN(data?.fatKesilenSayi ?? 0)} faturalı müşteri
-                </span>
-              )}
-            </div>
-            {loading ? (
-              <div className="flex-1 flex items-center justify-center py-6">
-                <div className="w-5 h-5 border-2 border-gray-300 border-t-teal-500 rounded-full animate-spin" />
-              </div>
-            ) : (
-              <div className="overflow-y-auto flex-1" style={{ maxHeight: '260px' }}>
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 z-10 bg-gray-50">
-                    <tr className="border-b border-gray-100">
-                      <th className="text-center px-2 py-1.5 text-gray-400 font-medium w-6">#</th>
-                      <th className="text-left px-2 py-1.5 text-gray-500 font-medium">Müşteri</th>
-                      <th className="text-right px-2 py-1.5 text-gray-500 font-medium">Ciro</th>
-                      <th className="text-right px-2 py-1.5 text-gray-500 font-medium">Pay</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(data?.allCari ?? []).map((row: DashboardCariRow, i: number) => (
-                      <tr key={row.cariIsim} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="px-2 py-1 text-center text-gray-400 font-medium">{i + 1}</td>
-                        <td className="px-2 py-1 truncate max-w-[110px] text-gray-700">{row.cariIsim}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-gray-700 font-medium">{fmtTL(row.ciro)}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-gray-600">{fmtPct(row.pay)}</td>
-                      </tr>
-                    ))}
-                    {(data?.allCari ?? []).length === 0 && (
-                      <tr><td colSpan={4} className="text-center text-gray-400 py-4">Veri yok</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
           {/* Kategori Bazında Adetler */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
             <div className="px-3 py-2 bg-purple-700">
               <p className="text-xs font-semibold text-white">Kategori Bazında Adetler</p>
             </div>
             {loading ? (
-              <div className="flex-1 flex items-center justify-center py-6">
+              <div className="flex items-center justify-center py-6">
                 <div className="w-5 h-5 border-2 border-gray-300 border-t-purple-500 rounded-full animate-spin" />
               </div>
             ) : (
@@ -385,76 +454,6 @@ export default function DashboardView() {
               </div>
             )}
           </div>
-
-          {/* Tahsilat */}
-          {(() => {
-            const t: DashboardTahsilat = data?.tahsilat ?? { hedef: 0, byTur: [], toplam: 0 }
-            const pct = t.hedef > 0 ? Math.min((t.toplam / t.hedef) * 100, 100) : 0
-            const TUR_LABEL: Record<string, string> = {
-              'Banka-KK': 'Kredi Kartı',
-              'Çek-Senet': 'Çek / Senet',
-              'Nakit': 'Nakit',
-              'EFT/Havale': 'EFT / Havale',
-            }
-            return (
-              <div className="bg-white rounded-xl border border-gray-100 overflow-hidden flex flex-col shadow-sm">
-                {/* Kart başlığı */}
-                <div className="px-3 py-2 flex items-center gap-2" style={{ background: 'linear-gradient(135deg,#0f766e,#0d9488)' }}>
-                  <Wallet size={13} className="text-white/80" />
-                  <p className="text-xs font-semibold text-white">Tahsilat</p>
-                </div>
-
-                <div className="flex-1 px-3 py-2.5 flex flex-col gap-2.5 overflow-auto">
-                  {/* Hedef + progress */}
-                  <div>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[10px] text-gray-400 uppercase tracking-wide">Açık Hesap Hedefi</span>
-                      <span className="text-[10px] font-semibold text-gray-500">{fmtTL(t.hedef)}</span>
-                    </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-2 rounded-full transition-all duration-700"
-                        style={{
-                          width: `${pct}%`,
-                          background: pct >= 80 ? '#16a34a' : pct >= 50 ? '#d97706' : '#0d9488',
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between mt-0.5">
-                      <span className="text-[10px] text-gray-400">Gerçekleşen</span>
-                      <span className="text-[10px] font-bold text-gray-700">{pct.toLocaleString('tr-TR', { maximumFractionDigits: 1 })}%</span>
-                    </div>
-                  </div>
-
-                  {/* Tür bazlı breakdown */}
-                  <div className="border border-gray-100 rounded-lg overflow-hidden">
-                    <table className="w-full text-xs">
-                      <tbody>
-                        {t.byTur.length === 0 ? (
-                          <tr>
-                            <td colSpan={2} className="text-center py-3 text-gray-300 text-[10px]">Bu dönemde tahsilat verisi yok</td>
-                          </tr>
-                        ) : (
-                          t.byTur.map(({ tur, tutar }) => (
-                            <tr key={tur} className="border-b border-gray-50 last:border-0">
-                              <td className="px-2.5 py-1.5 text-gray-600">{TUR_LABEL[tur] ?? tur}</td>
-                              <td className="px-2.5 py-1.5 text-right font-semibold text-gray-800 tabular-nums">{fmtTL(tutar)}</td>
-                            </tr>
-                          ))
-                        )}
-                        {t.byTur.length > 0 && (
-                          <tr className="bg-teal-50">
-                            <td className="px-2.5 py-1.5 font-semibold text-teal-800">Toplam Tahsilat</td>
-                            <td className="px-2.5 py-1.5 text-right font-bold text-teal-700 tabular-nums">{fmtTL(t.toplam)}</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )
-          })()}
 
         </div>
       </div>
