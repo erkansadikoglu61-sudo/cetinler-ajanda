@@ -153,31 +153,6 @@ export default function DashboardView() {
     [adetByGrup]
   )
 
-  // ── Tahmini Ciro (gercCiro + bekleyenCiro per BSY) ────────────────
-  const tahminiRows = useMemo((): DashboardCiroRow[] => {
-    if (!data) return []
-    const map = new Map<string, { elux: number; relux: number }>()
-    const addRows = (rows: DashboardCiroRow[]) => {
-      rows.filter(r => r.bsyAdi !== 'TOPLAM').forEach(r => {
-        const e = map.get(r.bsyAdi) ?? { elux: 0, relux: 0 }
-        e.elux  += r.elux
-        e.relux += r.relux
-        map.set(r.bsyAdi, e)
-      })
-    }
-    addRows(data.gercCiro)
-    addRows(data.bekleyenCiro)
-    const rows: DashboardCiroRow[] = [...map.entries()]
-      .map(([bsyAdi, v]) => ({ bsyAdi, elux: v.elux, relux: v.relux, toplam: v.elux + v.relux }))
-      .sort((a, b) => a.bsyAdi.localeCompare(b.bsyAdi, 'tr'))
-    if (rows.length > 0) {
-      const totE = rows.reduce((s, r) => s + r.elux,  0)
-      const totR = rows.reduce((s, r) => s + r.relux, 0)
-      rows.push({ bsyAdi: 'TOPLAM', elux: totE, relux: totR, toplam: totE + totR })
-    }
-    return rows
-  }, [data])
-
   const years = [2025, 2026]
 
   return (
@@ -219,24 +194,12 @@ export default function DashboardView() {
       {/* Body: 4 kolon grid */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3 p-3 overflow-y-auto min-h-0 items-start">
 
-        {/* KOL 1: Ciro tabloları */}
+        {/* KOL 1: Gerçekleşen Ciro */}
         <div className="flex flex-col gap-3">
           <CiroTable
             title="Gerçekleşen Ciro"
             rows={data?.gercCiro ?? []}
             headerColor="bg-[#1a8a8a]"
-            loading={loading}
-          />
-          <CiroTable
-            title="Bekleyen Sipariş"
-            rows={data?.bekleyenCiro ?? []}
-            headerColor="bg-amber-600"
-            loading={loading}
-          />
-          <CiroTable
-            title="Tahmini Ciro (Gerç. + Bekleyen)"
-            rows={tahminiRows}
-            headerColor="bg-gray-700"
             loading={loading}
           />
         </div>

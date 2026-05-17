@@ -55,7 +55,6 @@ export interface DashboardTahsilat {
 
 export interface DashboardResponse {
   gercCiro: DashboardCiroRow[]
-  bekleyenCiro: DashboardCiroRow[]
   allCari: DashboardCariRow[]
   fatKesilenSayi: number
   sellinByBrand: DashboardSellinBrand
@@ -74,7 +73,6 @@ export async function GET(req: Request) {
   if (!buf) {
     return NextResponse.json<DashboardResponse>({
       gercCiro: [],
-      bekleyenCiro: [],
       allCari: [],
       fatKesilenSayi: 0,
       sellinByBrand: { elux: 0, relux: 0 },
@@ -89,77 +87,61 @@ export async function GET(req: Request) {
 
     const raw: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null })
 
+    // Geçerli BSY adları seti (AG kolonundaki Plasiyer Adı doğrulaması için)
+    const BSY_NAMES = new Set(Object.values(BSY_KOD_TO_NAME))
+
     // Accumulators
-    const gercMap   = new Map<string, { elux: number; relux: number }>()
-    const bekMap    = new Map<string, { elux: number; relux: number }>()
-    const cariMap   = new Map<string, number>()        // cariIsim → ciro (gc=C only)
-    const fatCariSet = new Set<string>()               // unique cariKod (gc=C)
-    let sellinElux  = 0
-    let sellinRelux = 0
+    const gercMap    = new Map<string, { elux: number; relux: number }>()
+    const cariMap    = new Map<string, number>()
+    const fatCariSet = new Set<string>()
+    let sellinElux   = 0
+    let sellinRelux  = 0
 
     for (let i = 1; i < raw.length; i++) {
       const r = raw[i]
       if (!r) continue
 
-      const cariKod      = String(r[1]  ?? '').trim()
-      const cariIsim     = String(r[2]  ?? '').trim()
-      const tur          = String(r[10] ?? '').toUpperCase().trim()
-      const rawNetTutar  = typeof r[11] === 'number' ? r[11] : (parseFloat(String(r[11] ?? '').replace(',', '.')) || 0)
-      const rawAdet      = typeof r[15] === 'number' ? r[15] : (parseFloat(String(r[15] ?? '').replace(',', '.')) || 0)
-      const grupKodu     = String(r[16] ?? '').toUpperCase().trim()
-      const gc           = String(r[18] ?? '').toUpperCase().trim()
-      const rowAy        = typeof r[20] === 'number' ? r[20] : parseInt(String(r[20] ?? '0'))
-      const rowYil       = typeof r[21] === 'number' ? r[21] : parseInt(String(r[21] ?? '0'))
-      const plasiyerKodu = String(r[31] ?? '').trim()   // r[31] = Plasiyer Kodu (KB1, MB1 vb.)
-      const stokRapKod3  = String(r[41] ?? '').toUpperCase().trim()
-
-      // Sadece tanımlı BSY plasiyer kodları (MB10 = admin gibi BSY dışı kodlar atlanır)
-      const bsyAdi = BSY_KOD_TO_NAME[plasiyerKodu]
+      const cariKod     = String(r[1]  ?? '').trim()
+      const cariIsim    = String(r[2]  ?? '').trim()
+      const tur         = String(r[10] ?? '').toUpperCase().trim()
+      const rawNetTutar = typeof r[11] === 'number' ? r[11] : (parseFloat(String(r[11] ?? '').replace(',', '.')) || 0)
+      const rawAdet     = typeof r[15] === 'number' ? r[15] : (parseFloat(String(r[15] ?? '').replace(',', '.')) || 0)
+      const grupKodu    = String(r[17] ?? '').toUpperCase().trim()   // R kolonu = Grup
+      const gc          = String(r[18] ?? '').toUpperCase().trim()
+      const rowAy       = typeof r[20] === 'number' ? r[20] : parseInt(String(r[20] ?? '0'))
+      const rowYil      = typeof r[21] === 'number' ? r[21] : parseInt(String(r[21] ?? '0'))
+      const bsyAdi      = String(r[32] ?? '').trim()                // AG kolonu = Plasiyer Adı
+      const stokRapKod3 = String(r[41] ?? '').toUpperCase().trim()
 
       if (stokRapKod3 === 'MERCHX') continue
       if (!rowYil || !rowAy) continue
       if (yil && rowYil !== yil) continue
       if (ay  && rowAy  !== ay)  continue
+      if (!BSY_NAMES.has(bsyAdi)) continue
 
       const isElux  = grupKodu === 'EKEA'
       const isRelux = grupKodu === 'RELUX'
       if (!isElux && !isRelux) continue
 
       const isIade = tur.includes('IADE')
-      const isGc = gc === 'C'
-      const isGg = gc === 'G'
+      const isGc   = gc === 'C'
+      const isGg   = gc === 'G'
+      if (!isGc && !isGg) continue
 
-      if (isGc || isGg) {
-        // Gerçekleşen ciro: IADE or G = negative
-        const netTutar = (isIade || isGg) ? -Math.abs(rawNetTutar) : rawNetTutar
-        const adet     = (isIade || isGg) ? -Math.abs(rawAdet)     : rawAdet
+      const netTutar = (isIade || isGg) ? -Math.abs(rawNetTutar) : rawNetTutar
+      const adet     = (isIade || isGg) ? -Math.abs(rawAdet)     : rawAdet
 
-        // BSY ciro: sadece tanımlı BSY plasiyer kodları
-        if (bsyAdi) {
-          const entry = gercMap.get(bsyAdi) ?? { elux: 0, relux: 0 }
-          if (isElux)  entry.elux  += netTutar
-          if (isRelux) entry.relux += netTutar
-          gercMap.set(bsyAdi, entry)
-        }
+      const entry = gercMap.get(bsyAdi) ?? { elux: 0, relux: 0 }
+      if (isElux)  entry.elux  += netTutar
+      if (isRelux) entry.relux += netTutar
+      gercMap.set(bsyAdi, entry)
 
-        // Sellin by brand (adet) — tüm geçerli satırları say
-        if (isElux)  sellinElux  += adet
-        if (isRelux) sellinRelux += adet
+      if (isElux)  sellinElux  += adet
+      if (isRelux) sellinRelux += adet
 
-        // Müşteri cirosu ve fatura sayısı: gc=C only (not returns/G)
-        if (isGc && !isIade) {
-          const ciro = rawNetTutar
-          cariMap.set(cariIsim, (cariMap.get(cariIsim) ?? 0) + ciro)
-          if (cariKod) fatCariSet.add(cariKod)
-        }
-      } else if (gc !== '') {
-        // Bekleyen sipariş: gc is not C, G, or empty
-        if (bsyAdi) {
-          const entry = bekMap.get(bsyAdi) ?? { elux: 0, relux: 0 }
-          if (isElux)  entry.elux  += rawNetTutar
-          if (isRelux) entry.relux += rawNetTutar
-          bekMap.set(bsyAdi, entry)
-        }
+      if (isGc && !isIade) {
+        cariMap.set(cariIsim, (cariMap.get(cariIsim) ?? 0) + rawNetTutar)
+        if (cariKod) fatCariSet.add(cariKod)
       }
     }
 
@@ -228,7 +210,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json<DashboardResponse>({
       gercCiro:      buildRows(gercMap),
-      bekleyenCiro:  buildRows(bekMap),
       allCari,
       fatKesilenSayi: fatCariSet.size,
       sellinByBrand: { elux: sellinElux, relux: sellinRelux },
