@@ -14,7 +14,102 @@ import {
 } from '@/lib/sellout'
 import { Profile } from '@/lib/supabase'
 
-type SubTab = 'sup' | 'jr' | 'merch'
+type SubTab = 'sup' | 'jr' | 'merch' | 'top20'
+
+// ─── Top-30 yardımcı tipler ───
+interface Top20Row { cariIsim: string; subeAdi: string; adet: number }
+
+function calcTop20(
+  periodRows: import('@/hooks/useSellout').SelloutRow[],
+  filter: (r: import('@/hooks/useSellout').SelloutRow) => boolean,
+): Top20Row[] {
+  const map = new Map<string, Top20Row>()
+  periodRows.filter(filter).forEach(r => {
+    const key = `${r.cari_isim}||${r.sube_adi}`
+    const ex  = map.get(key) ?? { cariIsim: r.cari_isim, subeAdi: r.sube_adi, adet: 0 }
+    ex.adet  += r.satilan_adet
+    map.set(key, ex)
+  })
+  return [...map.values()].sort((a, b) => b.adet - a.adet)
+}
+
+function Top20Table({
+  title, subtitle, data, colorMap,
+}: {
+  title: string
+  subtitle?: string
+  data: Top20Row[]
+  colorMap: Map<string, string>
+}) {
+  if (data.length === 0) return (
+    <div className="text-xs text-gray-400 text-center py-6">Bu dönemde veri yok.</div>
+  )
+  const toplam = data.reduce((s, d) => s + d.adet, 0)
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col" style={{ maxHeight: '560px' }}>
+      {/* Başlık — sabit */}
+      <div className="flex-shrink-0 px-4 py-2.5 border-b border-gray-100 flex items-baseline gap-2">
+        <span className="text-xs font-bold text-gray-800">{title}</span>
+        {subtitle && <span className="text-[10px] text-gray-400">{subtitle}</span>}
+        <span className="ml-auto text-[10px] text-gray-400 tabular-nums">{data.length} şube</span>
+      </div>
+
+      {/* Kaydırılabilir satırlar */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <table className="w-full text-xs border-collapse">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-gray-800 text-white">
+              <th className="px-2 py-2 text-center font-semibold w-7">#</th>
+              <th className="px-3 py-2 text-left font-semibold">Cari</th>
+              <th className="px-3 py-2 text-left font-semibold">Şube</th>
+              <th className="px-3 py-2 text-right font-semibold">Adet</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((d, i) => {
+              const color = colorMap.get(d.cariIsim) ?? '#6B7280'
+              return (
+                <tr key={i} className="border-b border-gray-100 hover:bg-gray-50/60 transition-colors">
+                  <td className="px-2 py-1.5 text-center text-gray-400 font-medium text-[10px]">{i + 1}</td>
+                  <td className="px-3 py-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: color }}
+                      />
+                      <span className="font-semibold" style={{ color }}>
+                        {d.cariIsim?.split(' ')[0] ?? '—'}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-1.5 text-gray-600">{d.subeAdi}</td>
+                  <td className="px-3 py-1.5 text-right font-bold tabular-nums" style={{ color }}>
+                    {d.adet.toLocaleString('tr-TR')}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Toplam satırı — sabit altta */}
+      <div className="flex-shrink-0 border-t-2 border-gray-300">
+        <table className="w-full text-xs border-collapse">
+          <tbody>
+            <tr className="bg-gray-800 text-white font-semibold text-[11px]">
+              <td className="px-2 py-2 w-7" />
+              <td colSpan={2} className="px-3 py-2">Toplam</td>
+              <td className="px-3 py-2 text-right tabular-nums">
+                {toplam.toLocaleString('tr-TR')}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
 
 // ─── helpers ───
 function pct(hedef: number, gerc: number) {
@@ -143,6 +238,28 @@ function TargetEntryModal({
                 )
               })}
             </tbody>
+
+            {/* ── Toplam satırı ── */}
+            <tfoot>
+              <tr className="bg-brand-700 text-white font-semibold">
+                <td className="sticky left-0 z-10 bg-brand-700 border border-brand-600 px-3 py-2 text-xs">
+                  Toplam Dağıtılan
+                </td>
+                {groups.map(g => {
+                  const colTotal = rows.reduce((s, r) => s + (values[`${r.key}||${g}`] ?? 0), 0)
+                  return (
+                    <td key={g} className="border border-brand-600 px-3 py-2 text-center text-xs tabular-nums">
+                      {colTotal}
+                    </td>
+                  )
+                })}
+                <td className="border border-brand-600 px-3 py-2 text-center text-xs tabular-nums">
+                  {rows.reduce((s, r) =>
+                    s + groups.reduce((gs, g) => gs + (values[`${r.key}||${g}`] ?? 0), 0), 0
+                  )}
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
@@ -161,14 +278,17 @@ interface Props {
 export function SelloutView({ currentProfile, team, visibleIds, active }: Props) {
   const [donem, setDonem]         = useState(currentDonem)
   const [subTab, setSubTab]       = useState<SubTab>(() =>
-    currentProfile.role === 'jr' ? 'jr' : 'sup'
+    currentProfile.role === 'bsy' ? 'top20'
+    : currentProfile.role === 'jr' ? 'jr'
+    : 'sup'
   )
   const [targetModal, setTargetModal] = useState<SubTab | null>(null)
   const [merchSearch, setMerchSearch] = useState('')
 
-  const isAdmin = currentProfile.role === 'admin' || currentProfile.role === 'bsy'
+  const isAdmin = currentProfile.role === 'admin'
   const isSup   = currentProfile.role === 'sup'
   const isJr    = currentProfile.role === 'jr'
+  const isBsy   = currentProfile.role === 'bsy'
 
   const {
     rows: allRows, loading: selloutLoading, fetchedAt, reload: reloadSellout,
@@ -185,6 +305,47 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     () => allRows.filter(r => r.donem === donem),
     [allRows, donem]
   )
+
+  // ── Top-30 şube sıralamaları ─────────────────────────────────
+  const top20Ipl = useMemo(
+    () => calcTop20(periodRows, r =>
+      r.grup_aciklama?.toLowerCase().includes('ipl') ?? false
+    ),
+    [periodRows]
+  )
+  const top20Rms = useMemo(
+    () => calcTop20(periodRows, r =>
+      r.stok_kodu?.startsWith('RMS9200') ?? false
+    ),
+    [periodRows]
+  )
+  const top20Supurge = useMemo(
+    () => calcTop20(periodRows, r =>
+      r.grup_aciklama?.toLowerCase().includes('süpürge') ||
+      r.grup_aciklama?.toLowerCase().includes('supurge') ||
+      r.grup_aciklama?.toLowerCase().includes('süpürge') ? true : false
+    ),
+    [periodRows]
+  )
+
+  // ── Global cari renk haritası (3 tablodaki tüm unique cariler, globally eşsiz renk) ──
+  const globalCariColorMap = useMemo(() => {
+    const allCaris = new Set<string>()
+    top20Ipl.forEach(r => allCaris.add(r.cariIsim))
+    top20Rms.forEach(r => allCaris.add(r.cariIsim))
+    top20Supurge.forEach(r => allCaris.add(r.cariIsim))
+    const sorted = [...allCaris].sort((a, b) => a.localeCompare(b, 'tr'))
+    const map = new Map<string, string>()
+    const total = Math.max(sorted.length, 1)
+    sorted.forEach((name, i) => {
+      // Eşit aralıklı hue + hafif offset ile yakın renk çakışmasını önle
+      const hue = Math.round((i * 360) / total) % 360
+      // Açık/koyu alternasyonuyla daha kolay ayırt edilir
+      const lightness = i % 2 === 0 ? 40 : 50
+      map.set(name, `hsl(${hue}, 75%, ${lightness}%)`)
+    })
+    return map
+  }, [top20Ipl, top20Rms, top20Supurge])
 
   // ── Team slices ──────────────────────────────────────────────
   const visibleSups = useMemo(
@@ -223,15 +384,21 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
   // Filtre: MERCH_TIPI === 'Çetinler Merch' olan satırlardan unique kişi listesi
   const uniqueMerch = useMemo(() => {
-    const map = new Map<string, string>()
+    const map = new Map<string, { supApiName: string; cariIsim: string; subeAdi: string }>()
     allRows.forEach(r => {
       if (!r.merch_personel) return
       if (r.merch_tipi === 'Çetinler Merch') {
-        map.set(r.merch_personel, r.supervisor_adi ?? '')
+        if (!map.has(r.merch_personel)) {
+          map.set(r.merch_personel, {
+            supApiName: r.supervisor_adi ?? '',
+            cariIsim:   r.cari_isim  ?? '',
+            subeAdi:    r.sube_adi   ?? '',
+          })
+        }
       }
     })
     return Array.from(map.entries())
-      .map(([name, supApiName]) => ({ name, supApiName }))
+      .map(([name, v]) => ({ name, ...v }))
       .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
   }, [allRows])
 
@@ -344,7 +511,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       const tH    = groups.reduce((s, x) => s + x.h, 0)
       const tV    = groups.reduce((s, x) => s + x.v, 0)
       const tPrim = groups.reduce((s, x) => s + x.prim, 0)
-      return { name: m.name, supApiName: m.supApiName, groups, tH, tV, tP: pct(tH, tV), tPrim }
+      return { name: m.name, supApiName: m.supApiName, cariIsim: m.cariIsim, subeAdi: m.subeAdi, groups, tH, tV, tP: pct(tH, tV), tPrim }
     }),
   [filteredMerch, getMerchHedef, periodRows])
 
@@ -430,7 +597,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
       {/* ── Sub-tabs ── */}
       <div className="flex-shrink-0 flex border-b border-gray-100 bg-white px-4 gap-1 pt-1">
-        {showSupTab && (
+        {!isBsy && showSupTab && (
           <button
             onClick={() => setSubTab('sup')}
             className={clsx(
@@ -439,7 +606,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             )}
           >Süpervizör</button>
         )}
-        {showJrTab && (
+        {!isBsy && showJrTab && (
           <button
             onClick={() => setSubTab('jr')}
             className={clsx(
@@ -448,7 +615,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             )}
           >Jr. Süpervizör</button>
         )}
-        {showMerchTab && (
+        {!isBsy && showMerchTab && (
           <button
             onClick={() => setSubTab('merch')}
             className={clsx(
@@ -457,6 +624,13 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             )}
           >Merch</button>
         )}
+        <button
+          onClick={() => setSubTab('top20')}
+          className={clsx(
+            'px-3 py-2 text-xs font-medium border-b-2 transition-colors',
+            subTab === 'top20' ? 'border-amber-500 text-amber-700' : 'border-transparent text-gray-500 hover:text-gray-800'
+          )}
+        >Top 20</button>
         <div className="flex-1" />
         {/* Target entry button */}
         {(isAdmin || isSup) && subTab !== 'sup' && (
@@ -529,9 +703,10 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             </div>
             <SelloutTable
               rows={merchRows.map(r => ({
-                label: r.name,
-                sublabel: r.supApiName,
-                groups: r.groups.map(g => ({ h: g.h, v: g.v, p: g.p, prim: g.prim })),
+                label:     r.name,
+                sublabel:  r.supApiName,
+                sublabel2: [r.cariIsim?.split(' ')[0], r.subeAdi].filter(Boolean).join(' / '),
+                groups:    r.groups.map(g => ({ h: g.h, v: g.v, p: g.p, prim: g.prim })),
                 tH: r.tH, tV: r.tV, tP: r.tP, tPrim: r.tPrim,
               }))}
               footer={(() => {
@@ -550,6 +725,37 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
               kategoriPrimi={PRIM_MERCH}
             />
           </>
+        )}
+
+        {/* ── Top 30 Şube Sıralaması ── */}
+        {!selloutLoading && subTab === 'top20' && (
+          <div className="space-y-5 pb-4">
+            <div className="px-1 pt-1">
+              <p className="text-[10px] text-gray-400 mb-3">
+                Seçilen dönem için şube bazında satış adedi sıralaması
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Top20Table
+                  title="1 · IPL Grubu"
+                  subtitle="Kategori bazında tüm şubeler"
+                  data={top20Ipl}
+                  colorMap={globalCariColorMap}
+                />
+                <Top20Table
+                  title="2 · RMS9200 Stokları"
+                  subtitle="RMS9200 ile başlayan stoklarda tüm şubeler"
+                  data={top20Rms}
+                  colorMap={globalCariColorMap}
+                />
+                <Top20Table
+                  title="3 · Süpürge Grubu"
+                  subtitle="Kategori bazında tüm şubeler"
+                  data={top20Supurge}
+                  colorMap={globalCariColorMap}
+                />
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
@@ -602,6 +808,7 @@ interface GrupCell { h: number; v: number; p: number; prim?: number }
 interface TableRowData {
   label: string
   sublabel?: string
+  sublabel2?: string   // cari/şube satırı
   color?: string
   groups: GrupCell[]
   tH: number; tV: number; tP: number
@@ -688,7 +895,8 @@ function SelloutTable({
                   )}
                   <div>
                     <p className="font-medium text-gray-800 whitespace-nowrap">{r.label}</p>
-                    {r.sublabel && <p className="text-[10px] text-gray-400">{r.sublabel}</p>}
+                    {r.sublabel  && <p className="text-[10px] text-gray-400 leading-tight">{r.sublabel}</p>}
+                    {r.sublabel2 && <p className="text-[8px] text-gray-400 leading-tight">{r.sublabel2}</p>}
                   </div>
                 </div>
               </td>
@@ -696,8 +904,8 @@ function SelloutTable({
               {/* Group cells */}
               {r.groups.map((g, gi) => (
                 <>
-                  <td key={`${i}-${gi}-h`} className="text-center px-2 py-1.5 border-r border-gray-100 text-gray-600">{g.h || '—'}</td>
-                  <td key={`${i}-${gi}-v`} className="text-center px-2 py-1.5 border-r border-gray-100 font-semibold text-gray-800">{g.v}</td>
+                  <td key={`${i}-${gi}-h`} className="text-center px-2 py-1.5 border-r border-gray-100 text-gray-600">{g.h ? g.h.toLocaleString('tr-TR') : '—'}</td>
+                  <td key={`${i}-${gi}-v`} className="text-center px-2 py-1.5 border-r border-gray-100 font-semibold text-gray-800">{g.v.toLocaleString('tr-TR')}</td>
                   <td key={`${i}-${gi}-p`} className="text-center px-2 py-1.5 border-r border-gray-100">
                     {g.h > 0 ? <PctBadge val={g.p} /> : <span className="text-gray-300">—</span>}
                   </td>
@@ -710,8 +918,8 @@ function SelloutTable({
               ))}
 
               {/* Totals */}
-              <td className="text-center px-2 py-1.5 border-r border-gray-200 text-gray-600 font-medium">{r.tH || '—'}</td>
-              <td className="text-center px-2 py-1.5 border-r border-gray-200 font-bold text-gray-800">{r.tV}</td>
+              <td className="text-center px-2 py-1.5 border-r border-gray-200 text-gray-600 font-medium">{r.tH ? r.tH.toLocaleString('tr-TR') : '—'}</td>
+              <td className="text-center px-2 py-1.5 border-r border-gray-200 font-bold text-gray-800">{r.tV.toLocaleString('tr-TR')}</td>
               <td className="text-center px-2 py-1.5 border-r border-gray-200">
                 {r.tH > 0 ? <PctBadge val={r.tP} /> : <span className="text-gray-300">—</span>}
               </td>
@@ -731,8 +939,8 @@ function SelloutTable({
               <td className="sticky left-0 z-10 bg-gray-100 border-r border-gray-200 px-3 py-2 text-gray-700 text-xs">TOPLAM</td>
               {footer.groups.map((g, gi) => (
                 <>
-                  <td key={`f-${gi}-h`} className="text-center px-2 py-2 border-r border-gray-200 text-gray-600">{g.h || '—'}</td>
-                  <td key={`f-${gi}-v`} className="text-center px-2 py-2 border-r border-gray-200 text-gray-800">{g.v}</td>
+                  <td key={`f-${gi}-h`} className="text-center px-2 py-2 border-r border-gray-200 text-gray-600">{g.h ? g.h.toLocaleString('tr-TR') : '—'}</td>
+                  <td key={`f-${gi}-v`} className="text-center px-2 py-2 border-r border-gray-200 text-gray-800">{g.v.toLocaleString('tr-TR')}</td>
                   <td key={`f-${gi}-p`} className="text-center px-2 py-2 border-r border-gray-200">
                     {g.h > 0 ? <PctBadge val={g.p} /> : <span className="text-gray-300">—</span>}
                   </td>
@@ -743,8 +951,8 @@ function SelloutTable({
                   )}
                 </>
               ))}
-              <td className="text-center px-2 py-2 border-r border-gray-200 text-gray-700">{footer.tH || '—'}</td>
-              <td className="text-center px-2 py-2 border-r border-gray-200 text-gray-800">{footer.tV}</td>
+              <td className="text-center px-2 py-2 border-r border-gray-200 text-gray-700">{footer.tH ? footer.tH.toLocaleString('tr-TR') : '—'}</td>
+              <td className="text-center px-2 py-2 border-r border-gray-200 text-gray-800">{footer.tV.toLocaleString('tr-TR')}</td>
               <td className="text-center px-2 py-2 border-r border-gray-200">
                 {footer.tH > 0 ? <PctBadge val={footer.tP} /> : '—'}
               </td>

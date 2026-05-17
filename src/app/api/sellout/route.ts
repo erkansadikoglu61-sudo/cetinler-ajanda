@@ -19,6 +19,8 @@ export interface SelloutRow {
   donem: string
   tarih: string
   merch_tipi: string   // [14] 'Çetinler Merch' | diğer
+  sv_tipi:    string   // [15] 'Kıdemli Supervisor' vb.
+  bsy:        string   // [16] BSY kodu: KB1, IB1, IB2, MB1...
 }
 
 /** Yaygın HTML entity'lerini decode et (&amp; → & vb.) */
@@ -66,6 +68,8 @@ function parseHtmlTable(html: string): SelloutRow[] {
       donem:          cells[12],
       tarih:          cells[13],
       merch_tipi:     cells[14],
+      sv_tipi:        cells[15] ?? '',
+      bsy:            cells[16] ?? '',
     })
   }
 

@@ -27,10 +27,14 @@ export function useTeam(currentProfile: Profile | null) {
     if (!currentProfile) return []
     if (currentProfile.role === 'admin') return team.map(p => p.id)
     if (currentProfile.role === 'bsy') {
-      const linked = bsyLinks
+      const linkedSupIds = bsyLinks
         .filter(l => l.bsy_id === currentProfile.id)
         .map(l => l.sup_id)
-      return [currentProfile.id, ...linked]
+      // BSY aynı zamanda bağlı sup'ların Jr'larını da görebilmeli
+      const linkedJrIds = team
+        .filter(p => p.role === 'jr' && p.manager_id && linkedSupIds.includes(p.manager_id))
+        .map(p => p.id)
+      return [currentProfile.id, ...linkedSupIds, ...linkedJrIds]
     }
     if (currentProfile.role === 'sup') {
       const jrs = team

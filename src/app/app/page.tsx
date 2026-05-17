@@ -63,7 +63,7 @@ interface TaskSheetProps {
   onSave: (data: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
   onUpdate: (id: string, data: Partial<Task>) => Promise<void>
   onDelete: (id: string) => Promise<void>
-  onCheckIn: (taskId: string) => Promise<void>
+  onCheckIn: (taskId: string) => Promise<{ ok: boolean; hasLocation: boolean; hasAddress: boolean }>
 }
 
 function TaskSheet({
@@ -82,6 +82,7 @@ function TaskSheet({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [checkingIn, setCheckingIn] = useState(false)
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'no_location' | 'no_address' | 'done'>('idle')
 
   const canEdit = isNew || currentProfile.role === 'admin' || task?.pid === currentProfile.id
   const canAddForOthers = currentProfile.role === 'admin' ||
@@ -95,7 +96,7 @@ function TaskSheet({
   const handleSave = async () => {
     setSaving(true)
     if (isNew) {
-      await onSave({ pid, date, time: time || null, type, customer: customer || null, description: description || null, checkin_ts: null, checkin_lat: null, checkin_lng: null, checkin_by: null })
+      await onSave({ pid, date, time: time || null, type, customer: customer || null, description: description || null, checkin_ts: null, checkin_lat: null, checkin_lng: null, checkin_by: null, checkin_address: null })
     } else if (task) {
       await onUpdate(task.id, { pid, date, time: time || null, type, customer: customer || null, description: description || null })
     }
@@ -114,8 +115,16 @@ function TaskSheet({
   const handleCheckIn = async () => {
     if (!task) return
     setCheckingIn(true)
-    await onCheckIn(task.id)
+    setLocationStatus('idle')
+    const result = await onCheckIn(task.id)
     setCheckingIn(false)
+    if (!result.hasLocation) {
+      setLocationStatus('no_location')
+    } else if (!result.hasAddress) {
+      setLocationStatus('no_address')
+    } else {
+      setLocationStatus('done')
+    }
   }
 
   const handleAddNote = async () => {
@@ -245,37 +254,56 @@ function TaskSheet({
                 <MapPin size={14} /> Check-in
               </h3>
               {task?.checkin_ts ? (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                <div className="bg-green-50 border border-green-200 rounded-xl p-3 space-y-1">
                   <p className="text-green-700 font-medium text-sm flex items-center gap-1">
                     <Check size={14} /> Check-in yapıldı
                   </p>
-                  <p className="text-green-600 text-xs mt-1">
+                  <p className="text-green-600 text-xs">
                     {format(new Date(task.checkin_ts), 'dd.MM.yyyy HH:mm')}
                   </p>
-                  {task.checkin_address && (
-                    <p className="text-green-700 text-xs mt-1 flex items-start gap-1">
-                      <MapPin size={11} className="mt-0.5 shrink-0" />
-                      {task.checkin_address}
+                  {task.checkin_address ? (
+                    <p className="text-green-800 text-xs flex items-start gap-1 mt-1">
+                      <MapPin size={11} className="mt-0.5 shrink-0 text-green-600" />
+                      <span>{task.checkin_address}</span>
                     </p>
-                  )}
-                  {!task.checkin_address && task.checkin_lat && task.checkin_lng && (
-                    <a href={`https://maps.google.com/?q=${task.checkin_lat},${task.checkin_lng}`} target="_blank" rel="noreferrer" className="text-blue-500 text-xs underline mt-1 block">
-                      Haritada gör
+                  ) : task.checkin_lat && task.checkin_lng ? (
+                    <a
+                      href={`https://maps.google.com/?q=${task.checkin_lat},${task.checkin_lng}`}
+                      target="_blank" rel="noreferrer"
+                      className="text-blue-500 text-xs underline flex items-center gap-1 mt-1"
+                    >
+                      <MapPin size={11} /> Haritada gör
                     </a>
+                  ) : (
+                    <p className="text-amber-600 text-xs flex items-center gap-1 mt-1">
+                      ⚠️ Konum kaydedilmedi (izin verilmedi)
+                    </p>
                   )}
                 </div>
               ) : task?.pid === currentProfile.id ? (
-                <button
-                  onClick={handleCheckIn}
-                  disabled={checkingIn}
-                  className="w-full flex items-center justify-center gap-2 bg-brand-500 text-white rounded-lg py-2.5 font-medium min-h-[40px] btn-active disabled:opacity-60"
-                >
-                  {checkingIn ? (
-                    <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Konum alınıyor...</>
-                  ) : (
-                    <><MapPin size={16} /> Check-in Yap</>
+                <div className="space-y-2">
+                  <button
+                    onClick={handleCheckIn}
+                    disabled={checkingIn}
+                    className="w-full flex items-center justify-center gap-2 bg-brand-500 text-white rounded-lg py-2.5 font-medium min-h-[40px] btn-active disabled:opacity-60"
+                  >
+                    {checkingIn ? (
+                      <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Konum alınıyor...</>
+                    ) : (
+                      <><MapPin size={16} /> Check-in Yap</>
+                    )}
+                  </button>
+                  {locationStatus === 'no_location' && (
+                    <p className="text-amber-700 text-xs bg-amber-50 border border-amber-200 rounded-lg p-2 flex items-start gap-1">
+                      ⚠️ Konum izni verilmedi. Tarayıcı ayarlarından konum iznini aktif edin ve tekrar deneyin.
+                    </p>
                   )}
-                </button>
+                  {locationStatus === 'no_address' && (
+                    <p className="text-blue-700 text-xs bg-blue-50 border border-blue-200 rounded-lg p-2 flex items-start gap-1">
+                      ℹ️ Koordinat kaydedildi, adres dönüştürülemedi.
+                    </p>
+                  )}
+                </div>
               ) : (
                 <p className="text-gray-400 text-sm">Henüz check-in yapılmadı.</p>
               )}
@@ -1307,13 +1335,25 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
                                     : <span className="text-gray-300">—</span>
                                   }
                                 </td>
-                                <td className="px-2 py-2 text-xs text-gray-500 max-w-[160px]">
-                                  {t.checkin_address
-                                    ? <span title={t.checkin_address} className="truncate block">{t.checkin_address}</span>
-                                    : t.checkin_lat && t.checkin_lng
-                                      ? <a href={`https://maps.google.com/?q=${t.checkin_lat},${t.checkin_lng}`} target="_blank" rel="noreferrer" className="text-blue-500 underline">Haritada gör</a>
-                                      : '—'
-                                  }
+                                <td className="px-2 py-2 text-xs max-w-[180px]">
+                                  {t.checkin_address ? (
+                                    <span title={t.checkin_address} className="text-gray-700 flex items-start gap-1">
+                                      <MapPin size={10} className="mt-0.5 shrink-0 text-green-600" />
+                                      <span className="line-clamp-2">{t.checkin_address}</span>
+                                    </span>
+                                  ) : t.checkin_lat && t.checkin_lng ? (
+                                    <a
+                                      href={`https://maps.google.com/?q=${t.checkin_lat},${t.checkin_lng}`}
+                                      target="_blank" rel="noreferrer"
+                                      className="text-blue-500 underline flex items-center gap-1"
+                                    >
+                                      <MapPin size={10} /> Haritada gör
+                                    </a>
+                                  ) : t.checkin_ts ? (
+                                    <span className="text-amber-500">Konum yok</span>
+                                  ) : (
+                                    <span className="text-gray-300">—</span>
+                                  )}
                                 </td>
                               </tr>
                             )
@@ -1418,8 +1458,8 @@ export default function AppPage() {
   }
 
   const handleCheckIn = async (taskId: string) => {
-    if (!currentProfile) return
-    await checkIn(taskId, currentProfile.id)
+    if (!currentProfile) return { ok: false, hasLocation: false, hasAddress: false }
+    return checkIn(taskId, currentProfile.id)
   }
 
   if (authLoading || teamLoading) {

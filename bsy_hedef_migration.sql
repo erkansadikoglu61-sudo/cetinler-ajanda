@@ -1,4 +1,9 @@
 -- ============================================================
+-- Tasks tablosuna checkin_address kolonu ekle
+-- ============================================================
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS checkin_address TEXT;
+
+-- ============================================================
 -- BSY Hedef Tablosu — Supabase SQL Editor'de çalıştırın
 -- ============================================================
 

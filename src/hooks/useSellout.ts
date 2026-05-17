@@ -18,6 +18,8 @@ export interface SelloutRow {
   donem:          string
   tarih:          string
   merch_tipi:     string   // 'Çetinler Merch' | diğer
+  sv_tipi:        string
+  bsy:            string   // BSY kodu: KB1, IB1, IB2...
 }
 
 const REFRESH_MS = 30 * 60 * 1000 // 30 dakika
