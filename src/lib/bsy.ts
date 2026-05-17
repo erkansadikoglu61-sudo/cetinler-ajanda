@@ -1,16 +1,18 @@
 // BSY Hedef Takip — paylaşılan tipler, sabitler ve prim motoru
 
-/** Sellout verisi (ve field_personnel) içindeki BSY kodu → profil tam adı */
+/** Sellout verisi içindeki BSY kodu → profil tam adı
+ *  Değerler Supabase profiles.full_name ile AYNI olmalı */
 export const BSY_KOD_TO_NAME: Record<string, string> = {
-  KB1: 'Erdem Bozyel',
-  IB1: 'Burak Kılıç',
-  IB2: 'Okan Oğuz',
-  MB5: 'Kemal Tunalı',
-  EB1: 'Orçun Soyubitmez',
-  MB1: 'Mehmet Katırcı',
-  MB2: 'Mustafa Çetinkaya',
-  MB4: 'Mutlu Topay',
-  MB9: 'Atilla Yılmaz',
+  KB1:  'Erdem BOZYEL',
+  IB1:  'Burak KILIÇ',
+  IB2:  'Okan OĞUZ',
+  MB5:  'Kemal TUNALI',
+  EB1:  'Orçun SOYUBİTMEZ',
+  MB1:  'Mehmet KATIRCI',
+  MB2:  'Mustafa CETİNKAYA',
+  MB4:  'Mutlu TOPAY',
+  MB9:  'Atilla YILMAZ',
+  MB10: 'Erkan SADIKOĞLU',
 }
 
 /** Profil tam adı (küçük harf, Türkçe) → BSY kodu */
@@ -101,7 +103,7 @@ const BSY_MIN_SHARE         = 0.07       // Şirket cirosu %7 barajı
 const SPECIAL_CIRO_MIN      = 35_000_000 // Özel durum: 35M TL alt sınır
 
 // Ciroları tabloya yansır ama prim hesabına dahil edilmez
-export const PRIM_EXCLUDED_BSYS = ['Atilla Yılmaz', 'Erkan Sadıkoğlu']
+export const PRIM_EXCLUDED_BSYS = ['Atilla YILMAZ', 'Erkan SADIKOĞLU']
 
 // Özel durum basamakları: [minShare, primAmount]
 const SPECIAL_TIERS: [number, number][] = [
