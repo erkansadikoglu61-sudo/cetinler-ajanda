@@ -42,6 +42,7 @@ export interface Task {
   checkin_lat: number | null
   checkin_lng: number | null
   checkin_by: string | null
+  checkin_address: string | null
   created_at: string
   updated_at: string
 }

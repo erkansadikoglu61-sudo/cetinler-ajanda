@@ -81,6 +81,7 @@ export function useTasks(
     const ts = new Date().toISOString()
     let lat: number | null = null
     let lng: number | null = null
+    let checkin_address: string | null = null
 
     try {
       const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
@@ -88,16 +89,46 @@ export function useTasks(
       )
       lat = pos.coords.latitude
       lng = pos.coords.longitude
+
+      // Koordinatı adrese çevir (Nominatim / OpenStreetMap)
+      try {
+        const geoRes = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=tr`,
+          { headers: { 'User-Agent': 'CetinlerAjanda/1.0' } }
+        )
+        const geo = await geoRes.json()
+        const a = (geo.address ?? {}) as Record<string, string>
+        const parts = [
+          a.road ?? a.pedestrian ?? a.path ?? a.highway,
+          a.suburb ?? a.neighbourhood ?? a.quarter,
+          [a.town ?? a.district ?? a.county, a.city ?? a.province].filter(Boolean).join('/'),
+        ].filter(Boolean)
+        checkin_address = parts.join(', ') || geo.display_name || null
+      } catch {
+        // Adres çevrimi başarısız olursa koordinat zaten kaydedilir
+      }
     } catch {
       // Konum alınamazsa null koordinatlarla devam et
     }
 
-    return updateTask(taskId, {
+    // Önce adresle dene, kolon yoksa adreis olmadan kaydet
+    const ok = await updateTask(taskId, {
       checkin_ts: ts,
       checkin_lat: lat,
       checkin_lng: lng,
       checkin_by: userId,
+      checkin_address,
     })
+    if (!ok && checkin_address !== undefined) {
+      // checkin_address kolonu henüz eklenmemişse adreis olmadan kaydet
+      return updateTask(taskId, {
+        checkin_ts: ts,
+        checkin_lat: lat,
+        checkin_lng: lng,
+        checkin_by: userId,
+      })
+    }
+    return ok
   }
 
   return { tasks, loading, tasksForDay, addTask, updateTask, deleteTask, checkIn, reload: load }

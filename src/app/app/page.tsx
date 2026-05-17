@@ -251,10 +251,18 @@ function TaskSheet({
                   </p>
                   <p className="text-green-600 text-xs mt-1">
                     {format(new Date(task.checkin_ts), 'dd.MM.yyyy HH:mm')}
-                    {task.checkin_lat && task.checkin_lng &&
-                      ` · ${task.checkin_lat.toFixed(4)}, ${task.checkin_lng.toFixed(4)}`
-                    }
                   </p>
+                  {task.checkin_address && (
+                    <p className="text-green-700 text-xs mt-1 flex items-start gap-1">
+                      <MapPin size={11} className="mt-0.5 shrink-0" />
+                      {task.checkin_address}
+                    </p>
+                  )}
+                  {!task.checkin_address && task.checkin_lat && task.checkin_lng && (
+                    <a href={`https://maps.google.com/?q=${task.checkin_lat},${task.checkin_lng}`} target="_blank" rel="noreferrer" className="text-blue-500 text-xs underline mt-1 block">
+                      Haritada gör
+                    </a>
+                  )}
                 </div>
               ) : task?.pid === currentProfile.id ? (
                 <button
@@ -1299,10 +1307,12 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
                                     : <span className="text-gray-300">—</span>
                                   }
                                 </td>
-                                <td className="px-2 py-2 text-xs text-gray-400 whitespace-nowrap">
-                                  {t.checkin_lat && t.checkin_lng
-                                    ? <a href={`https://maps.google.com/?q=${t.checkin_lat},${t.checkin_lng}`} target="_blank" rel="noreferrer" className="text-blue-500 underline">Harita</a>
-                                    : '—'
+                                <td className="px-2 py-2 text-xs text-gray-500 max-w-[160px]">
+                                  {t.checkin_address
+                                    ? <span title={t.checkin_address} className="truncate block">{t.checkin_address}</span>
+                                    : t.checkin_lat && t.checkin_lng
+                                      ? <a href={`https://maps.google.com/?q=${t.checkin_lat},${t.checkin_lng}`} target="_blank" rel="noreferrer" className="text-blue-500 underline">Haritada gör</a>
+                                      : '—'
                                   }
                                 </td>
                               </tr>
