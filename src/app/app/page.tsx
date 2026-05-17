@@ -1062,10 +1062,10 @@ function ReportView({
                 return (
                   <div
                     key={t.id}
-                    className="flex items-center gap-3 rounded-xl p-3 border border-gray-100"
+                    className="flex items-start gap-3 rounded-xl p-3 border border-gray-100"
                   >
                     <div
-                      className="w-1 self-stretch rounded-full flex-shrink-0"
+                      className="w-1 self-stretch rounded-full flex-shrink-0 mt-0.5"
                       style={{ backgroundColor: p.color }}
                     />
                     <div className="flex-1 min-w-0">
@@ -1073,14 +1073,35 @@ function ReportView({
                         {t.customer ?? t.type}
                       </p>
                       <p className="text-xs text-gray-400">
-                        {p.full_name} · {format(new Date(t.date), 'dd.MM.yyyy')}
+                        {p.full_name} · {format(new Date(t.date), 'dd.MM.yyyy')}{t.time ? ` · ${t.time}` : ''} · {t.type}
                       </p>
+                      {t.checkin_ts && (
+                        <div className="mt-1 flex items-start gap-1 flex-wrap">
+                          <span className="text-xs text-green-700 font-medium flex items-center gap-0.5 whitespace-nowrap">
+                            <Check size={10} className="text-green-600" />
+                            {format(new Date(t.checkin_ts), 'HH:mm')}
+                          </span>
+                          {t.checkin_address ? (
+                            <span className="text-xs text-gray-500 flex items-start gap-0.5">
+                              <MapPin size={10} className="mt-0.5 shrink-0 text-green-500" />
+                              {t.checkin_address}
+                            </span>
+                          ) : t.checkin_lat && t.checkin_lng ? (
+                            <a
+                              href={`https://maps.google.com/?q=${t.checkin_lat},${t.checkin_lng}`}
+                              target="_blank" rel="noreferrer"
+                              className="text-xs text-blue-500 underline flex items-center gap-0.5"
+                            >
+                              <MapPin size={10} /> Haritada gör
+                            </a>
+                          ) : (
+                            <span className="text-xs text-amber-500 flex items-center gap-0.5">
+                              <MapPin size={10} /> Konum izni verilmedi
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {t.checkin_ts && (
-                      <span className="text-xs bg-green-100 text-green-700 rounded-full px-2 py-0.5 font-medium flex-shrink-0">
-                        ✓ Check-in
-                      </span>
-                    )}
                   </div>
                 )
               })}
