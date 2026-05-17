@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import {
   Menu, ChevronLeft, ChevronRight, BarChart2, Plus, X, Trash2,
   MapPin, MessageSquare, Calendar, CalendarDays, CalendarRange,
-  FileText, LogOut, Check, TrendingUp, Target
+  FileText, LogOut, Check, TrendingUp, Target, Activity, Store, Users
 } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, isToday } from 'date-fns'
 import { tr } from 'date-fns/locale'
@@ -21,8 +21,11 @@ import { TASK_TYPES, VISIT_TYPES, MONTHS_TR, DAYS_SHORT, ROLE_LABELS } from '@/l
 import { generateVisitReport } from '@/lib/pdf'
 import { SelloutView } from '@/components/SelloutView'
 import { BsyView } from '@/components/BsyView'
-
-type TabType = 'month' | 'week' | 'day' | 'report' | 'sellout' | 'bsy'
+import { KpiView } from '@/components/KpiView'
+import { NoktalarimizView } from '@/components/NoktalarimizView'
+import { KullanicilarView } from '@/components/KullanicilarView'
+import { SellinSelloutView } from '@/components/SellinSelloutView'
+type TabType = 'month' | 'week' | 'day' | 'report' | 'sellout' | 'bsy' | 'kpi' | 'noktalar' | 'kullanicilar' | 'sellinout'
 
 // Renk hex'ine alpha ekle
 function hexWithAlpha(hex: string, alpha: string) {
@@ -488,28 +491,22 @@ function Sidebar({ currentProfile, team, visibleIds, bsyLinks, filterPid, taskCo
           <div className="pt-1">
             {renderRow(currentProfile)}
             {(() => {
-              const linkedIds = bsyLinks
+              const linkedSupIds = bsyLinks
                 .filter(l => l.bsy_id === currentProfile.id)
                 .map(l => l.sup_id)
-              const linkedSups = team.filter(p => p.role === 'sup' && linkedIds.includes(p.id))
-              const linkedSupIds = linkedSups.map(s => s.id)
-              const directJrs = team.filter(p =>
-                p.role === 'jr' && linkedIds.includes(p.id) &&
-                !linkedSupIds.some(sid => p.manager_id === sid)
-              )
-              return linkedIds.length > 0 ? (
+              const linkedSups = team.filter(p => p.role === 'sup' && linkedSupIds.includes(p.id))
+              return linkedSupIds.length > 0 ? (
                 <div className="ml-2 border-l-2 border-gray-100 pl-1 space-y-0.5">
                   {linkedSups.map(sup => (
                     <div key={sup.id}>
                       {renderRow(sup)}
-                      {team.filter(p => p.role === 'jr' && p.manager_id === sup.id && linkedIds.includes(p.id)).map(jr => (
+                      {team.filter(p => p.role === 'jr' && p.manager_id === sup.id).map(jr => (
                         <div key={jr.id} className="ml-2 border-l-2 border-gray-50 pl-1">
                           {renderRow(jr)}
                         </div>
                       ))}
                     </div>
                   ))}
-                  {directJrs.map(jr => renderRow(jr))}
                 </div>
               ) : null
             })()}
@@ -1340,6 +1337,10 @@ export default function AppPage() {
   // BSY Hedef Takip sekmesi sadece admin/bsy rollerine görünür
   const isBsyOrAdmin = currentProfile?.role === 'admin'
     || currentProfile?.role === 'bsy'
+  const isBsy = currentProfile?.role === 'bsy'
+
+  // Süpervizör ve Jr. Süpervizör → sadece Sellout + Noktalarımız
+  const isSupOrJr = currentProfile?.role === 'sup' || currentProfile?.role === 'jr'
 
   // Auth redirect
   useEffect(() => {
@@ -1347,6 +1348,13 @@ export default function AppPage() {
       router.replace('/login')
     }
   }, [authLoading, currentProfile, router])
+
+  // sup/jr için varsayılan sekme: sellout, bsy için: bsy, admin için: month
+  useEffect(() => {
+    if (isSupOrJr) setTab('sellout')
+    else if (isBsy) setTab('bsy')
+    else if (currentProfile?.role === 'admin') setTab('month')
+  }, [isSupOrJr, isBsy, currentProfile?.role])
 
   const prevMonth = () => {
     if (month === 0) { setMonth(11); setYear(y => y - 1) }
@@ -1451,12 +1459,18 @@ export default function AppPage() {
           {/* Masaüstü: Tab sekmeleri */}
           <div className="hidden md:flex items-center gap-1 mr-2">
             {([
-              { key: 'month',   icon: Calendar,      label: 'Ay' },
-              { key: 'week',    icon: CalendarRange,  label: 'Hafta' },
-              { key: 'day',     icon: CalendarDays,   label: 'Gün' },
-              { key: 'report',  icon: FileText,       label: 'Rapor' },
-              { key: 'sellout', icon: TrendingUp,     label: 'Sellout' },
-              ...(isBsyOrAdmin ? [{ key: 'bsy' as const, icon: Target, label: 'BSY' }] : []),
+              ...(currentProfile?.role === 'admin' ? [
+                { key: 'month'  as const, icon: Calendar,     label: 'Ay' },
+                { key: 'week'   as const, icon: CalendarRange, label: 'Hafta' },
+                { key: 'day'    as const, icon: CalendarDays,  label: 'Gün' },
+                { key: 'report' as const, icon: FileText,      label: 'Rapor' },
+              ] : []),
+              ...(isBsyOrAdmin ? [{ key: 'bsy'      as const, icon: Target,     label: 'BSY' }] : []),
+              ...(isBsyOrAdmin ? [{ key: 'sellinout' as const, icon: BarChart2, label: 'S.In/Out' }] : []),
+              { key: 'sellout' as const, icon: TrendingUp, label: 'Sellout' },
+              ...(isBsyOrAdmin ? [{ key: 'kpi' as const, icon: Activity, label: 'KPI' }] : []),
+              { key: 'noktalar' as const, icon: Store,  label: 'Noktalarımız' },
+              { key: 'kullanicilar' as const, icon: Users, label: 'Kullanıcılar' },
             ] as const).map(({ key, icon: Icon, label }) => (
               <button
                 key={key}
@@ -1475,7 +1489,7 @@ export default function AppPage() {
           </div>
 
           {/* Ay navigasyon */}
-          {tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && (
+          {tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && (
             <div className="flex items-center gap-1">
               <button onClick={prevMonth} className="p-2 text-gray-500 min-h-[44px] min-w-[44px] flex items-center justify-center">
                 <ChevronLeft size={18} />
@@ -1489,12 +1503,14 @@ export default function AppPage() {
             </div>
           )}
 
-          <button
-            onClick={() => setShowStats(true)}
-            className="p-2 text-gray-600 min-h-[44px] min-w-[44px] flex items-center justify-center"
-          >
-            <BarChart2 size={20} />
-          </button>
+          {currentProfile?.role === 'admin' && (
+            <button
+              onClick={() => setShowStats(true)}
+              className="p-2 text-gray-600 min-h-[44px] min-w-[44px] flex items-center justify-center"
+            >
+              <BarChart2 size={20} />
+            </button>
+          )}
         </div>
 
       {/* İçerik */}
@@ -1540,14 +1556,42 @@ export default function AppPage() {
           )}
           {tab === 'bsy' && isBsyOrAdmin && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
-              <BsyView />
+              <BsyView isAdmin={currentProfile?.role === 'admin'} isBsy={isBsy} />
+            </div>
+          )}
+          {tab === 'sellinout' && isBsyOrAdmin && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <SellinSelloutView currentProfile={currentProfile} active={tab === 'sellinout'} />
+            </div>
+          )}
+          {tab === 'kpi' && isBsyOrAdmin && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <KpiView />
+            </div>
+          )}
+          {tab === 'noktalar' && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <NoktalarimizView
+                currentProfile={currentProfile}
+                team={team}
+                bsyLinks={bsyLinks}
+              />
+            </div>
+          )}
+          {tab === 'kullanicilar' && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <KullanicilarView
+                currentProfile={currentProfile}
+                team={team}
+                bsyLinks={bsyLinks}
+              />
             </div>
           )}
         </>
       )}
 
-      {/* FAB */}
-      {tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && (
+      {/* FAB — sadece admin takvim sekmelerinde görünür */}
+      {currentProfile?.role === 'admin' && tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'dashboard' && tab !== 'sellinout' && (
         <button
           onClick={handleAddTask}
           className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
@@ -1558,14 +1602,25 @@ export default function AppPage() {
 
       {/* Bottom Nav */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-20 safe-bottom">
-        <div className={clsx('grid h-16', isBsyOrAdmin ? 'grid-cols-7' : 'grid-cols-6')}>
+        <div className={clsx(
+          'grid h-16',
+          isSupOrJr                        ? 'grid-cols-4'  :
+          isBsy                            ? 'grid-cols-7'  :
+          currentProfile?.role === 'admin' ? 'grid-cols-11' : 'grid-cols-8'
+        )}>
           {([
-            { key: 'month',   icon: Calendar,     label: 'Ay' },
-            { key: 'week',    icon: CalendarRange, label: 'Hafta' },
-            { key: 'day',     icon: CalendarDays,  label: 'Gün' },
-            { key: 'report',  icon: FileText,      label: 'Rapor' },
-            { key: 'sellout', icon: TrendingUp,    label: 'Sellout' },
-            ...(isBsyOrAdmin ? [{ key: 'bsy' as const, icon: Target, label: 'BSY' }] : []),
+            ...(currentProfile?.role === 'admin' ? [
+              { key: 'month'   as const, icon: Calendar,     label: 'Ay'     },
+              { key: 'week'    as const, icon: CalendarRange, label: 'Hafta'  },
+              { key: 'day'     as const, icon: CalendarDays,  label: 'Gün'    },
+              { key: 'report'  as const, icon: FileText,      label: 'Rapor'  },
+            ] : []),
+            ...(isBsyOrAdmin ? [{ key: 'bsy'       as const, icon: Target,     label: 'BSY'      }] : []),
+            ...(isBsyOrAdmin ? [{ key: 'sellinout'  as const, icon: BarChart2,  label: 'S.In/Out' }] : []),
+            { key: 'sellout'      as const, icon: TrendingUp, label: 'Sellout'  },
+            ...(isBsyOrAdmin ? [{ key: 'kpi' as const, icon: Activity, label: 'KPI'  }] : []),
+            { key: 'noktalar'     as const, icon: Store,  label: 'Noktalar'  },
+            { key: 'kullanicilar' as const, icon: Users,  label: 'Kullanıcı' },
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
