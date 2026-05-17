@@ -1304,62 +1304,55 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
                     {personTasks.length === 0 ? (
                       <p className="text-xs text-gray-400 px-3 py-3 text-center">Bu ay görev yok.</p>
                     ) : (
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="bg-gray-50 border-b border-gray-100">
-                            <th className="text-left px-3 py-2 text-gray-500 font-medium">Tarih</th>
-                            <th className="text-left px-3 py-2 text-gray-500 font-medium">Saat</th>
-                            <th className="text-left px-3 py-2 text-gray-500 font-medium">Tür</th>
-                            <th className="text-left px-2 py-2 text-gray-500 font-medium">Müşteri/Şube</th>
-                            <th className="text-center px-2 py-2 text-gray-500 font-medium">Check-in</th>
-                            <th className="text-left px-2 py-2 text-gray-500 font-medium">Konum</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {personTasks.map(t => {
-                            const d = new Date(t.date + 'T00:00:00')
-                            const dayName = DAY_NAMES[d.getDay()]
-                            const dateLabel = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')} ${dayName}`
-                            const checkinTime = t.checkin_ts
-                              ? format(new Date(t.checkin_ts), 'HH:mm')
-                              : null
-                            return (
-                              <tr key={t.id} className="border-b border-gray-100 last:border-0">
-                                <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{dateLabel}</td>
-                                <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{t.time ?? '—'}</td>
-                                <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{t.type}</td>
-                                <td className="px-2 py-2 text-gray-600 max-w-[90px] truncate">{t.customer ?? '—'}</td>
-                                <td className="px-2 py-2 text-center whitespace-nowrap">
-                                  {checkinTime
-                                    ? <span className="inline-flex items-center gap-1 text-green-700 font-medium"><Check size={10} className="text-green-600" />{checkinTime}</span>
-                                    : <span className="text-gray-300">—</span>
-                                  }
-                                </td>
-                                <td className="px-2 py-2 text-xs max-w-[180px]">
+                      <div className="divide-y divide-gray-100">
+                        {personTasks.map(t => {
+                          const d = new Date(t.date + 'T00:00:00')
+                          const dayName = DAY_NAMES[d.getDay()]
+                          const dateLabel = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')} ${dayName}`
+                          const checkinTime = t.checkin_ts
+                            ? format(new Date(t.checkin_ts), 'HH:mm')
+                            : null
+                          return (
+                            <div key={t.id} className="px-3 py-2.5">
+                              {/* Üst satır: tarih, saat, tür, müşteri */}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-medium text-gray-700 whitespace-nowrap">{dateLabel}</span>
+                                {t.time && <span className="text-xs text-gray-400">{t.time}</span>}
+                                <span className="text-xs text-gray-600 bg-gray-100 rounded px-1.5 py-0.5">{t.type}</span>
+                                {t.customer && <span className="text-xs text-gray-500 truncate max-w-[120px]">{t.customer}</span>}
+                              </div>
+                              {/* Alt satır: check-in bilgisi ve adres */}
+                              {checkinTime ? (
+                                <div className="mt-1.5 flex items-start gap-1.5">
+                                  <span className="inline-flex items-center gap-1 text-green-700 font-medium text-xs whitespace-nowrap">
+                                    <Check size={10} className="text-green-600" /> {checkinTime}
+                                  </span>
                                   {t.checkin_address ? (
-                                    <span title={t.checkin_address} className="text-gray-700 flex items-start gap-1">
+                                    <span className="text-xs text-gray-600 flex items-start gap-1">
                                       <MapPin size={10} className="mt-0.5 shrink-0 text-green-600" />
-                                      <span className="line-clamp-2">{t.checkin_address}</span>
+                                      <span>{t.checkin_address}</span>
                                     </span>
                                   ) : t.checkin_lat && t.checkin_lng ? (
                                     <a
                                       href={`https://maps.google.com/?q=${t.checkin_lat},${t.checkin_lng}`}
                                       target="_blank" rel="noreferrer"
-                                      className="text-blue-500 underline flex items-center gap-1"
+                                      className="text-xs text-blue-500 underline flex items-center gap-1"
                                     >
                                       <MapPin size={10} /> Haritada gör
                                     </a>
-                                  ) : t.checkin_ts ? (
-                                    <span className="text-amber-500">Konum yok</span>
                                   ) : (
-                                    <span className="text-gray-300">—</span>
+                                    <span className="text-xs text-amber-500 flex items-center gap-1">
+                                      <MapPin size={10} /> Konum izni verilmedi
+                                    </span>
                                   )}
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
+                                </div>
+                              ) : (
+                                <div className="mt-1 text-xs text-gray-300">Check-in yapılmadı</div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
                     )}
                   </div>
                 )}
