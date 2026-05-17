@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { RefreshCw, Info, Wallet } from 'lucide-react'
+import { RefreshCw, Wallet } from 'lucide-react'
 import type { DashboardResponse, DashboardCiroRow, DashboardTahsilat, DashboardCariRow } from '@/app/api/dashboard/route'
 import type { SelloutRow } from '@/app/api/sellout/route'
 import { GRUP_NORMALIZE, SELLOUT_GROUPS } from '@/lib/sellout'
@@ -20,7 +20,7 @@ const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','A
 interface CiroTableProps {
   title: string
   rows: DashboardCiroRow[]
-  headerColor: string  // tailwind bg class
+  headerColor: string
   loading: boolean
 }
 
@@ -116,7 +116,7 @@ export default function DashboardView() {
 
   useEffect(() => {
     void fetchAll()
-    const id = setInterval(fetchAll, 30 * 60 * 1000) // 30 dakikada bir otomatik yenile
+    const id = setInterval(fetchAll, 30 * 60 * 1000)
     return () => clearInterval(id)
   }, [fetchAll])
 
@@ -136,7 +136,6 @@ export default function DashboardView() {
     return { elux, relux }
   }, [filteredSellout])
 
-  // Kategori bazında satilan_adet toplamı (b2b.cetinlerltd.com.tr kaynağı)
   const adetByGrup = useMemo(() => {
     const totals: Record<string, number> = {}
     SELLOUT_GROUPS.forEach(g => { totals[g] = 0 })
@@ -190,7 +189,6 @@ export default function DashboardView() {
         </div>
       </div>
 
-      {/* Body: flex row */}
       {/* Body: 4 kolon grid */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3 p-3 overflow-y-auto min-h-0 items-start">
 
