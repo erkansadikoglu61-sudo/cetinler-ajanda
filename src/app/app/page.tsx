@@ -256,7 +256,7 @@ function TaskSheet({
                     }
                   </p>
                 </div>
-              ) : task?.pid === currentProfile.id && (currentProfile.role === 'sup' || currentProfile.role === 'jr') ? (
+              ) : task?.pid === currentProfile.id ? (
                 <button
                   onClick={handleCheckIn}
                   disabled={checkingIn}
@@ -1276,6 +1276,7 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
                             <th className="text-left px-3 py-2 text-gray-500 font-medium">Tür</th>
                             <th className="text-left px-2 py-2 text-gray-500 font-medium">Müşteri/Şube</th>
                             <th className="text-center px-2 py-2 text-gray-500 font-medium">Check-in</th>
+                            <th className="text-left px-2 py-2 text-gray-500 font-medium">Konum</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1283,16 +1284,25 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
                             const d = new Date(t.date + 'T00:00:00')
                             const dayName = DAY_NAMES[d.getDay()]
                             const dateLabel = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')} ${dayName}`
+                            const checkinTime = t.checkin_ts
+                              ? format(new Date(t.checkin_ts), 'HH:mm')
+                              : null
                             return (
                               <tr key={t.id} className="border-b border-gray-100 last:border-0">
                                 <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{dateLabel}</td>
                                 <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{t.time ?? '—'}</td>
                                 <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{t.type}</td>
                                 <td className="px-2 py-2 text-gray-600 max-w-[90px] truncate">{t.customer ?? '—'}</td>
-                                <td className="px-2 py-2 text-center">
-                                  {t.checkin_ts
-                                    ? <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-100"><Check size={10} className="text-green-600" /></span>
+                                <td className="px-2 py-2 text-center whitespace-nowrap">
+                                  {checkinTime
+                                    ? <span className="inline-flex items-center gap-1 text-green-700 font-medium"><Check size={10} className="text-green-600" />{checkinTime}</span>
                                     : <span className="text-gray-300">—</span>
+                                  }
+                                </td>
+                                <td className="px-2 py-2 text-xs text-gray-400 whitespace-nowrap">
+                                  {t.checkin_lat && t.checkin_lng
+                                    ? <a href={`https://maps.google.com/?q=${t.checkin_lat},${t.checkin_lng}`} target="_blank" rel="noreferrer" className="text-blue-500 underline">Harita</a>
+                                    : '—'
                                   }
                                 </td>
                               </tr>
