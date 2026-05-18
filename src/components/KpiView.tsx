@@ -4,29 +4,63 @@ import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, Gift, Award, ChevronRight } from 'lucide-react'
 import clsx from 'clsx'
 
-// ─── Kampanya Tanımı ─────────────────────────────────────────────
-const KAMPANYA = {
-  stokKodu:  'EP72UB21SW',
-  stokAdi:   'Dikey Şarjlı Süpürge',
-  marka:     'Electrolux',
-  yil:       2026,
-  ay:        5,          // Mayıs
-  ayAdi:     'Mayıs',
-  esik:      60,         // Her 60 adette bir ödül
-  odul:      'Tatilbudur Çeki',
-  odulTutar: '25.000 TL',
+// ─── Kampanya Tanımları ───────────────────────────────────────────
+interface Kampanya {
+  id:         string
+  stokKodlar: string[]   // tekli veya çoklu stok kodu
+  stokAdi:    string
+  marka:      string
+  yil:        number
+  ay:         number
+  ayAdi:      string
+  esik:       number
+  odul:       string
+  odulTutar:  string
+  renk:       string     // tailwind gradient class başlangıcı
+  renkDark:   string
 }
+
+const KAMPANYALAR: Kampanya[] = [
+  {
+    id:         'k1',
+    stokKodlar: ['EP72UB21SW'],
+    stokAdi:    'Dikey Şarjlı Süpürge',
+    marka:      'Electrolux',
+    yil:        2026,
+    ay:         5,
+    ayAdi:      'Mayıs',
+    esik:       60,
+    odul:       'Tatilbudur Çeki',
+    odulTutar:  '25.000 TL',
+    renk:       'from-[#1a8a8a] to-[#1aacac]',
+    renkDark:   'bg-[#1a8a8a]',
+  },
+  {
+    id:         'k2',
+    stokKodlar: ['REP9548P', 'REP9548G'],
+    stokAdi:    'REP9548P + REP9548G',
+    marka:      'Relux',
+    yil:        2026,
+    ay:         5,
+    ayAdi:      'Mayıs',
+    esik:       250,
+    odul:       'Tatilbudur Çeki',
+    odulTutar:  '25.000 TL',
+    renk:       'from-[#7c3aed] to-[#9f5cf0]',
+    renkDark:   'bg-[#7c3aed]',
+  },
+]
 
 // ─── Tipler ──────────────────────────────────────────────────────
 interface BsyKpiRow {
   bsyAdi:       string
   adet:         number
   kazanilanCek: number
-  kalanAdet:    number   // bir sonraki çek için kalan
+  kalanAdet:    number
   ilerleme:     number   // 0–100
 }
 
-// ─── Yardımcılar ─────────────────────────────────────────────────
+// ─── Yardımcı ────────────────────────────────────────────────────
 function hesapla(adet: number, esik: number): Omit<BsyKpiRow, 'bsyAdi' | 'adet'> {
   const net          = Math.max(0, adet)
   const kazanilanCek = Math.floor(net / esik)
@@ -36,31 +70,44 @@ function hesapla(adet: number, esik: number): Omit<BsyKpiRow, 'bsyAdi' | 'adet'>
   return { kazanilanCek, kalanAdet, ilerleme }
 }
 
+function apiUrl(k: Kampanya): string {
+  const base = `/api/kpi-adet?yil=${k.yil}&ay=${k.ay}`
+  if (k.stokKodlar.length === 1) {
+    return `${base}&stokKodu=${encodeURIComponent(k.stokKodlar[0])}`
+  }
+  return `${base}&stokKodlar=${encodeURIComponent(k.stokKodlar.join(','))}`
+}
+
 // ─── Ana Bileşen ─────────────────────────────────────────────────
 export function KpiView() {
-  const [rows,    setRows]    = useState<BsyKpiRow[]>([])
-  const [loading, setLoading] = useState(false)
+  const [aktifIdx, setAktifIdx] = useState(0)
+  const kampanya = KAMPANYALAR[aktifIdx]
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const [rowsMap, setRowsMap]     = useState<Record<string, BsyKpiRow[]>>({})
+  const [loadingId, setLoadingId] = useState<string | null>(null)
+
+  const load = useCallback(async (k: Kampanya) => {
+    setLoadingId(k.id)
     try {
-      const res  = await fetch(
-        `/api/kpi-adet?yil=${KAMPANYA.yil}&ay=${KAMPANYA.ay}&stokKodu=${encodeURIComponent(KAMPANYA.stokKodu)}`
-      )
+      const res  = await fetch(apiUrl(k))
       const data = await res.json()
       const apiRows = (data.rows ?? []) as { bsyAdi: string; adet: number }[]
-
-      setRows(
-        apiRows
-          .map(r => ({ bsyAdi: r.bsyAdi, adet: Math.max(0, r.adet), ...hesapla(r.adet, KAMPANYA.esik) }))
-          .sort((a, b) => b.adet - a.adet)
-      )
+      const parsed = apiRows
+        .map(r => ({ bsyAdi: r.bsyAdi, adet: Math.max(0, r.adet), ...hesapla(r.adet, k.esik) }))
+        .sort((a, b) => b.adet - a.adet)
+      setRowsMap(prev => ({ ...prev, [k.id]: parsed }))
     } finally {
-      setLoading(false)
+      setLoadingId(null)
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  // Aktif kampanya değişince yükle (henüz yüklenmediyse)
+  useEffect(() => {
+    if (!rowsMap[kampanya.id]) load(kampanya)
+  }, [kampanya, rowsMap, load])
+
+  const rows    = rowsMap[kampanya.id] ?? []
+  const loading = loadingId === kampanya.id
 
   const toplamAdet = rows.reduce((s, r) => s + r.adet, 0)
   const toplamCek  = rows.reduce((s, r) => s + r.kazanilanCek, 0)
@@ -68,38 +115,62 @@ export function KpiView() {
   return (
     <div className="flex flex-col h-full bg-gray-50">
 
-      {/* ── Kampanya Başlık Kartı ─────────────────────────────── */}
-      <div className="flex-shrink-0 bg-gradient-to-br from-[#1a8a8a] to-[#1aacac] text-white px-5 py-4 shadow-sm">
+      {/* ── Sekme Seçimi ─────────────────────────────────────────── */}
+      <div className="flex-shrink-0 flex border-b border-gray-200 bg-white">
+        {KAMPANYALAR.map((k, idx) => (
+          <button
+            key={k.id}
+            onClick={() => setAktifIdx(idx)}
+            className={clsx(
+              'flex-1 py-2.5 text-xs font-semibold transition-colors',
+              aktifIdx === idx
+                ? 'text-white ' + k.renkDark
+                : 'text-gray-500 hover:text-gray-800'
+            )}
+          >
+            {k.marka}
+            <div className="text-[10px] font-normal opacity-75">Her {k.esik} adet → Çek</div>
+          </button>
+        ))}
+      </div>
+
+      {/* ── Kampanya Başlık Kartı ─────────────────────────────────── */}
+      <div className={clsx(
+        'flex-shrink-0 bg-gradient-to-br text-white px-5 py-4 shadow-sm',
+        kampanya.renk
+      )}>
         <div className="flex items-start justify-between gap-4">
 
           {/* Sol: Ürün Bilgisi */}
           <div className="flex-1 min-w-0">
             <div className="text-[10px] font-semibold uppercase tracking-wider opacity-70 mb-0.5">
-              {KAMPANYA.ayAdi} {KAMPANYA.yil} · BSY Kampanyası
+              {kampanya.ayAdi} {kampanya.yil} · BSY Kampanyası
             </div>
-            <div className="text-[11px] opacity-80">{KAMPANYA.marka}</div>
-            <div className="text-xl font-bold tracking-tight leading-tight">{KAMPANYA.stokKodu}</div>
-            <div className="text-xs opacity-80 mb-3">{KAMPANYA.stokAdi}</div>
+            <div className="text-[11px] opacity-80">{kampanya.marka}</div>
+            <div className="text-xl font-bold tracking-tight leading-tight">
+              {kampanya.stokKodlar.join(' + ')}
+            </div>
+            <div className="text-xs opacity-80 mb-3">{kampanya.stokAdi}</div>
 
             {/* Ödül Bandı */}
             <div className="flex items-center gap-2 bg-white/15 backdrop-blur rounded-xl px-3 py-2 w-fit">
               <Gift size={13} className="flex-shrink-0" />
               <span className="text-xs">
                 Her{' '}
-                <span className="font-bold text-sm">{KAMPANYA.esik}</span>
+                <span className="font-bold text-sm">{kampanya.esik}</span>
                 {' '}adette{' '}
                 <span className="font-bold">1</span>{' '}
-                {KAMPANYA.odul}
+                {kampanya.odul}
               </span>
               <ChevronRight size={11} className="opacity-60" />
-              <span className="font-bold text-sm">{KAMPANYA.odulTutar}</span>
+              <span className="font-bold text-sm">{kampanya.odulTutar}</span>
             </div>
           </div>
 
           {/* Sağ: Özet + Yenile */}
           <div className="flex flex-col items-end gap-2 flex-shrink-0">
             <button
-              onClick={load}
+              onClick={() => load(kampanya)}
               disabled={loading}
               className="p-1.5 rounded-lg bg-white/15 hover:bg-white/25 transition-colors disabled:opacity-50"
             >
@@ -121,7 +192,7 @@ export function KpiView() {
         </div>
       </div>
 
-      {/* ── Tablo ───────────────────────────────────────────────── */}
+      {/* ── Tablo ────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-auto">
         {loading ? (
           <div className="flex items-center justify-center h-full gap-2 text-xs text-gray-400">
@@ -144,7 +215,7 @@ export function KpiView() {
               {rows.length === 0 && (
                 <tr>
                   <td colSpan={6} className="text-center py-16 text-gray-400">
-                    {KAMPANYA.stokKodu} için {KAMPANYA.ayAdi} {KAMPANYA.yil} verisi bulunamadı
+                    {kampanya.stokKodlar.join(', ')} için {kampanya.ayAdi} {kampanya.yil} verisi bulunamadı
                   </td>
                 </tr>
               )}
@@ -157,18 +228,11 @@ export function KpiView() {
                     idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'
                   )}
                 >
-                  {/* Sıra */}
                   <td className="px-4 py-3 text-gray-400 font-mono w-8">{idx + 1}</td>
-
-                  {/* BSY Adı */}
                   <td className="px-4 py-3 text-gray-800 font-semibold">{row.bsyAdi}</td>
-
-                  {/* Satış Adedi */}
                   <td className="px-4 py-3 text-right font-bold text-gray-900 text-sm">
                     {row.adet.toLocaleString('tr-TR')}
                   </td>
-
-                  {/* Kazanılan Çek */}
                   <td className="px-4 py-3 text-right">
                     {row.kazanilanCek > 0 ? (
                       <span className="inline-flex items-center justify-end gap-1 text-teal-600 font-bold">
@@ -179,13 +243,9 @@ export function KpiView() {
                       <span className="text-gray-300">—</span>
                     )}
                   </td>
-
-                  {/* Kalan */}
                   <td className="px-4 py-3 text-right text-gray-500">
                     {row.kalanAdet} adet
                   </td>
-
-                  {/* İlerleme Çubuğu */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">

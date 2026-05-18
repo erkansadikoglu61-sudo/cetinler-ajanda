@@ -51,6 +51,11 @@ export async function GET(req: Request) {
   const yil      = sp.get('yil') ? parseInt(sp.get('yil')!) : null
   const ay       = sp.get('ay')  ? parseInt(sp.get('ay')!)  : null
   const stokKodu = sp.get('stokKodu') ?? null
+  // Çoklu stok kodu desteği: stokKodlar=REP9548P,REP9548G
+  const stokKodlarParam = sp.get('stokKodlar')
+  const stokKodlarSet: Set<string> | null = stokKodlarParam
+    ? new Set(stokKodlarParam.split(',').map(s => s.trim()).filter(Boolean))
+    : null
 
   const buf = await getExcelBuffer()
   if (!buf) {
@@ -93,20 +98,28 @@ export async function GET(req: Request) {
     // Stok kodu listesi için (dönem eşleşmişse)
     stoklarMap.set(rowStokKodu, rowStokAdi)
 
-    // Satır filtresi (belirli stok kodu seçildiyse)
-    if (stokKodu && rowStokKodu !== stokKodu) continue
+    // Satır filtresi
+    if (stokKodlarSet) {
+      // Çoklu stok kodu modu
+      if (!stokKodlarSet.has(rowStokKodu)) continue
+    } else if (stokKodu) {
+      if (rowStokKodu !== stokKodu) continue
+    }
 
     // Adet: C=satış(+), G=iade(-)
     const adet = gc === 'G' ? -Math.abs(rawAdet) : rawAdet
     bsyAdetMap.set(plasiyerAdi, (bsyAdetMap.get(plasiyerAdi) ?? 0) + adet)
   }
 
-  const rows: KpiAdetRow[] = stokKodu
+  const aktifStok = stokKodlarParam ?? stokKodu
+  const rows: KpiAdetRow[] = aktifStok
     ? [...bsyAdetMap.entries()]
         .map(([bsyAdi, adet]) => ({
           bsyAdi,
-          stokKodu: stokKodu!,
-          stokAdi:  stoklarMap.get(stokKodu!) ?? '',
+          stokKodu: aktifStok,
+          stokAdi:  stokKodlarParam
+            ? (stokKodlarParam)   // birden fazla → parametre olarak dön
+            : (stoklarMap.get(stokKodu!) ?? ''),
           adet,
         }))
         .filter(r => r.adet !== 0)
