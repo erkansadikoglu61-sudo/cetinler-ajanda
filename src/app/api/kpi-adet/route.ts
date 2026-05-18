@@ -50,6 +50,9 @@ export async function GET(req: Request) {
   const sp       = new URL(req.url).searchParams
   const yil      = sp.get('yil') ? parseInt(sp.get('yil')!) : null
   const ay       = sp.get('ay')  ? parseInt(sp.get('ay')!)  : null
+  // Ay aralığı desteği: ayBaslangic ve ayBitis
+  const ayBaslangic = sp.get('ayBaslangic') ? parseInt(sp.get('ayBaslangic')!) : ay
+  const ayBitis     = sp.get('ayBitis')     ? parseInt(sp.get('ayBitis')!)     : ay
   const stokKodu = sp.get('stokKodu') ?? null
   // Çoklu stok kodu desteği: stokKodlar=REP9548P,REP9548G
   const stokKodlarParam = sp.get('stokKodlar')
@@ -93,7 +96,8 @@ export async function GET(req: Request) {
 
     // Dönem filtresi
     if (yil && rowYil !== yil) continue
-    if (ay  && rowAy  !== ay)  continue
+    if (ayBaslangic && rowAy < ayBaslangic) continue
+    if (ayBitis     && rowAy > ayBitis)     continue
 
     // Stok kodu listesi için (dönem eşleşmişse)
     stoklarMap.set(rowStokKodu, rowStokAdi)
