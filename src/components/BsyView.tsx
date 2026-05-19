@@ -522,6 +522,29 @@ export function BsyView({ isAdmin = false, isBsy = false }: { isAdmin?: boolean;
 
   const isYeniLayout = ay >= 5
 
+  // ── BSY Rapor verileri (IPL + RMS9200) ────────────────────────
+  interface RaporRow { bsyAdi: string; ay: number; adet: number }
+  const [iplRows,    setIplRows]    = useState<RaporRow[]>([])
+  const [rmsRows,    setRmsRows]    = useState<RaporRow[]>([])
+  const [iplAylar,   setIplAylar]   = useState<number[]>([])
+  const [rmsAylar,   setRmsAylar]   = useState<number[]>([])
+  const [raporLoading, setRaporLoading] = useState(false)
+
+  useEffect(() => {
+    setRaporLoading(true)
+    const iplKodlar = 'IPL9650,IPL9750,IPL9850,IPL9950'
+    const rmsKodlar = 'RMS9200P,RMS9200B'
+    Promise.all([
+      fetch(`/api/bsy-rapor?yil=${yil}&stokKodlar=${encodeURIComponent(iplKodlar)}`).then(r => r.json()),
+      fetch(`/api/bsy-rapor?yil=${yil}&stokKodlar=${encodeURIComponent(rmsKodlar)}`).then(r => r.json()),
+    ]).then(([ipl, rms]) => {
+      setIplRows(ipl.rows ?? [])
+      setIplAylar(ipl.aylar ?? [])
+      setRmsRows(rms.rows ?? [])
+      setRmsAylar(rms.aylar ?? [])
+    }).finally(() => setRaporLoading(false))
+  }, [yil])
+
   async function handleExcelUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -1023,6 +1046,41 @@ export function BsyView({ isAdmin = false, isBsy = false }: { isAdmin?: boolean;
           </> /* /isYeniLayout === false */
           )}
 
+          {/* ══════════════════════════════════════════════════
+               BSY RAPOR — IPL + RMS9200 Aylık Adet Tabloları
+          ══════════════════════════════════════════════════ */}
+          <div className="space-y-4 mt-2">
+            <h2 className="text-sm font-bold text-gray-800 border-b border-gray-200 pb-2">
+              BSY Rapor
+            </h2>
+
+            {raporLoading ? (
+              <div className="flex items-center justify-center py-8 gap-2 text-xs text-gray-400">
+                <RefreshCw size={13} className="animate-spin" /> Yükleniyor…
+              </div>
+            ) : (
+              <>
+                {/* IPL Tablosu */}
+                <BsyRaporTablosu
+                  baslik="IPL Serisi"
+                  altyazi="IPL9650 · IPL9750 · IPL9850 · IPL9950"
+                  rows={iplRows}
+                  aylar={iplAylar}
+                  renkClass="bg-[#0e7490]"
+                />
+
+                {/* RMS9200 Tablosu */}
+                <BsyRaporTablosu
+                  baslik="RMS9200 Serisi"
+                  altyazi="RMS9200P · RMS9200B"
+                  rows={rmsRows}
+                  aylar={rmsAylar}
+                  renkClass="bg-[#7c3aed]"
+                />
+              </>
+            )}
+          </div>
+
         </div>
       )}
 
@@ -1057,6 +1115,109 @@ export function BsyView({ isAdmin = false, isBsy = false }: { isAdmin?: boolean;
       {showParamModal && (
         <ParametrelerModal isAdmin={isAdmin} onClose={() => setShowParamModal(false)} />
       )}
+    </div>
+  )
+}
+
+// ─── BSY Rapor Tablo Bileşeni ──────────────────────────────────
+function BsyRaporTablosu({
+  baslik, altyazi, rows, aylar, renkClass,
+}: {
+  baslik:    string
+  altyazi:   string
+  rows:      { bsyAdi: string; ay: number; adet: number }[]
+  aylar:     number[]
+  renkClass: string
+}) {
+  // BSY listesi (adet toplamına göre sıralı)
+  const bsyler = [...new Set(rows.map(r => r.bsyAdi))].sort((a, b) => {
+    const totA = rows.filter(r => r.bsyAdi === a).reduce((s, r) => s + r.adet, 0)
+    const totB = rows.filter(r => r.bsyAdi === b).reduce((s, r) => s + r.adet, 0)
+    return totB - totA
+  })
+
+  // pivot: bsyAdi → ay → adet
+  const pivot = new Map<string, Map<number, number>>()
+  rows.forEach(r => {
+    if (!pivot.has(r.bsyAdi)) pivot.set(r.bsyAdi, new Map())
+    pivot.get(r.bsyAdi)!.set(r.ay, r.adet)
+  })
+
+  // ay toplamları
+  const ayToplam = new Map<number, number>()
+  aylar.forEach(ay => {
+    ayToplam.set(ay, rows.filter(r => r.ay === ay).reduce((s, r) => s + r.adet, 0))
+  })
+  const genelToplam = rows.reduce((s, r) => s + r.adet, 0)
+
+  if (bsyler.length === 0) {
+    return (
+      <div>
+        <div className={clsx('px-3 py-2 rounded-t-xl text-white text-xs font-bold', renkClass)}>
+          {baslik} <span className="font-normal opacity-80 ml-1">{altyazi}</span>
+        </div>
+        <div className="border border-t-0 border-gray-200 rounded-b-xl px-4 py-6 text-center text-xs text-gray-400">
+          Veri bulunamadı
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {/* Başlık */}
+      <div className={clsx('px-3 py-2 rounded-t-xl text-white text-xs font-bold flex items-baseline gap-2', renkClass)}>
+        {baslik}
+        <span className="font-normal opacity-80 text-[10px]">{altyazi}</span>
+      </div>
+
+      {/* Tablo */}
+      <div className="overflow-x-auto border border-t-0 border-gray-200 rounded-b-xl">
+        <table className="text-xs border-collapse w-full">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="text-left px-3 py-2 font-semibold text-gray-600 whitespace-nowrap sticky left-0 bg-gray-50">BSY</th>
+              {aylar.map(ay => (
+                <th key={ay} className="text-right px-3 py-2 font-semibold text-gray-500 whitespace-nowrap min-w-[70px]">
+                  {MONTHS_TR[ay - 1]}
+                </th>
+              ))}
+              <th className="text-right px-3 py-2 font-bold text-gray-700 whitespace-nowrap">Toplam</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bsyler.map((bsy, idx) => {
+              const ayMap   = pivot.get(bsy) ?? new Map()
+              const toplam  = [...ayMap.values()].reduce((s, v) => s + v, 0)
+              return (
+                <tr key={bsy} className={clsx('border-b border-gray-100 last:border-0', idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40')}>
+                  <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap sticky left-0 bg-inherit">{bsy}</td>
+                  {aylar.map(ay => {
+                    const adet = ayMap.get(ay) ?? 0
+                    return (
+                      <td key={ay} className="px-3 py-2 text-right text-gray-700 tabular-nums">
+                        {adet > 0 ? adet.toLocaleString('tr-TR') : <span className="text-gray-200">—</span>}
+                      </td>
+                    )
+                  })}
+                  <td className="px-3 py-2 text-right font-bold text-gray-900 tabular-nums">{toplam.toLocaleString('tr-TR')}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+          <tfoot>
+            <tr className={clsx('text-white text-[10px] font-semibold', renkClass)}>
+              <td className="px-3 py-2">Toplam</td>
+              {aylar.map(ay => (
+                <td key={ay} className="px-3 py-2 text-right tabular-nums">
+                  {(ayToplam.get(ay) ?? 0).toLocaleString('tr-TR')}
+                </td>
+              ))}
+              <td className="px-3 py-2 text-right tabular-nums font-bold">{genelToplam.toLocaleString('tr-TR')}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   )
 }
