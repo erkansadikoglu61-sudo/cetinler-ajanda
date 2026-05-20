@@ -551,11 +551,19 @@ export function BsyView({ isAdmin = false, isBsy = false }: { isAdmin?: boolean;
     setUploading(true)
     setUploadMsg(null)
     try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const res  = await fetch('/api/bsy-excel-upload', { method: 'POST', body: fd })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Yükleme hatası')
+      // 1. Supabase'den imzalı yükleme URL'si al (Vercel üzerinden küçük istek)
+      const presignRes = await fetch('/api/bsy-excel-presign', { method: 'POST' })
+      const presign    = await presignRes.json()
+      if (!presignRes.ok) throw new Error(presign.error ?? 'Presign hatası')
+
+      // 2. Dosyayı doğrudan Supabase Storage'a yükle (Vercel 4.5MB limitini atlar)
+      const uploadRes = await fetch(presign.signedUrl, {
+        method:  'PUT',
+        body:    file,
+        headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      })
+      if (!uploadRes.ok) throw new Error('Supabase yükleme hatası: ' + uploadRes.status)
+
       setUploadMsg('✓ Yüklendi, veriler güncellendi')
       reload()
     } catch (err) {
