@@ -13,7 +13,7 @@ export async function POST() {
 
     const { data, error } = await sb.storage
       .from(BUCKET)
-      .createSignedUploadUrl(OBJ_NAME)
+      .createSignedUploadUrl(OBJ_NAME, { upsert: true })
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
