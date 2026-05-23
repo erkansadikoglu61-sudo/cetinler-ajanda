@@ -316,16 +316,30 @@ export function KpiView() {
     KAMPANYALAR.forEach(k => load(k))
   }, [load])
 
+  // İkişerli satırlara böl: [k1,k2], [k3,k4], …
+  const satirlar: Kampanya[][] = []
+  for (let i = 0; i < KAMPANYALAR.length; i += 2) {
+    satirlar.push(KAMPANYALAR.slice(i, i + 2))
+  }
+
   return (
-    <div className="flex flex-col h-full overflow-auto bg-gray-50 divide-y divide-gray-200">
-      {KAMPANYALAR.map(k => (
-        <KampanyaBlok
-          key={k.id}
-          k={k}
-          rows={rowsMap[k.id] ?? []}
-          loading={loadingSet.has(k.id)}
-          onRefresh={() => load(k)}
-        />
+    <div className="flex flex-col h-full overflow-auto bg-gray-50">
+      {satirlar.map((satir, si) => (
+        <div
+          key={si}
+          className="grid border-b border-gray-200 divide-x divide-gray-200"
+          style={{ gridTemplateColumns: `repeat(${satir.length}, minmax(0, 1fr))` }}
+        >
+          {satir.map(k => (
+            <KampanyaBlok
+              key={k.id}
+              k={k}
+              rows={rowsMap[k.id] ?? []}
+              loading={loadingSet.has(k.id)}
+              onRefresh={() => load(k)}
+            />
+          ))}
+        </div>
       ))}
     </div>
   )
