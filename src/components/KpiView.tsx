@@ -236,7 +236,8 @@ function KampanyaBlok({ k, rows, loading, onRefresh }: {
                   <td className="px-3 py-2.5 text-center">
                     {kazandi ? (
                       <span className="inline-flex items-center gap-1 text-green-700 font-bold text-[10px] bg-green-100 rounded-full px-2 py-0.5">
-                        <Award size={10} /> Çek Kazandı
+                        <Award size={10} />
+                        {bireyselKazandi ? row.kazanilanCek : 1} Çek Kazandı
                       </span>
                     ) : (
                       <span className="text-gray-300 text-[10px]">—</span>
