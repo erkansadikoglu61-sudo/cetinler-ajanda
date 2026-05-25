@@ -545,6 +545,19 @@ export function BsyView({ isAdmin = false, isBsy = false }: { isAdmin?: boolean;
     }).finally(() => setRaporLoading(false))
   }, [yil])
 
+  // ── Tahsilat verileri ──────────────────────────────────────────
+  interface TahsilatRow { bsyAdi: string; acikHesap: number; hedef: number; gerceklesen: number; oran: number }
+  const [tahsilatRows,    setTahsilatRows]    = useState<TahsilatRow[]>([])
+  const [tahsilatLoading, setTahsilatLoading] = useState(false)
+
+  useEffect(() => {
+    setTahsilatLoading(true)
+    fetch(`/api/tahsilat?yil=${yil}&ay=${ay}`)
+      .then(r => r.json())
+      .then(d => setTahsilatRows(d.rows ?? []))
+      .finally(() => setTahsilatLoading(false))
+  }, [yil, ay])
+
   async function handleExcelUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -1055,6 +1068,16 @@ export function BsyView({ isAdmin = false, isBsy = false }: { isAdmin?: boolean;
           )}
 
           {/* ══════════════════════════════════════════════════
+               TAHSİLAT HEDEF TABLOSU
+          ══════════════════════════════════════════════════ */}
+          <TahsilatTablosu
+            yil={yil}
+            ay={ay}
+            rows={tahsilatRows}
+            loading={tahsilatLoading}
+          />
+
+          {/* ══════════════════════════════════════════════════
                BSY RAPOR — IPL + RMS9200 Aylık Adet Tabloları
           ══════════════════════════════════════════════════ */}
           <div className="space-y-4 mt-2">
@@ -1123,6 +1146,119 @@ export function BsyView({ isAdmin = false, isBsy = false }: { isAdmin?: boolean;
       {showParamModal && (
         <ParametrelerModal isAdmin={isAdmin} onClose={() => setShowParamModal(false)} />
       )}
+    </div>
+  )
+}
+
+// ─── Tahsilat Hedef Tablosu ────────────────────────────────────
+function TahsilatTablosu({
+  yil, ay, rows, loading,
+}: {
+  yil:     number
+  ay:      number
+  rows:    { bsyAdi: string; acikHesap: number; hedef: number; gerceklesen: number; oran: number }[]
+  loading: boolean
+}) {
+  const toplamAcik  = rows.reduce((s, r) => s + r.acikHesap,   0)
+  const toplamHedef = rows.reduce((s, r) => s + r.hedef,       0)
+  const toplamGerc  = rows.reduce((s, r) => s + r.gerceklesen, 0)
+  const toplamOran  = toplamHedef > 0 ? (toplamGerc / toplamHedef) * 100 : 0
+
+  return (
+    <div className="space-y-0">
+      {/* Başlık */}
+      <div className="flex items-baseline gap-2 px-3 py-2 rounded-t-xl text-white text-xs font-bold bg-[#b45309]">
+        Tahsilat Hedef Tablosu
+        <span className="font-normal opacity-80 text-[10px]">
+          {MONTHS_TR[ay - 1]} {yil} · Açık Hesap × %90
+        </span>
+      </div>
+
+      <div className="border border-t-0 border-gray-200 rounded-b-xl overflow-x-auto">
+        {loading ? (
+          <div className="flex items-center justify-center py-8 gap-2 text-xs text-gray-400">
+            <RefreshCw size={13} className="animate-spin" /> Yükleniyor…
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="text-center py-8 text-xs text-gray-400">
+            Bu döneme ait tahsilat verisi bulunamadı
+          </div>
+        ) : (
+          <table className="text-xs border-collapse w-full">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left px-3 py-2 font-semibold text-gray-600 w-6">#</th>
+                <th className="text-left px-3 py-2 font-semibold text-gray-600 sticky left-0 bg-gray-50">BSY</th>
+                <th className="text-right px-3 py-2 font-semibold text-gray-500 min-w-[130px]">Açık Hesap</th>
+                <th className="text-right px-3 py-2 font-semibold text-gray-500 min-w-[130px]">Hedef (%90)</th>
+                <th className="text-right px-3 py-2 font-semibold text-gray-500 min-w-[130px]">Gerçekleşen</th>
+                <th className="text-center px-3 py-2 font-semibold text-gray-500 min-w-[100px]">Oran</th>
+                <th className="text-left px-3 py-2 font-semibold text-gray-500 min-w-[140px]">İlerleme</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, idx) => {
+                const ok  = row.oran >= 100
+                const pct = Math.min(100, row.oran)
+                return (
+                  <tr key={row.bsyAdi} className={clsx(
+                    'border-b border-gray-100 last:border-0',
+                    ok ? 'bg-green-50' : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                  )}>
+                    <td className="px-3 py-2 text-gray-400 font-mono">{idx + 1}</td>
+                    <td className="px-3 py-2 font-semibold text-gray-800 sticky left-0 bg-inherit whitespace-nowrap">{row.bsyAdi}</td>
+                    <td className="px-3 py-2 text-right text-gray-600 tabular-nums">
+                      {row.acikHesap > 0 ? fmtCur(row.acikHesap) : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-gray-800 tabular-nums">
+                      {row.hedef > 0 ? fmtCur(row.hedef) : '—'}
+                    </td>
+                    <td className={clsx('px-3 py-2 text-right font-bold tabular-nums',
+                      row.gerceklesen > 0 ? (ok ? 'text-green-700' : 'text-gray-900') : 'text-gray-300'
+                    )}>
+                      {row.gerceklesen > 0 ? fmtCur(row.gerceklesen) : '—'}
+                    </td>
+                    <td className={clsx('px-3 py-2 text-center font-semibold tabular-nums',
+                      row.hedef > 0
+                        ? ok ? 'text-green-600' : row.oran >= 80 ? 'text-amber-600' : 'text-red-500'
+                        : 'text-gray-300'
+                    )}>
+                      {row.hedef > 0 ? fmtPct(row.oran) : '—'}
+                    </td>
+                    <td className="px-3 py-2">
+                      {row.hedef > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden min-w-[80px]">
+                            <div
+                              className={clsx('h-2 rounded-full transition-all duration-500',
+                                ok ? 'bg-green-500' : row.oran >= 80 ? 'bg-amber-400' : 'bg-red-400'
+                              )}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] text-gray-400 w-8 text-right tabular-nums">
+                            {Math.round(pct)}%
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="bg-[#b45309] text-white text-[10px] font-semibold">
+                <td className="px-3 py-2" colSpan={2}>Toplam</td>
+                <td className="px-3 py-2 text-right tabular-nums">{fmtCur(toplamAcik)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{fmtCur(toplamHedef)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{fmtCur(toplamGerc)}</td>
+                <td className="px-3 py-2 text-center tabular-nums font-bold">{fmtPct(toplamOran)}</td>
+                <td className="px-3 py-2" />
+              </tr>
+            </tfoot>
+          </table>
+        )}
+      </div>
     </div>
   )
 }
