@@ -25,7 +25,8 @@ import { KpiView } from '@/components/KpiView'
 import { NoktalarimizView } from '@/components/NoktalarimizView'
 import { KullanicilarView } from '@/components/KullanicilarView'
 import { SellinSelloutView } from '@/components/SellinSelloutView'
-type TabType = 'month' | 'week' | 'day' | 'report' | 'sellout' | 'bsy' | 'kpi' | 'noktalar' | 'kullanicilar' | 'sellinout'
+import { AdetPrimTablosu, BayiMerchHakdis } from '@/components/AdetPrimView'
+type TabType = 'month' | 'week' | 'day' | 'report' | 'sellout' | 'bsy' | 'kpi' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch'
 
 // Renk hex'ine alpha ekle
 function hexWithAlpha(hex: string, alpha: string) {
@@ -1602,6 +1603,19 @@ export default function AppPage() {
               >
                 <Store size={15} /> Noktalarımız
               </button>
+
+              {/* Primler grubu (sadece admin) */}
+              {currentProfile?.role === 'admin' && (
+                <button
+                  onClick={() => { if (!['adet-prim','bayi-merch'].includes(tab)) setTab('adet-prim') }}
+                  className={clsx(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                    ['adet-prim','bayi-merch'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                  )}
+                >
+                  <Activity size={15} /> Primler
+                </button>
+              )}
             </div>
 
             {/* Ay navigasyon */}
@@ -1663,6 +1677,24 @@ export default function AppPage() {
                   )}
                 >
                   <Icon size={12} /> {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {/* Primler alt sekmeleri (admin) */}
+          {currentProfile?.role === 'admin' && ['adet-prim','bayi-merch'].includes(tab) && (
+            <div className="hidden md:flex items-center gap-1 px-3 pb-1.5">
+              {([
+                { key: 'adet-prim' as const,  label: 'Adet Prim Tablosu' },
+                { key: 'bayi-merch' as const,  label: 'Bayi Merch Prim Hakedişleri' },
+              ] as const).map(({ key, label }) => (
+                <button key={key} onClick={() => setTab(key)}
+                  className={clsx(
+                    'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
+                    tab === key ? 'bg-brand-100 text-brand-700' : 'text-gray-400 hover:bg-gray-100'
+                  )}
+                >
+                  {label}
                 </button>
               ))}
             </div>
@@ -1761,11 +1793,21 @@ export default function AppPage() {
               />
             </div>
           )}
+          {tab === 'adet-prim' && currentProfile?.role === 'admin' && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <AdetPrimTablosu />
+            </div>
+          )}
+          {tab === 'bayi-merch' && currentProfile?.role === 'admin' && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <BayiMerchHakdis />
+            </div>
+          )}
         </>
       )}
 
       {/* FAB — sadece admin takvim sekmelerinde görünür */}
-      {currentProfile?.role === 'admin' && tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && (
+      {currentProfile?.role === 'admin' && tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && (
         <button
           onClick={handleAddTask}
           className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
