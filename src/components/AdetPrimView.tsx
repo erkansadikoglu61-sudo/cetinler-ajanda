@@ -222,6 +222,8 @@ export function BayiMerchHakdis() {
   const [rows,    setRows]    = useState<HakdisRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
+  const [cariQ,   setCariQ]   = useState('')
+  const [subeQ,   setSubeQ]   = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -240,13 +242,19 @@ export function BayiMerchHakdis() {
 
   useEffect(() => { load() }, [load])
 
-  const toplamPrim  = rows.reduce((s, r) => s + r.primHakdis, 0)
-  const toplamAdet  = rows.reduce((s, r) => s + r.satisAdet, 0)
+  const filtered = rows.filter(r => {
+    if (cariQ && !r.cariAdi.toLowerCase().includes(cariQ.toLowerCase())) return false
+    if (subeQ && !r.subeAdi.toLowerCase().includes(subeQ.toLowerCase())) return false
+    return true
+  })
+
+  const toplamPrim = filtered.reduce((s, r) => s + r.primHakdis, 0)
+  const toplamAdet = filtered.reduce((s, r) => s + r.satisAdet, 0)
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-100 flex-shrink-0">
+      <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-100 flex-shrink-0 flex-wrap">
         <span className="text-xs font-bold text-gray-700">Bayi Merch Prim Hakedişleri</span>
 
         {/* Yıl */}
@@ -274,9 +282,34 @@ export function BayiMerchHakdis() {
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
         </button>
 
+        {/* Cari Adı filtre */}
+        <input
+          type="text"
+          value={cariQ}
+          onChange={e => setCariQ(e.target.value)}
+          placeholder="Cari Adı ara…"
+          className="pl-2.5 pr-2.5 py-1 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-brand-400 w-44"
+        />
+
+        {/* Şube Adı filtre */}
+        <input
+          type="text"
+          value={subeQ}
+          onChange={e => setSubeQ(e.target.value)}
+          placeholder="Şube Adı ara…"
+          className="pl-2.5 pr-2.5 py-1 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-brand-400 w-36"
+        />
+
+        {(cariQ || subeQ) && (
+          <button onClick={() => { setCariQ(''); setSubeQ('') }}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+            <X size={13} />
+          </button>
+        )}
+
         {!loading && rows.length > 0 && (
-          <span className="text-[10px] text-gray-400 ml-2">
-            {rows.length} satır · Toplam: {toplamPrim.toLocaleString('tr-TR')} ₺
+          <span className="text-[10px] text-gray-400 ml-1">
+            {filtered.length}{filtered.length !== rows.length ? `/${rows.length}` : ''} satır · Toplam: {toplamPrim.toLocaleString('tr-TR')} ₺
           </span>
         )}
       </div>
@@ -311,7 +344,7 @@ export function BayiMerchHakdis() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row, idx) => (
+                  {filtered.map((row, idx) => (
                     <tr key={idx} className={clsx(
                       'border-b border-gray-100 last:border-0',
                       idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
