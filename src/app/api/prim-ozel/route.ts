@@ -25,22 +25,22 @@ export async function GET(req: Request) {
   return NextResponse.json({ rows: data ?? [] })
 }
 
-// POST /api/prim-ozel  — yeni satır ekle
+// POST — yeni satır ekle
 export async function POST(req: Request) {
   try {
     const body = await req.json()
     const { error, data } = await sb()
       .from('prim_ozel')
       .insert({
-        stok_kodu:        body.stokKodu,
+        stok_kodu:        body.stokKodu        ?? null,   // text[] | null
         yil:              body.yil,
         ay:               body.ay,
-        tarih_baslangic:  body.tarihBaslangic || null,
-        tarih_bitis:      body.tarihBitis     || null,
-        cari_adi:         body.cariAdi        || null,
-        sube_adi:         body.subeAdi        || null,
-        bayi_merch:       body.bayiMerch      ?? null,
-        kosullu_destek:   body.kosulluDestek  ?? null,
+        tarih_baslangic:  body.tarihBaslangic  || null,
+        tarih_bitis:      body.tarihBitis      || null,
+        cari_adi:         body.cariAdi         ?? null,   // text[] | null
+        sube_adi:         body.subeAdi         ?? null,   // text[] | null
+        bayi_merch:       body.bayiMerch       ?? null,
+        kosullu_destek:   body.kosulluDestek   ?? null,
       })
       .select()
       .single()
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
   }
 }
 
-// PUT /api/prim-ozel?id=  — güncelle
+// PUT /api/prim-ozel?id=
 export async function PUT(req: Request) {
   const id = new URL(req.url).searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id gerekli' }, { status: 400 })
@@ -60,13 +60,13 @@ export async function PUT(req: Request) {
     const { error } = await sb()
       .from('prim_ozel')
       .update({
-        stok_kodu:        body.stokKodu,
-        tarih_baslangic:  body.tarihBaslangic || null,
-        tarih_bitis:      body.tarihBitis     || null,
-        cari_adi:         body.cariAdi        || null,
-        sube_adi:         body.subeAdi        || null,
-        bayi_merch:       body.bayiMerch      ?? null,
-        kosullu_destek:   body.kosulluDestek  ?? null,
+        stok_kodu:        body.stokKodu        ?? null,
+        tarih_baslangic:  body.tarihBaslangic  || null,
+        tarih_bitis:      body.tarihBitis      || null,
+        cari_adi:         body.cariAdi         ?? null,
+        sube_adi:         body.subeAdi         ?? null,
+        bayi_merch:       body.bayiMerch       ?? null,
+        kosullu_destek:   body.kosulluDestek   ?? null,
       })
       .eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
