@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 const MERCH_URL = 'http://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
 
-const COL = { CARI_ISIM: 1, SUBE_ADI: 2, GRUP_KODU: 7, MERCH_TIPI: 14 }
+const COL = { CARI_ISIM: 1, SUBE_ADI: 2, STOK_KODU: 4, GRUP_KODU: 7, MERCH_TIPI: 14 }
 
 function decodeHtml(s: string): string {
   return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g,' ').trim()
@@ -17,9 +17,12 @@ export async function GET() {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 
-  const cariSet = new Set<string>()
-  const subeSet = new Set<string>()
-  const grupSet = new Set<string>()
+  const cariSet  = new Set<string>()
+  const subeSet  = new Set<string>()
+  const grupSet  = new Set<string>()
+  // grup_kodu -> Set<stok_kodu>
+  const grupStokMap: Record<string, Set<string>> = {}
+
   const tdRe = /<td[^>]*>(.*?)<\/td>/g
   const parts = html.split('</tr>')
 
@@ -34,12 +37,27 @@ export async function GET() {
     if (cells[COL.MERCH_TIPI] !== 'Bayi Merch') continue
     if (cells[COL.CARI_ISIM]) cariSet.add(cells[COL.CARI_ISIM])
     if (cells[COL.SUBE_ADI])  subeSet.add(cells[COL.SUBE_ADI])
-    if (cells[COL.GRUP_KODU]) grupSet.add(cells[COL.GRUP_KODU])
+    const g = cells[COL.GRUP_KODU]
+    const s = cells[COL.STOK_KODU].toUpperCase()
+    if (g) {
+      grupSet.add(g)
+      if (s) {
+        if (!grupStokMap[g]) grupStokMap[g] = new Set()
+        grupStokMap[g].add(s)
+      }
+    }
+  }
+
+  // Convert sets to sorted arrays
+  const grupStokMapSorted: Record<string, string[]> = {}
+  for (const [g, stokSet] of Object.entries(grupStokMap)) {
+    grupStokMapSorted[g] = [...stokSet].sort()
   }
 
   return NextResponse.json({
-    cariOptions: [...cariSet].sort(),
-    subeOptions: [...subeSet].sort(),
-    grupOptions: [...grupSet].sort(),
+    cariOptions:  [...cariSet].sort(),
+    subeOptions:  [...subeSet].sort(),
+    grupOptions:  [...grupSet].sort(),
+    grupStokMap:  grupStokMapSorted,
   })
 }

@@ -170,9 +170,10 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
   const [cariOptions,  setCariOptions] = useState<string[]>([])
   const [subeOptions,  setSubeOptions] = useState<string[]>([])
   const [grupOptions,  setGrupOptions] = useState<string[]>([])
+  const [grupStokMap,  setGrupStokMap] = useState<Record<string, string[]>>({})
   const [optsLoading,  setOptsLoading] = useState(false)
 
-  const STOK_OPTIONS = ADET_PRIM_DEFAULTS.map(r => r.stokKodu)
+  const ALL_STOK_OPTIONS = ADET_PRIM_DEFAULTS.map(r => r.stokKodu)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -197,9 +198,24 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
     setOptsLoading(true)
     fetch('/api/merch-options')
       .then(r => r.json())
-      .then(d => { setCariOptions(d.cariOptions ?? []); setSubeOptions(d.subeOptions ?? []); setGrupOptions(d.grupOptions ?? []) })
+      .then(d => {
+        setCariOptions(d.cariOptions ?? [])
+        setSubeOptions(d.subeOptions ?? [])
+        setGrupOptions(d.grupOptions ?? [])
+        setGrupStokMap(d.grupStokMap ?? {})
+      })
       .finally(() => setOptsLoading(false))
   }, [])
+
+  // Compute available stok options based on selected grup kodu
+  function stokOptionsFor(grupKodu: string[] | null): string[] {
+    if (grupKodu === null || grupKodu.length === 0) return ALL_STOK_OPTIONS
+    const merged = new Set<string>()
+    for (const g of grupKodu) {
+      for (const s of (grupStokMap[g] ?? [])) merged.add(s)
+    }
+    return merged.size > 0 ? [...merged].sort() : ALL_STOK_OPTIONS
+  }
 
   function numVal(v: number | null | undefined) { return v != null ? String(v) : '' }
   function parseNum(s: string) { const n = parseFloat(s); return isNaN(n) ? null : n }
@@ -277,8 +293,8 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
         <table className="text-xs border-collapse w-full bg-white">
           <thead>
             <tr className="bg-gray-800 text-white">
-              <th className="text-left px-3 py-2.5 font-semibold min-w-[160px]">Stok Kodu</th>
               <th className="text-left px-3 py-2.5 font-semibold min-w-[150px]">Grup Kodu</th>
+              <th className="text-left px-3 py-2.5 font-semibold min-w-[160px]">Stok Kodu</th>
               <th className="text-left px-3 py-2.5 font-semibold min-w-[110px]">Başlangıç</th>
               <th className="text-left px-3 py-2.5 font-semibold min-w-[110px]">Bitiş</th>
               <th className="text-left px-3 py-2.5 font-semibold min-w-[180px]">Cari Adı</th>
@@ -293,12 +309,12 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
             {adding && (
               <tr className="bg-brand-50 border-b border-brand-100">
                 <td className="px-2 py-1.5">
-                  <MultiSelectBox options={STOK_OPTIONS} value={newRow.stokKodu}
-                    onChange={v => setNewRow(p => ({ ...p, stokKodu: v }))} placeholder="Stok kodu seçin…" />
+                  <MultiSelectBox options={grupOptions} value={newRow.grupKodu}
+                    onChange={v => setNewRow(p => ({ ...p, grupKodu: v, stokKodu: null }))} placeholder="Grup kodu seçin…" loading={optsLoading} />
                 </td>
                 <td className="px-2 py-1.5">
-                  <MultiSelectBox options={grupOptions} value={newRow.grupKodu}
-                    onChange={v => setNewRow(p => ({ ...p, grupKodu: v }))} placeholder="Grup kodu seçin…" loading={optsLoading} />
+                  <MultiSelectBox options={stokOptionsFor(newRow.grupKodu)} value={newRow.stokKodu}
+                    onChange={v => setNewRow(p => ({ ...p, stokKodu: v }))} placeholder="Stok kodu seçin…" />
                 </td>
                 <td className="px-2 py-1.5">
                   <input type="date" value={newRow.tarihBaslangic ?? ''} onChange={e => setNewRow(p => ({ ...p, tarihBaslangic: e.target.value || null }))} className={inputCls} />
@@ -341,15 +357,15 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
                 <tr key={row.id} className={clsx('border-b border-gray-100 last:border-0', idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40')}>
                   <td className="px-3 py-2">
                     {isEdit
-                      ? <MultiSelectBox options={STOK_OPTIONS} value={eVal('stokKodu', row) as string[] | null}
-                          onChange={v => setEditBuf(p => ({ ...p, stokKodu: v }))} placeholder="Stok seçin…" />
-                      : <ArrayBadge val={row.stokKodu} />}
+                      ? <MultiSelectBox options={grupOptions} value={eVal('grupKodu', row) as string[] | null}
+                          onChange={v => setEditBuf(p => ({ ...p, grupKodu: v, stokKodu: null }))} placeholder="Grup seçin…" loading={optsLoading} />
+                      : <ArrayBadge val={row.grupKodu} />}
                   </td>
                   <td className="px-3 py-2">
                     {isEdit
-                      ? <MultiSelectBox options={grupOptions} value={eVal('grupKodu', row) as string[] | null}
-                          onChange={v => setEditBuf(p => ({ ...p, grupKodu: v }))} placeholder="Grup seçin…" loading={optsLoading} />
-                      : <ArrayBadge val={row.grupKodu} />}
+                      ? <MultiSelectBox options={stokOptionsFor(eVal('grupKodu', row) as string[] | null)} value={eVal('stokKodu', row) as string[] | null}
+                          onChange={v => setEditBuf(p => ({ ...p, stokKodu: v }))} placeholder="Stok seçin…" />
+                      : <ArrayBadge val={row.stokKodu} />}
                   </td>
                   <td className="px-3 py-2 text-gray-600">
                     {isEdit
