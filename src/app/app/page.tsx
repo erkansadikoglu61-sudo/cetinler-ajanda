@@ -1515,75 +1515,175 @@ export default function AppPage() {
       {/* Sağ: Ana içerik */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Top Bar */}
-        <div className="flex items-center gap-2 px-3 py-2 border-b bg-white sticky top-0 z-20">
-          {/* Mobil: hamburger + filtre adı */}
-          <button
-            onClick={() => setShowPersonSheet(true)}
-            className="p-2 text-gray-600 min-h-[44px] min-w-[44px] flex items-center justify-center md:hidden"
-          >
-            <Menu size={20} />
-          </button>
-          <button
-            onClick={() => setShowPersonSheet(true)}
-            className="text-left text-sm font-medium text-gray-700 truncate md:hidden flex-1"
-          >
-            {filterPid ? profileById(filterPid)?.full_name : 'Tüm Ekip'}
-          </button>
+        <div className="border-b bg-white sticky top-0 z-20">
+          {/* Ana satır */}
+          <div className="flex items-center gap-2 px-3 py-2">
+            {/* Mobil: hamburger + filtre adı */}
+            <button
+              onClick={() => setShowPersonSheet(true)}
+              className="p-2 text-gray-600 min-h-[44px] min-w-[44px] flex items-center justify-center md:hidden"
+            >
+              <Menu size={20} />
+            </button>
+            <button
+              onClick={() => setShowPersonSheet(true)}
+              className="text-left text-sm font-medium text-gray-700 truncate md:hidden flex-1"
+            >
+              {filterPid ? profileById(filterPid)?.full_name : 'Tüm Ekip'}
+            </button>
 
-          {/* Masaüstü: Tab sekmeleri */}
-          <div className="hidden md:flex items-center gap-1 mr-2">
-            {([
-              ...(currentProfile?.role === 'admin' ? [
-                { key: 'month'  as const, icon: Calendar,     label: 'Ay' },
-                { key: 'week'   as const, icon: CalendarRange, label: 'Hafta' },
-                { key: 'day'    as const, icon: CalendarDays,  label: 'Gün' },
-                { key: 'report' as const, icon: FileText,      label: 'Rapor' },
-              ] : []),
-              ...(isBsyOrAdmin ? [{ key: 'bsy'      as const, icon: Target,     label: 'BSY' }] : []),
-              ...(isBsyOrAdmin ? [{ key: 'sellinout' as const, icon: BarChart2, label: 'S.In/Out' }] : []),
-              { key: 'sellout' as const, icon: TrendingUp, label: 'Sellout' },
-              ...(isBsyOrAdmin ? [{ key: 'kpi' as const, icon: Activity, label: 'KPI' }] : []),
-              { key: 'noktalar' as const, icon: Store,  label: 'Noktalarımız' },
-              { key: 'kullanicilar' as const, icon: Users, label: 'Kullanıcılar' },
-            ] as const).map(({ key, icon: Icon, label }) => (
+            {/* Masaüstü: Gruplu Tab sekmeleri */}
+            <div className="hidden md:flex items-center gap-1 mr-2">
+              {/* Takvim grubu (admin) */}
+              {currentProfile?.role === 'admin' && (
+                <button
+                  onClick={() => { if (!['month','week','day'].includes(tab)) setTab('month') }}
+                  className={clsx(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                    ['month','week','day'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                  )}
+                >
+                  <Calendar size={15} /> Takvim
+                </button>
+              )}
+              {/* Rapor (admin) */}
+              {currentProfile?.role === 'admin' && (
+                <button
+                  onClick={() => setTab('report')}
+                  className={clsx(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                    tab === 'report' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                  )}
+                >
+                  <FileText size={15} /> Rapor
+                </button>
+              )}
+              {/* BSY grubu */}
+              {isBsyOrAdmin && (
+                <button
+                  onClick={() => { if (!['bsy','kpi'].includes(tab)) setTab('bsy') }}
+                  className={clsx(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                    ['bsy','kpi'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                  )}
+                >
+                  <Target size={15} /> BSY
+                </button>
+              )}
+              {/* S.In/Out */}
+              {isBsyOrAdmin && (
+                <button
+                  onClick={() => setTab('sellinout')}
+                  className={clsx(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                    tab === 'sellinout' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                  )}
+                >
+                  <BarChart2 size={15} /> S.In/Out
+                </button>
+              )}
+              {/* Sellout */}
               <button
-                key={key}
-                onClick={() => setTab(key)}
+                onClick={() => setTab('sellout')}
                 className={clsx(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                  tab === key
-                    ? 'bg-brand-500 text-white'
-                    : 'text-gray-500 hover:bg-gray-100'
+                  tab === 'sellout' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
                 )}
               >
-                <Icon size={15} />
-                {label}
+                <TrendingUp size={15} /> Sellout
               </button>
-            ))}
-          </div>
-
-          {/* Ay navigasyon */}
-          {tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && (
-            <div className="flex items-center gap-1">
-              <button onClick={prevMonth} className="p-2 text-gray-500 min-h-[44px] min-w-[44px] flex items-center justify-center">
-                <ChevronLeft size={18} />
-              </button>
-              <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">
-                {MONTHS_TR[month]} {year}
-              </span>
-              <button onClick={nextMonth} className="p-2 text-gray-500 min-h-[44px] min-w-[44px] flex items-center justify-center">
-                <ChevronRight size={18} />
+              {/* Noktalarımız grubu */}
+              <button
+                onClick={() => { if (!['noktalar','kullanicilar'].includes(tab)) setTab('noktalar') }}
+                className={clsx(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                  ['noktalar','kullanicilar'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                )}
+              >
+                <Store size={15} /> Noktalarımız
               </button>
             </div>
-          )}
 
-          {currentProfile?.role === 'admin' && (
-            <button
-              onClick={() => setShowStats(true)}
-              className="p-2 text-gray-600 min-h-[44px] min-w-[44px] flex items-center justify-center"
-            >
-              <BarChart2 size={20} />
-            </button>
+            {/* Ay navigasyon */}
+            {['month','week','day'].includes(tab) && (
+              <div className="flex items-center gap-1">
+                <button onClick={prevMonth} className="p-2 text-gray-500 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                  <ChevronLeft size={18} />
+                </button>
+                <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">
+                  {MONTHS_TR[month]} {year}
+                </span>
+                <button onClick={nextMonth} className="p-2 text-gray-500 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            )}
+
+            {currentProfile?.role === 'admin' && (
+              <button
+                onClick={() => setShowStats(true)}
+                className="p-2 text-gray-600 min-h-[44px] min-w-[44px] flex items-center justify-center"
+              >
+                <BarChart2 size={20} />
+              </button>
+            )}
+          </div>
+
+          {/* Alt sekmeler satırı (gruplu sekmelerde gösterilir) */}
+          {/* Takvim alt sekmeleri */}
+          {currentProfile?.role === 'admin' && ['month','week','day'].includes(tab) && (
+            <div className="hidden md:flex items-center gap-1 px-3 pb-1.5">
+              {([
+                { key: 'month' as const, icon: Calendar,     label: 'Ay' },
+                { key: 'week'  as const, icon: CalendarRange, label: 'Hafta' },
+                { key: 'day'   as const, icon: CalendarDays,  label: 'Gün' },
+              ] as const).map(({ key, icon: Icon, label }) => (
+                <button key={key} onClick={() => setTab(key)}
+                  className={clsx(
+                    'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
+                    tab === key ? 'bg-brand-100 text-brand-700' : 'text-gray-400 hover:bg-gray-100'
+                  )}
+                >
+                  <Icon size={12} /> {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {/* BSY alt sekmeleri */}
+          {isBsyOrAdmin && ['bsy','kpi'].includes(tab) && (
+            <div className="hidden md:flex items-center gap-1 px-3 pb-1.5">
+              {([
+                { key: 'bsy' as const, icon: Target,   label: 'BSY' },
+                { key: 'kpi' as const, icon: Activity,  label: 'Özel Hedefler' },
+              ] as const).map(({ key, icon: Icon, label }) => (
+                <button key={key} onClick={() => setTab(key)}
+                  className={clsx(
+                    'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
+                    tab === key ? 'bg-brand-100 text-brand-700' : 'text-gray-400 hover:bg-gray-100'
+                  )}
+                >
+                  <Icon size={12} /> {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {/* Noktalarımız alt sekmeleri */}
+          {['noktalar','kullanicilar'].includes(tab) && (
+            <div className="hidden md:flex items-center gap-1 px-3 pb-1.5">
+              {([
+                { key: 'noktalar'     as const, icon: Store, label: 'Noktalarımız' },
+                { key: 'kullanicilar' as const, icon: Users, label: 'Kullanıcılar' },
+              ] as const).map(({ key, icon: Icon, label }) => (
+                <button key={key} onClick={() => setTab(key)}
+                  className={clsx(
+                    'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
+                    tab === key ? 'bg-brand-100 text-brand-700' : 'text-gray-400 hover:bg-gray-100'
+                  )}
+                >
+                  <Icon size={12} /> {label}
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
