@@ -18,19 +18,20 @@ interface PrimRow {
 
 // ─── Özel Prim Satırı ─────────────────────────────────────────────
 interface OzelRow {
-  id:            string
-  stokKodu:      string
-  yil:           number
-  ay:            number
-  tarih:         string | null
-  cariAdi:       string | null
-  subeAdi:       string | null
-  bayiMerch:     number | null
-  kosulluDestek: number | null
+  id:              string
+  stokKodu:        string
+  yil:             number
+  ay:              number
+  tarihBaslangic:  string | null
+  tarihBitis:      string | null
+  cariAdi:         string | null
+  subeAdi:         string | null
+  bayiMerch:       number | null
+  kosulluDestek:   number | null
 }
 
 const EMPTY_OZEL = (yil: number, ay: number): Omit<OzelRow,'id'> => ({
-  stokKodu: '', yil, ay, tarih: null, cariAdi: null, subeAdi: null, bayiMerch: null, kosulluDestek: null
+  stokKodu: '', yil, ay, tarihBaslangic: null, tarihBitis: null, cariAdi: null, subeAdi: null, bayiMerch: null, kosulluDestek: null
 })
 
 function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
@@ -50,7 +51,8 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
       const d = await r.json()
       setRows((d.rows ?? []).map((x: Record<string,unknown>) => ({
         id: x.id, stokKodu: x.stok_kodu, yil: x.yil, ay: x.ay,
-        tarih: x.tarih, cariAdi: x.cari_adi, subeAdi: x.sube_adi,
+        tarihBaslangic: x.tarih_baslangic, tarihBitis: x.tarih_bitis,
+        cariAdi: x.cari_adi, subeAdi: x.sube_adi,
         bayiMerch: x.bayi_merch, kosulluDestek: x.kosullu_destek
       })))
     } finally { setLoading(false) }
@@ -72,7 +74,8 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
       if (!r.ok) throw new Error(d.error)
       setRows(prev => [...prev, {
         id: d.row.id, stokKodu: d.row.stok_kodu, yil: d.row.yil, ay: d.row.ay,
-        tarih: d.row.tarih, cariAdi: d.row.cari_adi, subeAdi: d.row.sube_adi,
+        tarihBaslangic: d.row.tarih_baslangic, tarihBitis: d.row.tarih_bitis,
+        cariAdi: d.row.cari_adi, subeAdi: d.row.sube_adi,
         bayiMerch: d.row.bayi_merch, kosulluDestek: d.row.kosullu_destek
       }])
       setNewRow(EMPTY_OZEL(yil, ay))
@@ -92,7 +95,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
       })
       const d = await r.json()
       if (!r.ok) throw new Error(d.error)
-      setRows(prev => prev.map(x => x.id === id ? { ...x, ...editBuf } : x))
+      setRows(prev => prev.map(x => x.id === id ? { ...x, ...editBuf } as OzelRow : x))
       setEditId(null); setMsg('✓ Kaydedildi')
     } catch (e) { setMsg('✗ ' + String(e)) }
     finally { setSaving(false) }
@@ -136,7 +139,8 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
           <thead>
             <tr className="bg-gray-800 text-white">
               <th className="text-left px-3 py-2.5 font-semibold min-w-[130px]">Stok Kodu</th>
-              <th className="text-left px-3 py-2.5 font-semibold min-w-[110px]">Tarih</th>
+              <th className="text-left px-3 py-2.5 font-semibold min-w-[110px]">Başlangıç</th>
+              <th className="text-left px-3 py-2.5 font-semibold min-w-[110px]">Bitiş</th>
               <th className="text-left px-3 py-2.5 font-semibold min-w-[200px]">Cari Adı</th>
               <th className="text-left px-3 py-2.5 font-semibold min-w-[140px]">Şube Adı</th>
               <th className="text-right px-3 py-2.5 font-semibold min-w-[130px]">Bayi Merch (₺)</th>
@@ -156,7 +160,11 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
                   </select>
                 </td>
                 <td className="px-2 py-1.5">
-                  <input type="date" value={newRow.tarih ?? ''} onChange={e => setNewRow(p => ({ ...p, tarih: e.target.value || null }))}
+                  <input type="date" value={newRow.tarihBaslangic ?? ''} onChange={e => setNewRow(p => ({ ...p, tarihBaslangic: e.target.value || null }))}
+                    className={inputCls} />
+                </td>
+                <td className="px-2 py-1.5">
+                  <input type="date" value={newRow.tarihBitis ?? ''} onChange={e => setNewRow(p => ({ ...p, tarihBitis: e.target.value || null }))}
                     className={inputCls} />
                 </td>
                 <td className="px-2 py-1.5">
@@ -191,9 +199,9 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
             )}
 
             {loading ? (
-              <tr><td colSpan={7} className="text-center py-8 text-gray-400"><RefreshCw size={14} className="animate-spin inline mr-1" />Yükleniyor…</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-gray-400"><RefreshCw size={14} className="animate-spin inline mr-1" />Yükleniyor…</td></tr>
             ) : rows.length === 0 && !adding ? (
-              <tr><td colSpan={7} className="text-center py-8 text-gray-300 text-[11px]">Henüz özel prim tanımı yok. "Yeni Ekle" ile başlayın.</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-gray-300 text-[11px]">Henüz özel prim tanımı yok. "Yeni Ekle" ile başlayın.</td></tr>
             ) : rows.map((row, idx) => {
               const isEdit = editId === row.id
               return (
@@ -207,8 +215,13 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
                   </td>
                   <td className="px-3 py-2 text-gray-600">
                     {isEdit
-                      ? <input type="date" value={editBuf.tarih ?? row.tarih ?? ''} onChange={e => setEditBuf(p => ({ ...p, tarih: e.target.value || null }))} className={inputCls} />
-                      : row.tarih ?? <span className="text-gray-300">Tümü</span>}
+                      ? <input type="date" value={editBuf.tarihBaslangic ?? row.tarihBaslangic ?? ''} onChange={e => setEditBuf(p => ({ ...p, tarihBaslangic: e.target.value || null }))} className={inputCls} />
+                      : row.tarihBaslangic ?? <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-3 py-2 text-gray-600">
+                    {isEdit
+                      ? <input type="date" value={editBuf.tarihBitis ?? row.tarihBitis ?? ''} onChange={e => setEditBuf(p => ({ ...p, tarihBitis: e.target.value || null }))} className={inputCls} />
+                      : row.tarihBitis ?? <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-3 py-2 text-gray-700">
                     {isEdit
@@ -241,7 +254,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
                         </>
                       ) : (
                         <>
-                          <button onClick={() => { setEditId(row.id); setEditBuf({ stokKodu: row.stokKodu, tarih: row.tarih, cariAdi: row.cariAdi, subeAdi: row.subeAdi, bayiMerch: row.bayiMerch, kosulluDestek: row.kosulluDestek }) }}
+                          <button onClick={() => { setEditId(row.id); setEditBuf({ stokKodu: row.stokKodu, tarihBaslangic: row.tarihBaslangic, tarihBitis: row.tarihBitis, cariAdi: row.cariAdi, subeAdi: row.subeAdi, bayiMerch: row.bayiMerch, kosulluDestek: row.kosulluDestek }) }}
                             className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg"><Edit2 size={11} /></button>
                           <button onClick={() => deleteRow(row.id)}
                             className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={11} /></button>

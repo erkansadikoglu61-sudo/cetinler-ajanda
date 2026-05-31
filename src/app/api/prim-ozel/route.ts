@@ -32,14 +32,15 @@ export async function POST(req: Request) {
     const { error, data } = await sb()
       .from('prim_ozel')
       .insert({
-        stok_kodu:     body.stokKodu,
-        yil:           body.yil,
-        ay:            body.ay,
-        tarih:         body.tarih     || null,
-        cari_adi:      body.cariAdi   || null,
-        sube_adi:      body.subeAdi   || null,
-        bayi_merch:    body.bayiMerch    ?? null,
-        kosullu_destek: body.kosulluDestek ?? null,
+        stok_kodu:        body.stokKodu,
+        yil:              body.yil,
+        ay:               body.ay,
+        tarih_baslangic:  body.tarihBaslangic || null,
+        tarih_bitis:      body.tarihBitis     || null,
+        cari_adi:         body.cariAdi        || null,
+        sube_adi:         body.subeAdi        || null,
+        bayi_merch:       body.bayiMerch      ?? null,
+        kosullu_destek:   body.kosulluDestek  ?? null,
       })
       .select()
       .single()
@@ -59,12 +60,13 @@ export async function PUT(req: Request) {
     const { error } = await sb()
       .from('prim_ozel')
       .update({
-        stok_kodu:      body.stokKodu,
-        tarih:          body.tarih     || null,
-        cari_adi:       body.cariAdi   || null,
-        sube_adi:       body.subeAdi   || null,
-        bayi_merch:     body.bayiMerch    ?? null,
-        kosullu_destek: body.kosulluDestek ?? null,
+        stok_kodu:        body.stokKodu,
+        tarih_baslangic:  body.tarihBaslangic || null,
+        tarih_bitis:      body.tarihBitis     || null,
+        cari_adi:         body.cariAdi        || null,
+        sube_adi:         body.subeAdi        || null,
+        bayi_merch:       body.bayiMerch      ?? null,
+        kosullu_destek:   body.kosulluDestek  ?? null,
       })
       .eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
