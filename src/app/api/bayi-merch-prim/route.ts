@@ -7,16 +7,20 @@ export const maxDuration = 30
 const MERCH_URL = 'http://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
 
 // Column indices in the HTML table
+// 0:MERCH_PERSONEL 1:CARI_ISIM 2:SUBE_ADI 3:STOK_ADI 4:STOK_KODU
+// 5:GRUP_ACIKLAMA  6:SATILAN_ADET 7:GRUP_KODU 8:BEKLENEN_CIRO
+// 9:SUPERVISOR_ADI 10:CARI_KOD 11:SUBE_KOD 12:DONEM 13:TARIH
+// 14:MERCH_TIPI ("Bayi Merch" | "Çetinler Merch") 15:SV_TIPI 16:BSY
 const COL = {
   MERCH_PERSONEL: 0,
   CARI_ISIM:      1,
   SUBE_ADI:       2,
   STOK_ADI:       3,
   STOK_KODU:      4,
-  MERCH_GRUBU:    5,   // "Bayi Merch" vs "Çetinler Merch"
   SATILAN_ADET:   6,
   SUPERVISOR_ADI: 9,
   DONEM:          12,
+  MERCH_TIPI:     14,
 }
 
 function decodeHtml(s: string): string {
@@ -96,14 +100,13 @@ export async function GET(req: Request) {
     while ((m = tdRe.exec(part)) !== null) {
       cells.push(decodeHtml(m[1]))
     }
-    if (cells.length < 13) continue
+    if (cells.length < 15) continue
 
     // Filter by donem
     if (cells[COL.DONEM] !== donem) continue
 
-    // Only include "Bayi Merch" group — skip Çetinler merch
-    const grup = cells[COL.MERCH_GRUBU]?.toLowerCase() ?? ''
-    if (grup.includes('çetinler') || grup.includes('cetinler')) continue
+    // Only include "Bayi Merch" — skip "Çetinler Merch"
+    if (cells[COL.MERCH_TIPI] !== 'Bayi Merch') continue
 
     const stokKodu    = cells[COL.STOK_KODU].toUpperCase()
     const satisAdet   = parseFloat(cells[COL.SATILAN_ADET]) || 0
