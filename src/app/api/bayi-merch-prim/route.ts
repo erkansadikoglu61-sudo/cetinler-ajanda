@@ -13,6 +13,7 @@ const COL = {
   SUBE_ADI:       2,
   STOK_ADI:       3,
   STOK_KODU:      4,
+  MERCH_GRUBU:    5,   // "Bayi Merch" vs "Çetinler Merch"
   SATILAN_ADET:   6,
   SUPERVISOR_ADI: 9,
   DONEM:          12,
@@ -99,6 +100,10 @@ export async function GET(req: Request) {
 
     // Filter by donem
     if (cells[COL.DONEM] !== donem) continue
+
+    // Only include "Bayi Merch" group — skip Çetinler merch
+    const grup = cells[COL.MERCH_GRUBU]?.toLowerCase() ?? ''
+    if (grup.includes('çetinler') || grup.includes('cetinler')) continue
 
     const stokKodu    = cells[COL.STOK_KODU].toUpperCase()
     const satisAdet   = parseFloat(cells[COL.SATILAN_ADET]) || 0

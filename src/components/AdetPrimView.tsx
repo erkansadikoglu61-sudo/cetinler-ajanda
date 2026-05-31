@@ -243,10 +243,6 @@ export function BayiMerchHakdis() {
   const toplamPrim  = rows.reduce((s, r) => s + r.primHakdis, 0)
   const toplamAdet  = rows.reduce((s, r) => s + r.satisAdet, 0)
 
-  // Group by supervizor for summary
-  const svMap = new Map<string, number>()
-  rows.forEach(r => svMap.set(r.supervizor, (svMap.get(r.supervizor) ?? 0) + r.primHakdis))
-
   return (
     <div className="flex flex-col h-full bg-gray-50">
       {/* Toolbar */}
@@ -300,18 +296,6 @@ export function BayiMerchHakdis() {
           </div>
         ) : (
           <>
-            {/* Supervizör Özeti */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {[...svMap.entries()].sort((a, b) => b[1] - a[1]).map(([sv, prim]) => (
-                <div key={sv} className="bg-white rounded-xl border border-gray-200 px-4 py-3 shadow-sm">
-                  <div className="text-[10px] text-gray-400 font-medium truncate">{sv || '—'}</div>
-                  <div className="text-sm font-bold text-gray-800 mt-0.5">
-                    {prim.toLocaleString('tr-TR')} ₺
-                  </div>
-                </div>
-              ))}
-            </div>
-
             {/* Detay Tablosu */}
             <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
               <table className="text-xs border-collapse w-full bg-white">
