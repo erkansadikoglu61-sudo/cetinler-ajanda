@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 const MERCH_URL = 'http://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
 
-const COL = { CARI_ISIM: 1, SUBE_ADI: 2, MERCH_TIPI: 14 }
+const COL = { CARI_ISIM: 1, SUBE_ADI: 2, GRUP_KODU: 7, MERCH_TIPI: 14 }
 
 function decodeHtml(s: string): string {
   return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g,' ').trim()
@@ -19,6 +19,7 @@ export async function GET() {
 
   const cariSet = new Set<string>()
   const subeSet = new Set<string>()
+  const grupSet = new Set<string>()
   const tdRe = /<td[^>]*>(.*?)<\/td>/g
   const parts = html.split('</tr>')
 
@@ -33,10 +34,12 @@ export async function GET() {
     if (cells[COL.MERCH_TIPI] !== 'Bayi Merch') continue
     if (cells[COL.CARI_ISIM]) cariSet.add(cells[COL.CARI_ISIM])
     if (cells[COL.SUBE_ADI])  subeSet.add(cells[COL.SUBE_ADI])
+    if (cells[COL.GRUP_KODU]) grupSet.add(cells[COL.GRUP_KODU])
   }
 
   return NextResponse.json({
     cariOptions: [...cariSet].sort(),
     subeOptions: [...subeSet].sort(),
+    grupOptions: [...grupSet].sort(),
   })
 }

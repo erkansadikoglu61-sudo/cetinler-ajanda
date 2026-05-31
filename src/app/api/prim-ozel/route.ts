@@ -33,6 +33,7 @@ export async function POST(req: Request) {
       .from('prim_ozel')
       .insert({
         stok_kodu:        body.stokKodu        ?? null,   // text[] | null
+        grup_kodu:        body.grupKodu        ?? null,   // text[] | null
         yil:              body.yil,
         ay:               body.ay,
         tarih_baslangic:  body.tarihBaslangic  || null,
@@ -61,6 +62,7 @@ export async function PUT(req: Request) {
       .from('prim_ozel')
       .update({
         stok_kodu:        body.stokKodu        ?? null,
+        grup_kodu:        body.grupKodu        ?? null,
         tarih_baslangic:  body.tarihBaslangic  || null,
         tarih_bitis:      body.tarihBitis      || null,
         cari_adi:         body.cariAdi         ?? null,

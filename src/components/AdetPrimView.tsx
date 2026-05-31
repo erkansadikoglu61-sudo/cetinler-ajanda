@@ -26,11 +26,16 @@ function MultiSelectBox({
   const [open, setOpen] = useState(false)
   const [q,    setQ]    = useState('')
   const [pos,  setPos]  = useState({ top: 0, left: 0, width: 0 })
-  const ref    = useRef<HTMLDivElement>(null)
-  const btnRef = useRef<HTMLButtonElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const dropRef = useRef<HTMLDivElement>(null)
+  const btnRef  = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    const h = (e: MouseEvent) => {
+      const inWrap = wrapRef.current?.contains(e.target as Node)
+      const inDrop = dropRef.current?.contains(e.target as Node)
+      if (!inWrap && !inDrop) setOpen(false)
+    }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [])
@@ -58,6 +63,7 @@ function MultiSelectBox({
 
   const dropdown = open && !loading ? (
     <div
+      ref={dropRef}
       style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 9999 }}
       className="bg-white border border-gray-200 rounded-xl shadow-2xl flex flex-col max-h-72"
     >
@@ -78,7 +84,7 @@ function MultiSelectBox({
         {filtered.map(opt => (
           <label key={opt} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
             <input type="checkbox"
-              checked={!isAll && value.includes(opt)}
+              checked={isAll || value.includes(opt)}
               onChange={() => toggle(opt)}
               className="w-3.5 h-3.5 rounded accent-brand-600 flex-shrink-0" />
             <span className="text-xs text-gray-700 truncate">{opt}</span>
@@ -99,7 +105,7 @@ function MultiSelectBox({
   ) : null
 
   return (
-    <div ref={ref} className="relative w-full">
+    <div ref={wrapRef} className="relative w-full">
       <button ref={btnRef} type="button" onClick={openDropdown} disabled={loading}
         className="flex items-center justify-between gap-1 w-full pl-2.5 pr-2 py-1 text-xs border border-gray-200 rounded-lg bg-white hover:border-brand-400 focus:outline-none disabled:opacity-50">
         <span className={clsx('truncate', isAll || (value && value.length > 0) ? 'text-gray-800' : 'text-gray-400')}>
@@ -125,6 +131,7 @@ interface PrimRow {
 interface OzelRow {
   id:              string
   stokKodu:        string[] | null   // null = Tümü
+  grupKodu:        string[] | null   // null = Tümü
   yil:             number
   ay:              number
   tarihBaslangic:  string | null
@@ -136,7 +143,7 @@ interface OzelRow {
 }
 
 const EMPTY_OZEL = (yil: number, ay: number): Omit<OzelRow,'id'> => ({
-  stokKodu: null, yil, ay, tarihBaslangic: null, tarihBitis: null, cariAdi: null, subeAdi: null, bayiMerch: null, kosulluDestek: null
+  stokKodu: null, grupKodu: null, yil, ay, tarihBaslangic: null, tarihBitis: null, cariAdi: null, subeAdi: null, bayiMerch: null, kosulluDestek: null
 })
 
 // Helper: display an array value in read-only cells
@@ -152,17 +159,18 @@ function ArrayBadge({ val }: { val: string[] | null }) {
 }
 
 function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
-  const [rows,        setRows]        = useState<OzelRow[]>([])
-  const [loading,     setLoading]     = useState(false)
-  const [adding,      setAdding]      = useState(false)
-  const [newRow,      setNewRow]      = useState<Omit<OzelRow,'id'>>(EMPTY_OZEL(yil, ay))
-  const [editId,      setEditId]      = useState<string | null>(null)
-  const [editBuf,     setEditBuf]     = useState<Partial<OzelRow>>({})
-  const [saving,      setSaving]      = useState(false)
-  const [msg,         setMsg]         = useState<string | null>(null)
-  const [cariOptions, setCariOptions] = useState<string[]>([])
-  const [subeOptions, setSubeOptions] = useState<string[]>([])
-  const [optsLoading, setOptsLoading] = useState(false)
+  const [rows,         setRows]        = useState<OzelRow[]>([])
+  const [loading,      setLoading]     = useState(false)
+  const [adding,       setAdding]      = useState(false)
+  const [newRow,       setNewRow]      = useState<Omit<OzelRow,'id'>>(EMPTY_OZEL(yil, ay))
+  const [editId,       setEditId]      = useState<string | null>(null)
+  const [editBuf,      setEditBuf]     = useState<Partial<OzelRow>>({})
+  const [saving,       setSaving]      = useState(false)
+  const [msg,          setMsg]         = useState<string | null>(null)
+  const [cariOptions,  setCariOptions] = useState<string[]>([])
+  const [subeOptions,  setSubeOptions] = useState<string[]>([])
+  const [grupOptions,  setGrupOptions] = useState<string[]>([])
+  const [optsLoading,  setOptsLoading] = useState(false)
 
   const STOK_OPTIONS = ADET_PRIM_DEFAULTS.map(r => r.stokKodu)
 
@@ -172,7 +180,8 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
       const r = await fetch(`/api/prim-ozel?yil=${yil}&ay=${ay}`)
       const d = await r.json()
       setRows((d.rows ?? []).map((x: Record<string,unknown>) => ({
-        id: x.id, stokKodu: x.stok_kodu ?? null, yil: x.yil, ay: x.ay,
+        id: x.id, stokKodu: x.stok_kodu ?? null, grupKodu: x.grup_kodu ?? null,
+        yil: x.yil, ay: x.ay,
         tarihBaslangic: x.tarih_baslangic, tarihBitis: x.tarih_bitis,
         cariAdi: x.cari_adi ?? null, subeAdi: x.sube_adi ?? null,
         bayiMerch: x.bayi_merch, kosulluDestek: x.kosullu_destek
@@ -188,7 +197,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
     setOptsLoading(true)
     fetch('/api/merch-options')
       .then(r => r.json())
-      .then(d => { setCariOptions(d.cariOptions ?? []); setSubeOptions(d.subeOptions ?? []) })
+      .then(d => { setCariOptions(d.cariOptions ?? []); setSubeOptions(d.subeOptions ?? []); setGrupOptions(d.grupOptions ?? []) })
       .finally(() => setOptsLoading(false))
   }, [])
 
@@ -205,7 +214,8 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
       const d = await r.json()
       if (!r.ok) throw new Error(d.error)
       setRows(prev => [...prev, {
-        id: d.row.id, stokKodu: d.row.stok_kodu ?? null, yil: d.row.yil, ay: d.row.ay,
+        id: d.row.id, stokKodu: d.row.stok_kodu ?? null, grupKodu: d.row.grup_kodu ?? null,
+        yil: d.row.yil, ay: d.row.ay,
         tarihBaslangic: d.row.tarih_baslangic, tarihBitis: d.row.tarih_bitis,
         cariAdi: d.row.cari_adi ?? null, subeAdi: d.row.sube_adi ?? null,
         bayiMerch: d.row.bayi_merch, kosulluDestek: d.row.kosullu_destek
@@ -268,6 +278,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
           <thead>
             <tr className="bg-gray-800 text-white">
               <th className="text-left px-3 py-2.5 font-semibold min-w-[160px]">Stok Kodu</th>
+              <th className="text-left px-3 py-2.5 font-semibold min-w-[150px]">Grup Kodu</th>
               <th className="text-left px-3 py-2.5 font-semibold min-w-[110px]">Başlangıç</th>
               <th className="text-left px-3 py-2.5 font-semibold min-w-[110px]">Bitiş</th>
               <th className="text-left px-3 py-2.5 font-semibold min-w-[180px]">Cari Adı</th>
@@ -284,6 +295,10 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
                 <td className="px-2 py-1.5">
                   <MultiSelectBox options={STOK_OPTIONS} value={newRow.stokKodu}
                     onChange={v => setNewRow(p => ({ ...p, stokKodu: v }))} placeholder="Stok kodu seçin…" />
+                </td>
+                <td className="px-2 py-1.5">
+                  <MultiSelectBox options={grupOptions} value={newRow.grupKodu}
+                    onChange={v => setNewRow(p => ({ ...p, grupKodu: v }))} placeholder="Grup kodu seçin…" loading={optsLoading} />
                 </td>
                 <td className="px-2 py-1.5">
                   <input type="date" value={newRow.tarihBaslangic ?? ''} onChange={e => setNewRow(p => ({ ...p, tarihBaslangic: e.target.value || null }))} className={inputCls} />
@@ -317,9 +332,9 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
             )}
 
             {loading ? (
-              <tr><td colSpan={8} className="text-center py-8 text-gray-400"><RefreshCw size={14} className="animate-spin inline mr-1" />Yükleniyor…</td></tr>
+              <tr><td colSpan={9} className="text-center py-8 text-gray-400"><RefreshCw size={14} className="animate-spin inline mr-1" />Yükleniyor…</td></tr>
             ) : rows.length === 0 && !adding ? (
-              <tr><td colSpan={8} className="text-center py-8 text-gray-300 text-[11px]">Henüz özel prim tanımı yok. "Yeni Ekle" ile başlayın.</td></tr>
+              <tr><td colSpan={9} className="text-center py-8 text-gray-300 text-[11px]">Henüz özel prim tanımı yok. "Yeni Ekle" ile başlayın.</td></tr>
             ) : rows.map((row, idx) => {
               const isEdit = editId === row.id
               return (
@@ -329,6 +344,12 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
                       ? <MultiSelectBox options={STOK_OPTIONS} value={eVal('stokKodu', row) as string[] | null}
                           onChange={v => setEditBuf(p => ({ ...p, stokKodu: v }))} placeholder="Stok seçin…" />
                       : <ArrayBadge val={row.stokKodu} />}
+                  </td>
+                  <td className="px-3 py-2">
+                    {isEdit
+                      ? <MultiSelectBox options={grupOptions} value={eVal('grupKodu', row) as string[] | null}
+                          onChange={v => setEditBuf(p => ({ ...p, grupKodu: v }))} placeholder="Grup seçin…" loading={optsLoading} />
+                      : <ArrayBadge val={row.grupKodu} />}
                   </td>
                   <td className="px-3 py-2 text-gray-600">
                     {isEdit
@@ -375,7 +396,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
                         <>
                           <button onClick={() => {
                             setEditId(row.id)
-                            setEditBuf({ stokKodu: row.stokKodu, tarihBaslangic: row.tarihBaslangic, tarihBitis: row.tarihBitis, cariAdi: row.cariAdi, subeAdi: row.subeAdi, bayiMerch: row.bayiMerch, kosulluDestek: row.kosulluDestek })
+                            setEditBuf({ stokKodu: row.stokKodu, grupKodu: row.grupKodu, tarihBaslangic: row.tarihBaslangic, tarihBitis: row.tarihBitis, cariAdi: row.cariAdi, subeAdi: row.subeAdi, bayiMerch: row.bayiMerch, kosulluDestek: row.kosulluDestek })
                           }} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg"><Edit2 size={11} /></button>
                           <button onClick={() => deleteRow(row.id)}
                             className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={11} /></button>
