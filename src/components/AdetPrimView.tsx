@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { RefreshCw, Edit2, Save, X, ChevronDown, Plus, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -24,13 +25,23 @@ function MultiSelectBox({
 }) {
   const [open, setOpen] = useState(false)
   const [q,    setQ]    = useState('')
-  const ref = useRef<HTMLDivElement>(null)
+  const [pos,  setPos]  = useState({ top: 0, left: 0, width: 0 })
+  const ref    = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [])
+
+  function openDropdown() {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + window.scrollY + 4, left: r.left + window.scrollX, width: Math.max(r.width, 288) })
+    }
+    setOpen(o => !o)
+  }
 
   const isAll    = value === null
   const filtered = q ? options.filter(o => o.toLowerCase().includes(q.toLowerCase())) : options
@@ -45,54 +56,60 @@ function MultiSelectBox({
     }
   }
 
+  const dropdown = open && !loading ? (
+    <div
+      style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 9999 }}
+      className="bg-white border border-gray-200 rounded-xl shadow-2xl flex flex-col max-h-72"
+    >
+      {/* Arama */}
+      <div className="p-2 border-b border-gray-100 flex-shrink-0">
+        <input autoFocus type="text" value={q} onChange={e => setQ(e.target.value)}
+          placeholder="Ara…"
+          className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-brand-400" />
+      </div>
+      <div className="overflow-y-auto flex-1">
+        {/* Tümü */}
+        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+          <input type="checkbox" checked={isAll} onChange={() => onChange(isAll ? [] : null)}
+            className="w-3.5 h-3.5 rounded accent-brand-600 flex-shrink-0" />
+          <span className="text-xs font-semibold text-gray-700">Tümü</span>
+        </label>
+        {/* Seçenekler */}
+        {filtered.map(opt => (
+          <label key={opt} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+            <input type="checkbox"
+              checked={!isAll && value.includes(opt)}
+              onChange={() => toggle(opt)}
+              className="w-3.5 h-3.5 rounded accent-brand-600 flex-shrink-0" />
+            <span className="text-xs text-gray-700 truncate">{opt}</span>
+          </label>
+        ))}
+        {filtered.length === 0 && (
+          <div className="px-3 py-3 text-xs text-gray-300 text-center">Sonuç yok</div>
+        )}
+      </div>
+      {/* Footer: seçili sayı */}
+      {!isAll && value.length > 0 && (
+        <div className="border-t border-gray-100 px-3 py-1.5 flex items-center justify-between flex-shrink-0">
+          <span className="text-[10px] text-gray-500">{value.length} seçili</span>
+          <button type="button" onClick={() => onChange(null)} className="text-[10px] text-brand-600 hover:underline">Tümünü seç</button>
+        </div>
+      )}
+    </div>
+  ) : null
+
   return (
     <div ref={ref} className="relative w-full">
-      <button type="button" onClick={() => setOpen(o => !o)} disabled={loading}
+      <button ref={btnRef} type="button" onClick={openDropdown} disabled={loading}
         className="flex items-center justify-between gap-1 w-full pl-2.5 pr-2 py-1 text-xs border border-gray-200 rounded-lg bg-white hover:border-brand-400 focus:outline-none disabled:opacity-50">
         <span className={clsx('truncate', isAll || (value && value.length > 0) ? 'text-gray-800' : 'text-gray-400')}>
           {loading ? 'Yükleniyor…' : label}
         </span>
         <ChevronDown size={11} className="text-gray-400 flex-shrink-0" />
       </button>
-
-      {open && !loading && (
-        <div className="absolute z-50 top-full mt-1 left-0 w-72 bg-white border border-gray-200 rounded-xl shadow-xl flex flex-col max-h-72">
-          {/* Arama */}
-          <div className="p-2 border-b border-gray-100 flex-shrink-0">
-            <input autoFocus type="text" value={q} onChange={e => setQ(e.target.value)}
-              placeholder="Ara…"
-              className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-brand-400" />
-          </div>
-          <div className="overflow-y-auto flex-1">
-            {/* Tümü */}
-            <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-              <input type="checkbox" checked={isAll} onChange={() => onChange(isAll ? [] : null)}
-                className="w-3.5 h-3.5 rounded accent-brand-600 flex-shrink-0" />
-              <span className="text-xs font-semibold text-gray-700">Tümü</span>
-            </label>
-            {/* Seçenekler */}
-            {filtered.map(opt => (
-              <label key={opt} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
-                <input type="checkbox"
-                  checked={!isAll && value.includes(opt)}
-                  onChange={() => toggle(opt)}
-                  className="w-3.5 h-3.5 rounded accent-brand-600 flex-shrink-0" />
-                <span className="text-xs text-gray-700 truncate">{opt}</span>
-              </label>
-            ))}
-            {filtered.length === 0 && (
-              <div className="px-3 py-3 text-xs text-gray-300 text-center">Sonuç yok</div>
-            )}
-          </div>
-          {/* Footer: seçili sayı */}
-          {!isAll && value.length > 0 && (
-            <div className="border-t border-gray-100 px-3 py-1.5 flex items-center justify-between flex-shrink-0">
-              <span className="text-[10px] text-gray-500">{value.length} seçili</span>
-              <button type="button" onClick={() => onChange(null)} className="text-[10px] text-brand-600 hover:underline">Tümünü seç</button>
-            </div>
-          )}
-        </div>
-      )}
+      {open && !loading && typeof document !== 'undefined'
+        ? createPortal(dropdown, document.body)
+        : null}
     </div>
   )
 }
