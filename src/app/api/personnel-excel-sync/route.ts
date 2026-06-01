@@ -44,15 +44,18 @@ export async function POST(req: Request) {
 
     const existingMap = new Map<string, { id: string; jr_profile_id: string | null }>()
     for (const r of existing ?? []) {
-      const k = `${(r.merch_adi ?? '').trim()}||${(r.cari_adi ?? '').trim()}||${(r.sube_adi ?? '').trim()}`
+      const k = `${(r.merch_adi ?? '').trim()}||${(r.sube_adi ?? '').trim()}`
       existingMap.set(k, { id: r.id, jr_profile_id: r.jr_profile_id })
     }
 
     const toInsert: object[] = []
     const toUpdate: { id: string; fields: object }[] = []
+    const seenKeys = new Set<string>()  // Excel'deki kopyaları atla
 
     for (const row of excelRows) {
-      const k = `${(row.merch_adi ?? '').trim()}||${(row.cari_adi ?? '').trim()}||${(row.sube_adi ?? '').trim()}`
+      const k = `${(row.merch_adi ?? '').trim()}||${(row.sube_adi ?? '').trim()}`
+      if (seenKeys.has(k)) continue   // Excel'de tekrar eden satırı atla
+      seenKeys.add(k)
       const fields = {
         merch_adi:   row.merch_adi?.trim()   || null,
         sup_adi:     row.sup_adi?.trim()     || null,
