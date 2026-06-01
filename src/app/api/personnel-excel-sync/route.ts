@@ -36,65 +36,42 @@ export async function POST(req: Request) {
 
     const client = sb()
 
-    // 1. Mevcut kayıtları çek (key: merch_adi||cari_adi||sube_adi)
-    const { data: existing, error: fetchErr } = await client
-      .from('field_personnel')
-      .select('id, merch_adi, cari_adi, sube_adi, jr_profile_id')
-    if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 })
-
-    const existingMap = new Map<string, { id: string; jr_profile_id: string | null }>()
-    for (const r of existing ?? []) {
-      const k = `${(r.merch_adi ?? '').trim()}||${(r.sube_adi ?? '').trim()}`
-      existingMap.set(k, { id: r.id, jr_profile_id: r.jr_profile_id })
-    }
-
-    const toInsert: object[] = []
-    const toUpdate: { id: string; fields: object }[] = []
-    const seenKeys = new Set<string>()  // Excel'deki kopyaları atla
-
+    // Excel'deki kopyaları (merch_adi + sube_adi) temizle
+    const seen = new Set<string>()
+    const dedupedRows: object[] = []
     for (const row of excelRows) {
       const k = `${(row.merch_adi ?? '').trim()}||${(row.sube_adi ?? '').trim()}`
-      if (seenKeys.has(k)) continue   // Excel'de tekrar eden satırı atla
-      seenKeys.add(k)
-      const fields = {
-        merch_adi:   row.merch_adi?.trim()   || null,
+      if (seen.has(k)) continue
+      seen.add(k)
+      dedupedRows.push({
+        merch_adi:   (row.merch_adi ?? '').trim() || null,
         sup_adi:     row.sup_adi?.trim()     || null,
         merch_grubu: row.merch_grubu?.trim() || null,
         cari_adi:    row.cari_adi?.trim()    || null,
         sube_adi:    row.sube_adi?.trim()    || null,
         jr_adi:      row.jr_adi?.trim()      || null,
         bsy_adi:     row.bsy_adi?.trim()     || null,
-      }
-      const ex = existingMap.get(k)
-      if (ex) {
-        toUpdate.push({ id: ex.id, fields })
-      } else {
-        toInsert.push({ ...fields, jr_profile_id: null })
-      }
+      })
     }
 
-    // 2. Yeni kayıtları ekle (batch 100)
-    let inserted = 0
-    for (let i = 0; i < toInsert.length; i += 100) {
-      const { error } = await client.from('field_personnel').insert(toInsert.slice(i, i + 100))
-      if (error) return NextResponse.json({ error: `Insert hatası: ${error.message}` }, { status: 500 })
-      inserted += toInsert.slice(i, i + 100).length
-    }
-
-    // 3. Mevcut kayıtları güncelle (jr_profile_id dokunma)
-    let updated = 0
-    for (const { id, fields } of toUpdate) {
-      const { error } = await client.from('field_personnel').update(fields).eq('id', id)
-      if (error) return NextResponse.json({ error: `Update hatası (${id}): ${error.message}` }, { status: 500 })
-      updated++
+    // Supabase upsert: onConflict = merch_adi,sube_adi
+    // jr_profile_id sütunu gönderilmediği için dokunulmaz
+    let upserted = 0
+    const BATCH = 100
+    for (let i = 0; i < dedupedRows.length; i += BATCH) {
+      const slice = dedupedRows.slice(i, i + BATCH)
+      const { error } = await client
+        .from('field_personnel')
+        .upsert(slice, { onConflict: 'merch_adi,sube_adi', ignoreDuplicates: false })
+      if (error) return NextResponse.json({ error: `Upsert hatası (batch ${Math.floor(i/BATCH)+1}): ${error.message}` }, { status: 500 })
+      upserted += slice.length
     }
 
     return NextResponse.json({
       ok: true,
-      inserted,
-      updated,
+      upserted,
       total: excelRows.length,
-      skipped: excelRows.length - inserted - updated,
+      deduped: excelRows.length - dedupedRows.length,
     })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
