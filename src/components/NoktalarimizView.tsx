@@ -15,16 +15,25 @@ interface FpJrEntry {
   jr_profile_id: string | null
 }
 
+// field_personnel'dan gelen Destek Personeli
+interface FpDestekEntry {
+  sube_adi:    string | null
+  cari_adi:    string | null
+  merch_adi:   string | null
+  merch_grubu: string | null
+}
+
 // ─── Tipler ────────────────────────────────────────────────────
 interface SubeItem {
-  subeKod:       string
-  subeAdi:       string
-  cariIsim:      string
-  sups:          Profile[]
-  jrs:           Profile[]
-  cetinlerMerch: string[]
-  bayiMerch:     string[]
-  bsyIds:        string[]   // Bu şubeyle ilişkili BSY id'leri
+  subeKod:          string
+  subeAdi:          string
+  cariIsim:         string
+  sups:             Profile[]
+  jrs:              Profile[]
+  cetinlerMerch:    string[]
+  bayiMerch:        string[]
+  destekPersoneli:  string[]
+  bsyIds:           string[]
 }
 
 interface Props {
@@ -73,6 +82,7 @@ function buildSubeList(
   team:           Profile[],
   bsyLinks:       BsySupervisor[],
   fpJrMap:        Map<string, Set<string>>,
+  fpDestekMap:    Map<string, string[]>,
 ): SubeItem[] {
   let visible: SelloutRow[]
 
@@ -151,14 +161,18 @@ function buildSubeList(
         .map(id => team.find(p => p.id === id))
         .filter(Boolean) as Profile[]
 
+      // Destek personeli → field_personnel'dan
+      const destekPersoneli = fpDestekMap.get(fpKey) ?? []
+
       return {
         subeKod,
-        subeAdi:       e.subeAdi,
-        cariIsim:      e.cariIsim,
-        sups:          [...e.supNames].map(n => team.find(p => p.full_name === n) ?? { id: '', full_name: n, role: 'sup', color: '#888', manager_id: null, email: null } as Profile),
+        subeAdi:          e.subeAdi,
+        cariIsim:         e.cariIsim,
+        sups:             [...e.supNames].map(n => team.find(p => p.full_name === n) ?? { id: '', full_name: n, role: 'sup', color: '#888', manager_id: null, email: null } as Profile),
         jrs,
-        cetinlerMerch: [...e.cetinler].sort(),
-        bayiMerch:     [...e.bayi].sort(),
+        cetinlerMerch:    [...e.cetinler].sort(),
+        bayiMerch:        [...e.bayi].sort(),
+        destekPersoneli:  destekPersoneli.sort(),
         bsyIds,
       }
     })
@@ -185,19 +199,21 @@ interface SubeDetailProps {
 
 function SubeDetail({ sube, onClose, currentProfile }: SubeDetailProps) {
   const sections = [
-    { title: 'Süpervizör',     icon: <User size={14} />,       color: 'blue',    items: sube.sups.map(p => ({ name: p.full_name, color: p.color })) },
-    { title: 'Jr. Süpervizör', icon: <Users size={14} />,      color: 'violet',  items: sube.jrs.map(p => ({ name: p.full_name, color: p.color })) },
-    { title: 'Çetinler Merch', icon: <ShoppingBag size={14} />,color: 'emerald', items: sube.cetinlerMerch.map(n => ({ name: n, color: undefined })) },
-    { title: 'Bayi Merch',     icon: <Store size={14} />,      color: 'amber',   items: sube.bayiMerch.map(n => ({ name: n, color: undefined })) },
+    { title: 'Süpervizör',       icon: <User size={14} />,       color: 'blue',    items: sube.sups.map(p => ({ name: p.full_name, color: p.color })) },
+    { title: 'Jr. Süpervizör',   icon: <Users size={14} />,      color: 'violet',  items: sube.jrs.map(p => ({ name: p.full_name, color: p.color })) },
+    { title: 'Çetinler Merch',   icon: <ShoppingBag size={14} />,color: 'emerald', items: sube.cetinlerMerch.map(n => ({ name: n, color: undefined })) },
+    { title: 'Bayi Merch',       icon: <Store size={14} />,      color: 'amber',   items: sube.bayiMerch.map(n => ({ name: n, color: undefined })) },
+    { title: 'Destek Personeli', icon: <User size={14} />,       color: 'sky',     items: sube.destekPersoneli.map(n => ({ name: n, color: undefined })) },
   ]
   const colorMap: Record<string, string> = {
     blue:    'bg-blue-100 text-blue-700 border-blue-200',
     violet:  'bg-violet-100 text-violet-700 border-violet-200',
     emerald: 'bg-emerald-100 text-emerald-700 border-emerald-200',
     amber:   'bg-amber-100 text-amber-700 border-amber-200',
+    sky:     'bg-sky-100 text-sky-700 border-sky-200',
   }
   const dotMap: Record<string, string> = {
-    blue: 'bg-blue-500', violet: 'bg-violet-500', emerald: 'bg-emerald-500', amber: 'bg-amber-500',
+    blue: 'bg-blue-500', violet: 'bg-violet-500', emerald: 'bg-emerald-500', amber: 'bg-amber-500', sky: 'bg-sky-500',
   }
 
   return (
@@ -285,13 +301,19 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
   const [selected,     setSelected]    = useState<SubeItem | null>(null)
 
   // ── field_personnel'dan Jr. atamaları yükle ────────────────────
-  const [fpJrEntries, setFpJrEntries] = useState<FpJrEntry[]>([])
+  const [fpJrEntries,    setFpJrEntries]    = useState<FpJrEntry[]>([])
+  const [fpDestekEntries, setFpDestekEntries] = useState<FpDestekEntry[]>([])
 
   useEffect(() => {
     supabase
       .from('field_personnel')
       .select('sube_adi, cari_adi, jr_profile_id')
       .then(({ data }) => setFpJrEntries(data ?? []))
+    supabase
+      .from('field_personnel')
+      .select('sube_adi, cari_adi, merch_adi, merch_grubu')
+      .eq('merch_grubu', 'Destek Personeli')
+      .then(({ data }) => setFpDestekEntries(data ?? []))
   }, [])
 
   // normalize("sube||cari") → Set<jr_profile_id>
@@ -306,12 +328,24 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
     return map
   }, [fpJrEntries])
 
+  // normalize("sube||cari") → string[] (destek personeli adları)
+  const fpDestekMap = useMemo(() => {
+    const map = new Map<string, string[]>()
+    fpDestekEntries.forEach(fp => {
+      if (!fp.merch_adi) return
+      const key = (fp.sube_adi ?? '').trim() + '||' + (fp.cari_adi ?? '').trim()
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(fp.merch_adi)
+    })
+    return map
+  }, [fpDestekEntries])
+
   // BSY değişince Sup filtresini sıfırla (cascade tutarlılığı)
   const handleBsyChange = (v: string) => { setFilterBsy(v); setFilterSup('') }
 
   const subeList = useMemo(
-    () => buildSubeList(rows, currentProfile, team, bsyLinks, fpJrMap),
-    [rows, currentProfile, team, bsyLinks, fpJrMap]
+    () => buildSubeList(rows, currentProfile, team, bsyLinks, fpJrMap, fpDestekMap),
+    [rows, currentProfile, team, bsyLinks, fpJrMap, fpDestekMap]
   )
 
   // BSY listesi
