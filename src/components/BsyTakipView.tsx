@@ -494,10 +494,10 @@ function BsyKisiTable({
     return <p className="text-xs text-gray-400 text-center py-8">Bu döneme ait veri bulunamadı.</p>
   }
 
-  // Şirket toplam hedef + gerc (tüm BSY'ler dahil)
+  // Şirket toplam hedef + gerc — SADECE Elx + Relux (hedefle karşılaştırılabilir olsun)
   let compGerc = 0; let compHedef = 0
   mergedRows.forEach(row => {
-    compGerc  += row.toplamGercCiro
+    compGerc  += row.brands['ELECTROLUX'].gercCiro + row.brands['RELUX'].gercCiro
     compHedef += getKisiHedef(row.bsyAdi, 'ELECTROLUX').hedefCiro +
                  getKisiHedef(row.bsyAdi, 'RELUX').hedefCiro
   })
@@ -534,7 +534,7 @@ function BsyKisiTable({
     totals.elxH   += elx.hedefCiro;   totals.elxG  += row.brands['ELECTROLUX'].gercCiro; totals.elxP  += elxPrim
     totals.reluxH += relux.hedefCiro; totals.reluxG += row.brands['RELUX'].gercCiro;      totals.reluxP += reluxPrim
     totals.topH   += elx.hedefCiro + relux.hedefCiro
-    totals.topG   += row.toplamGercCiro
+    totals.topG   += row.brands['ELECTROLUX'].gercCiro + row.brands['RELUX'].gercCiro
     totals.topP   += elxPrim + reluxPrim
   })
 
@@ -605,20 +605,41 @@ function BsyKisiTable({
               const reluxGerc = row.brands['RELUX'].gercCiro
               const { elxPrim, reluxPrim } = getPrims(row)
               const topHedef  = elx.hedefCiro + relux.hedefCiro
-              const topGerc   = row.toplamGercCiro
+              // topGerc: sadece Elx + Relux (hedefle tutarlı)
+              const topGerc   = elxGerc + reluxGerc
               const topPrim   = elxPrim + reluxPrim
               const excluded  = isExcluded(row.bsyAdi)
               const tahsilOran = getTahsilatOran(row.bsyAdi)
 
+              // Hangi çarpanlar bu BSY için aktif?
+              const c1thr = params['carp1_thr'] ?? 50
+              const achElxPct   = elx.hedefCiro   > 0 ? (elxGerc   / elx.hedefCiro)   * 100 : -1
+              const achReluxPct = relux.hedefCiro > 0 ? (reluxGerc / relux.hedefCiro) * 100 : -1
+              const carp1Active = !excluded && (
+                (achElxPct   >= 0 && achElxPct   < c1thr) ||
+                (achReluxPct >= 0 && achReluxPct < c1thr)
+              )
+              const c2thr = params['carp2_thr'] ?? 80
+              const compAchRow = compHedef > 0 ? (compGerc / compHedef) * 100 : 0
+              const carp2Active = !excluded && compAchRow < c2thr
+              const c3thr = params['carp3_thr'] ?? 100
+              const carp3Active = !excluded && tahsilOran >= c3thr
+
               return (
                 <tr key={row.bsyAdi} className={clsx('border-b border-gray-100 hover:bg-blue-50/20', idx % 2 === 1 && 'bg-gray-50/40')}>
-                  <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-4 py-2 font-medium text-gray-800 whitespace-nowrap">
-                    <div className="flex items-center gap-1.5">
+                  <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-3 py-2 font-medium text-gray-800">
+                    <div className="flex flex-col gap-0.5">
                       <span className={excluded ? 'italic text-gray-500' : ''}>{row.bsyAdi}</span>
-                      {excluded && <span className="text-[9px] bg-gray-200 text-gray-500 rounded px-1 py-0.5">prim yok</span>}
-                      {!excluded && tahsilOran >= (params['carp3_thr'] ?? 100) && (
-                        <span className="text-[9px] bg-green-100 text-green-700 rounded px-1 py-0.5">③×{params['carp3_val'] ?? 1.5}</span>
-                      )}
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {excluded && <span className="text-[9px] bg-gray-200 text-gray-500 rounded px-1 py-0.5">prim yok</span>}
+                        {carp1Active && <span className="text-[9px] bg-orange-100 text-orange-700 rounded px-1 py-0.5">①×{params['carp1_val'] ?? 0.30}</span>}
+                        {carp2Active && <span className="text-[9px] bg-red-100 text-red-700 rounded px-1 py-0.5">②×{params['carp2_val'] ?? 0.50}</span>}
+                        {carp3Active && <span className="text-[9px] bg-green-100 text-green-700 rounded px-1 py-0.5">③×{params['carp3_val'] ?? 1.50}</span>}
+                        {/* Tahsilat oranı — eşleşme doğrulaması için */}
+                        {tahsilOran > 0 && (
+                          <span className="text-[9px] text-gray-400">Tah:{Math.round(tahsilOran)}%</span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   {/* ELX */}
