@@ -27,7 +27,7 @@ const DEFAULT_PARAMS: Params = {
   relux_t2_thr: 100, relux_t2_rate: 0.85,
   relux_t3_thr: 130, relux_t3_rate: 1.15,
   relux_t4_thr: 150, relux_t4_rate: 1.40,
-  carp1_thr: 50,  carp1_val: 0.30,
+  carp1_thr: 50,  carp1_val: 0.70,
   carp2_thr: 80,  carp2_val: 0.50,
   carp3_thr: 100, carp3_val: 1.50,
 }
