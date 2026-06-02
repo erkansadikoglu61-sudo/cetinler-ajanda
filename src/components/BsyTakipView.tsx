@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { RefreshCw, ChevronDown, Settings2, X, Save, Upload, SlidersHorizontal, ImagePlus } from 'lucide-react'
 import clsx from 'clsx'
 import { useBsyCiro, BRAND_KEYS, BrandKey } from '@/hooks/useBsyCiro'
@@ -9,6 +9,83 @@ import { useBsyKisiHedef } from '@/hooks/useBsyKisiHedef'
 import { BRAND_LABEL, calcBsyPrims, PRIM_EXCLUDED_BSYS } from '@/lib/bsy'
 import type { BsyBrandRow } from '@/hooks/useBsyCiro'
 import { supabase } from '@/lib/supabase'
+
+// ─── Parametreler tanımı ──────────────────────────────────────
+interface ParamDef { label: string; default: number; unit?: string }
+const PARAM_DEFS: Record<string, ParamDef> = {
+  baraj_pct:       { label: 'Prim Barajı',             default: 80,  unit: '%'  },
+  elx_prim_pct:    { label: 'Electrolux Prim Oranı',   default: 0,   unit: '%'  },
+  relux_prim_pct:  { label: 'Relux Prim Oranı',        default: 0,   unit: '%'  },
+}
+type Params = Record<string, number>
+
+const BRAND_PRIM_KEY: Partial<Record<BrandKey, string>> = {
+  'ELECTROLUX': 'elx_prim_pct',
+  'RELUX':      'relux_prim_pct',
+}
+
+/** Parametrelere göre BSY prim hesapla */
+function calcPrimFromParams(
+  gercCiro:  number,
+  hedefCiro: number,
+  brand:     BrandKey,
+  params:    Params,
+  excluded:  boolean,
+): number | null {
+  if (excluded) return 0
+  const primKey = BRAND_PRIM_KEY[brand]
+  if (!primKey) return null
+  const primPct    = params[primKey] ?? 0
+  const barajPct   = (params['baraj_pct'] ?? 80) / 100
+  if (hedefCiro <= 0 || primPct <= 0) return null
+  const achievement = gercCiro / hedefCiro
+  if (achievement < barajPct) return 0
+  return Math.round(Math.min(achievement, 1.0) * hedefCiro * (primPct / 100))
+}
+
+// ─── Parametreler hook'u ──────────────────────────────────────
+function useBsyParametreler() {
+  const defaults: Params = Object.fromEntries(
+    Object.entries(PARAM_DEFS).map(([k, d]) => [k, d.default])
+  )
+  const [params,  setParams]  = useState<Params>(defaults)
+  const [loading, setLoading] = useState(false)
+  const [saving,  setSaving]  = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res  = await fetch('/api/bsy-parametreler')
+      const json = await res.json()
+      const map: Params = { ...defaults }
+      ;(json.rows ?? []).forEach((r: { key: string; value: number }) => { map[r.key] = r.value })
+      setParams(map)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const save = useCallback(async (newParams: Params) => {
+    setSaving(true)
+    try {
+      const rows = Object.entries(newParams).map(([key, value]) => ({
+        key, label: PARAM_DEFS[key]?.label ?? key, value,
+      }))
+      await fetch('/api/bsy-parametreler', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ rows }),
+      })
+      setParams(newParams)
+    } finally {
+      setSaving(false)
+    }
+  }, [])
+
+  return { params, loading, saving, reload: load, save }
+}
 
 const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
                    'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
@@ -25,14 +102,29 @@ function parseCur(s: string): number {
 }
 
 // ─── Parametreler Modalı ──────────────────────────────────────
-function ParametrelerModal({ onClose }: { onClose: () => void }) {
+function ParametrelerModal({
+  params, saving, onSave, onClose,
+}: {
+  params:  Params
+  saving:  boolean
+  onSave:  (p: Params) => Promise<void>
+  onClose: () => void
+}) {
   const [imgSrc, setImgSrc] = useState<string | null>(null)
   const imgRef = useRef<HTMLInputElement>(null)
+  const [vals, setVals] = useState<Record<string, string>>(
+    () => Object.fromEntries(Object.keys(PARAM_DEFS).map(k => [k, String(params[k] ?? PARAM_DEFS[k].default)]))
+  )
 
   useEffect(() => {
     const saved = localStorage.getItem('bsy_param_img')
     if (saved) setImgSrc(saved)
   }, [])
+
+  // Params değişince vals'i senkronize et
+  useEffect(() => {
+    setVals(Object.fromEntries(Object.keys(PARAM_DEFS).map(k => [k, String(params[k] ?? PARAM_DEFS[k].default)])))
+  }, [params])
 
   function handleImgUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -46,19 +138,26 @@ function ParametrelerModal({ onClose }: { onClose: () => void }) {
     reader.readAsDataURL(file)
   }
 
+  async function handleSave() {
+    const newParams: Params = Object.fromEntries(
+      Object.keys(PARAM_DEFS).map(k => [k, parseFloat(vals[k]) || 0])
+    )
+    await onSave(newParams)
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col">
+
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-2">
             <SlidersHorizontal size={16} className="text-brand-600" />
             <h2 className="text-sm font-bold text-gray-800">BSY Parametreleri</h2>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => imgRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-600 font-medium"
-            >
+            <button onClick={() => imgRef.current?.click()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-600 font-medium">
               <ImagePlus size={12} />
               {imgSrc ? 'Görseli Değiştir' : 'PNG Ekle'}
             </button>
@@ -68,17 +167,62 @@ function ParametrelerModal({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         </div>
-        <div className="flex-1 overflow-auto p-4 flex items-start justify-center bg-gray-50/40">
-          {imgSrc ? (
-            <img src={imgSrc} alt="BSY Parametreleri" className="max-w-full rounded-lg shadow-sm border border-gray-200" />
-          ) : (
-            <div className="flex flex-col items-center gap-3 mt-24 text-gray-300">
-              <ImagePlus size={56} />
-              <span className="text-sm font-medium text-gray-400">
-                Henüz görsel eklenmemiş — &quot;PNG Ekle&quot; butonunu kullanın
-              </span>
+
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+
+          {/* Sol: Prim Parametreleri formu */}
+          <div className="w-full md:w-72 flex-shrink-0 border-b md:border-b-0 md:border-r border-gray-100 p-5 flex flex-col gap-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Prim Parametreleri</p>
+
+            {Object.entries(PARAM_DEFS).map(([key, def]) => (
+              <div key={key}>
+                <label className="text-xs text-gray-600 font-medium block mb-1.5">
+                  {def.label} {def.unit && <span className="text-gray-400">({def.unit})</span>}
+                </label>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={key === 'baraj_pct' ? '100' : '100'}
+                    value={vals[key] ?? ''}
+                    onChange={e => setVals(v => ({ ...v, [key]: e.target.value }))}
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs text-right focus:outline-none focus:border-brand-400 tabular-nums"
+                  />
+                  {def.unit && <span className="text-xs text-gray-400 w-4">{def.unit}</span>}
+                </div>
+              </div>
+            ))}
+
+            {/* Prim formülü açıklaması */}
+            <div className="mt-auto bg-gray-50 rounded-xl p-3 text-[10px] text-gray-500 space-y-1">
+              <p className="font-semibold text-gray-600">Hesaplama Formülü</p>
+              <p>Baraj ≥ {vals['baraj_pct'] || 80}% ise:</p>
+              <p className="font-mono">Prim = min(Gerç/Hedef, 1) × Hedef × Oran%</p>
+              <p>Baraj altında: Prim = 0</p>
             </div>
-          )}
+
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold disabled:opacity-60"
+            >
+              {saving ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
+              {saving ? 'Kaydediliyor…' : 'Parametreleri Kaydet'}
+            </button>
+          </div>
+
+          {/* Sağ: Görsel */}
+          <div className="flex-1 overflow-auto p-4 flex items-start justify-center bg-gray-50/40">
+            {imgSrc ? (
+              <img src={imgSrc} alt="BSY Parametreleri" className="max-w-full rounded-lg shadow-sm border border-gray-200" />
+            ) : (
+              <div className="flex flex-col items-center gap-3 mt-16 text-gray-300">
+                <ImagePlus size={48} />
+                <span className="text-xs font-medium text-gray-400">Görsel için &quot;PNG Ekle&quot; butonunu kullanın</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -263,7 +407,7 @@ const EMPTY_BRANDS = Object.fromEntries(
 ) as Record<BrandKey, { gercCiro: number }>
 
 function BsyKisiTable({
-  yil, ay, bsyRows, allBsyNames, getKisiHedef, getKisiExtra,
+  yil, ay, bsyRows, allBsyNames, getKisiHedef, getKisiExtra, params,
 }: {
   yil:          number
   ay:           number
@@ -271,6 +415,7 @@ function BsyKisiTable({
   allBsyNames:  string[]
   getKisiHedef: (bsyAdi: string, brand: BrandKey) => { hedefCiro: number; hakedilenPrim: number | null }
   getKisiExtra: (bsyAdi: string) => { markaCarp: number | null; tahsiatCarp: number | null }
+  params:       Params
 }) {
   const ciroMap = new Map(bsyRows.map(r => [r.bsyAdi.toLocaleLowerCase('tr'), r]))
   const mergedRows: BsyBrandRow[] = (allBsyNames.length > 0 ? allBsyNames : bsyRows.map(r => r.bsyAdi))
@@ -282,6 +427,20 @@ function BsyKisiTable({
     return <p className="text-xs text-gray-400 text-center py-8">Bu döneme ait veri bulunamadı.</p>
   }
 
+  // Parametrelerden prim hesapla (yoksa DB'deki hakedilenPrim)
+  function getPrim(row: BsyBrandRow, brand: BrandKey): number {
+    const excluded = PRIM_EXCLUDED_BSYS.some(
+      n => row.bsyAdi.toLocaleLowerCase('tr') === n.toLocaleLowerCase('tr')
+    )
+    const hedef = getKisiHedef(row.bsyAdi, brand).hedefCiro
+    const gerc  = row.brands[brand].gercCiro
+    const fromParams = calcPrimFromParams(gerc, hedef, brand, params, excluded)
+    if (fromParams !== null) return fromParams
+    // Fallback: DB değeri (prim oranı girilmemişse)
+    if (excluded) return 0
+    return getKisiHedef(row.bsyAdi, brand).hakedilenPrim ?? 0
+  }
+
   const totals = {
     elxHedef: 0, elxGerc: 0, elxPrim: 0,
     reluxHedef: 0, reluxGerc: 0, reluxPrim: 0,
@@ -290,15 +449,17 @@ function BsyKisiTable({
   mergedRows.forEach(row => {
     const elx   = getKisiHedef(row.bsyAdi, 'ELECTROLUX')
     const relux = getKisiHedef(row.bsyAdi, 'RELUX')
+    const elxPrim   = getPrim(row, 'ELECTROLUX')
+    const reluxPrim = getPrim(row, 'RELUX')
     totals.elxHedef    += elx.hedefCiro
     totals.elxGerc     += row.brands['ELECTROLUX'].gercCiro
-    totals.elxPrim     += elx.hakedilenPrim ?? 0
+    totals.elxPrim     += elxPrim
     totals.reluxHedef  += relux.hedefCiro
     totals.reluxGerc   += row.brands['RELUX'].gercCiro
-    totals.reluxPrim   += relux.hakedilenPrim ?? 0
+    totals.reluxPrim   += reluxPrim
     totals.toplamHedef += elx.hedefCiro + relux.hedefCiro
     totals.toplamGerc  += row.toplamGercCiro
-    totals.toplamPrim  += (elx.hakedilenPrim ?? 0) + (relux.hakedilenPrim ?? 0)
+    totals.toplamPrim  += elxPrim + reluxPrim
   })
 
   const cellCls   = 'border-r border-gray-100 px-3 py-1.5 text-right tabular-nums'
@@ -345,29 +506,37 @@ function BsyKisiTable({
             const relux     = getKisiHedef(row.bsyAdi, 'RELUX')
             const elxGerc   = row.brands['ELECTROLUX'].gercCiro
             const reluxGerc = row.brands['RELUX'].gercCiro
+            const elxPrim   = getPrim(row, 'ELECTROLUX')
+            const reluxPrim = getPrim(row, 'RELUX')
             const topHedef  = elx.hedefCiro + relux.hedefCiro
             const topGerc   = row.toplamGercCiro
-            const topPrim   = (elx.hakedilenPrim ?? 0) + (relux.hakedilenPrim ?? 0)
+            const topPrim   = elxPrim + reluxPrim
+            const excluded  = PRIM_EXCLUDED_BSYS.some(
+              n => row.bsyAdi.toLocaleLowerCase('tr') === n.toLocaleLowerCase('tr')
+            )
             return (
               <tr key={row.bsyAdi} className={clsx('border-b border-gray-100 hover:bg-blue-50/20', idx % 2 === 1 && 'bg-gray-50/40')}>
-                <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-4 py-2 font-medium text-gray-800 whitespace-nowrap">{row.bsyAdi}</td>
+                <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-4 py-2 font-medium text-gray-800 whitespace-nowrap">
+                  <span className={excluded ? 'italic text-gray-500' : ''}>{row.bsyAdi}</span>
+                  {excluded && <span className="ml-1.5 text-[9px] bg-gray-200 text-gray-500 rounded px-1 py-0.5 font-normal not-italic">prim yok</span>}
+                </td>
                 <td className={cellCls + ' text-gray-700'}>{elx.hedefCiro > 0 ? fmtCur(elx.hedefCiro) : '—'}</td>
                 <td className={cellCls + ' text-gray-800'}>{elxGerc !== 0 ? fmtCur(elxGerc) : '—'}</td>
                 <OranCell gerc={elxGerc} hedef={elx.hedefCiro} className={pctCls} />
-                <td className={cellCls + (elx.hakedilenPrim != null && elx.hakedilenPrim > 0 ? ' text-green-600 font-semibold' : ' text-gray-300')}>
-                  {elx.hakedilenPrim != null ? fmtCur(elx.hakedilenPrim) : '—'}
+                <td className={cellCls + (elxPrim > 0 ? ' text-green-600 font-semibold' : excluded ? ' text-gray-300' : ' text-gray-400')}>
+                  {excluded ? '—' : elxPrim > 0 ? fmtCur(elxPrim) : elx.hedefCiro > 0 ? fmtCur(0) : '—'}
                 </td>
                 <td className={cellCls + ' text-gray-700'}>{relux.hedefCiro > 0 ? fmtCur(relux.hedefCiro) : '—'}</td>
                 <td className={cellCls + ' text-gray-800'}>{reluxGerc !== 0 ? fmtCur(reluxGerc) : '—'}</td>
                 <OranCell gerc={reluxGerc} hedef={relux.hedefCiro} className={pctCls} />
-                <td className={cellCls + (relux.hakedilenPrim != null && relux.hakedilenPrim > 0 ? ' text-green-600 font-semibold' : ' text-gray-300')}>
-                  {relux.hakedilenPrim != null ? fmtCur(relux.hakedilenPrim) : '—'}
+                <td className={cellCls + (reluxPrim > 0 ? ' text-green-600 font-semibold' : excluded ? ' text-gray-300' : ' text-gray-400')}>
+                  {excluded ? '—' : reluxPrim > 0 ? fmtCur(reluxPrim) : relux.hedefCiro > 0 ? fmtCur(0) : '—'}
                 </td>
                 <td className={cellCls + ' font-semibold text-gray-700'}>{topHedef > 0 ? fmtCur(topHedef) : '—'}</td>
                 <td className={cellCls + ' font-semibold text-gray-800'}>{topGerc !== 0 ? fmtCur(topGerc) : '—'}</td>
                 <OranCell gerc={topGerc} hedef={topHedef} className={pctCls + ' font-semibold'} />
                 <td className={cellCls + (topPrim > 0 ? ' text-green-600 font-semibold' : ' text-gray-300')}>
-                  {topPrim > 0 ? fmtCur(topPrim) : '—'}
+                  {excluded ? '—' : topPrim > 0 ? fmtCur(topPrim) : topHedef > 0 ? fmtCur(0) : '—'}
                 </td>
               </tr>
             )
@@ -518,6 +687,8 @@ export function BsyTakipView() {
   const [uploading,      setUploading]      = useState(false)
   const [uploadMsg,      setUploadMsg]      = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const { params, saving: paramSaving, save: saveParams } = useBsyParametreler()
 
   const [allBsyNames, setAllBsyNames] = useState<string[]>([])
   useEffect(() => {
@@ -709,6 +880,7 @@ export function BsyTakipView() {
               allBsyNames={allBsyNames}
               getKisiHedef={getKisiHedef}
               getKisiExtra={getKisiExtra}
+              params={params}
             />
           )}
 
@@ -912,7 +1084,14 @@ export function BsyTakipView() {
           onClose={() => setShowKisiModal(false)}
         />
       )}
-      {showParamModal && <ParametrelerModal onClose={() => setShowParamModal(false)} />}
+      {showParamModal && (
+        <ParametrelerModal
+          params={params}
+          saving={paramSaving}
+          onSave={async (p) => { await saveParams(p); setShowParamModal(false) }}
+          onClose={() => setShowParamModal(false)}
+        />
+      )}
     </div>
   )
 }
