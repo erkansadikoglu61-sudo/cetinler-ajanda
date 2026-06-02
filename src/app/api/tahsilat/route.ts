@@ -61,6 +61,18 @@ export async function GET(req: Request) {
     ? XLSX.utils.sheet_to_json(hedefSheet, { header: 1, defval: null })
     : []
 
+  // Dinamik olarak "Ay" sütun indeksini bul (başlık satırında arar)
+  let hedefAyCol = -1
+  if (hedefRaw.length > 0) {
+    const header = hedefRaw[0] as unknown[]
+    for (let c = 0; c < header.length; c++) {
+      if (String(header[c] ?? '').trim().toLowerCase() === 'ay') {
+        hedefAyCol = c
+        break
+      }
+    }
+  }
+
   // BSY kodu → açık hesap toplamı (Toplam sütunu, col 7)
   const acikHesapMap = new Map<string, number>()
   for (let i = 1; i < hedefRaw.length; i++) {
@@ -68,6 +80,11 @@ export async function GET(req: Request) {
     if (!r) continue
     const bsyKod = String(r[1] ?? '').trim().toUpperCase()
     if (!bsyKod) continue
+    // Eğer "Ay" sütunu varsa o aya ait satırları filtrele
+    if (hedefAyCol >= 0) {
+      const rowAy = typeof r[hedefAyCol] === 'number' ? r[hedefAyCol] : parseInt(String(r[hedefAyCol] ?? '0'))
+      if (rowAy !== ay) continue
+    }
     const toplam = toNum(r[7])
     acikHesapMap.set(bsyKod, (acikHesapMap.get(bsyKod) ?? 0) + toplam)
   }
