@@ -40,8 +40,8 @@ function calcTieredPrim(
   tahsilatOran: number,
   params: Params,
   excluded: boolean,
-): { elxPrim: number; reluxPrim: number } {
-  if (excluded) return { elxPrim: 0, reluxPrim: 0 }
+): { elxPrim: number; reluxPrim: number; topPrim: number } {
+  if (excluded) return { elxPrim: 0, reluxPrim: 0, topPrim: 0 }
 
   const achElxPct   = hedefElx   > 0 ? (gercElx   / hedefElx)   * 100 : 0
   const achReluxPct = hedefRelux > 0 ? (gercRelux / hedefRelux) * 100 : 0
@@ -77,15 +77,16 @@ function calcTieredPrim(
     reluxPrim *= c2val
   }
 
-  // ③ Tahsilat çarpanı
+  // ③ Tahsilat çarpanı — sadece TOPLAM sütununa uygulanır
   const c3thr = params['carp3_thr'] ?? 100
   const c3val = params['carp3_val'] ?? 1.50
-  if (tahsilatOran >= c3thr) {
-    elxPrim   *= c3val
-    reluxPrim *= c3val
-  }
+  const topPrim = (elxPrim + reluxPrim) * (tahsilatOran >= c3thr ? c3val : 1)
 
-  return { elxPrim: Math.round(elxPrim), reluxPrim: Math.round(reluxPrim) }
+  return {
+    elxPrim:  Math.round(elxPrim),
+    reluxPrim: Math.round(reluxPrim),
+    topPrim:  Math.round(topPrim),
+  }
 }
 
 // ─── useBsyParametreler hook ──────────────────────────────────
@@ -530,12 +531,12 @@ function BsyKisiTable({
   mergedRows.forEach(row => {
     const elx   = getKisiHedef(row.bsyAdi, 'ELECTROLUX')
     const relux = getKisiHedef(row.bsyAdi, 'RELUX')
-    const { elxPrim, reluxPrim } = getPrims(row)
+    const { elxPrim, reluxPrim, topPrim } = getPrims(row)
     totals.elxH   += elx.hedefCiro;   totals.elxG  += row.brands['ELECTROLUX'].gercCiro; totals.elxP  += elxPrim
     totals.reluxH += relux.hedefCiro; totals.reluxG += row.brands['RELUX'].gercCiro;      totals.reluxP += reluxPrim
     totals.topH   += elx.hedefCiro + relux.hedefCiro
     totals.topG   += row.brands['ELECTROLUX'].gercCiro + row.brands['RELUX'].gercCiro
-    totals.topP   += elxPrim + reluxPrim
+    totals.topP   += topPrim   // ③ çarpanı burada yansır
   })
 
   const cellCls   = 'border-r border-gray-100 px-3 py-1.5 text-right tabular-nums'
@@ -603,11 +604,10 @@ function BsyKisiTable({
               const relux     = getKisiHedef(row.bsyAdi, 'RELUX')
               const elxGerc   = row.brands['ELECTROLUX'].gercCiro
               const reluxGerc = row.brands['RELUX'].gercCiro
-              const { elxPrim, reluxPrim } = getPrims(row)
+              const { elxPrim, reluxPrim, topPrim } = getPrims(row)
               const topHedef  = elx.hedefCiro + relux.hedefCiro
               // topGerc: sadece Elx + Relux (hedefle tutarlı)
               const topGerc   = elxGerc + reluxGerc
-              const topPrim   = elxPrim + reluxPrim
               const excluded  = isExcluded(row.bsyAdi)
               const tahsilOran = getTahsilatOran(row.bsyAdi)
 
