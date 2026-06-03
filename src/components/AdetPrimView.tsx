@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { RefreshCw, Edit2, Save, X, ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { RefreshCw, Edit2, Save, X, ChevronDown, Plus, Trash2, FileDown } from 'lucide-react'
 import clsx from 'clsx'
 
 import { ADET_PRIM_DEFAULTS } from '@/lib/adet-prim-defaults'
+import { generateBayiMerchPdf } from '@/lib/pdf'
 
 const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
                    'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
@@ -746,8 +747,18 @@ export function BayiMerchHakdis({
         </div>
 
         <button onClick={load} disabled={loading}
-          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-50">
+          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-50" title="Yenile">
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+        </button>
+
+        {/* PDF Export */}
+        <button
+          onClick={() => generateBayiMerchPdf(filtered, yil, ay)}
+          disabled={loading || filtered.length === 0}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold shadow-sm disabled:opacity-50"
+          title="PDF olarak indir"
+        >
+          <FileDown size={12} /> PDF
         </button>
 
         {/* Cari Adı filtre */}

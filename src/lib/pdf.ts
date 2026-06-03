@@ -156,3 +156,126 @@ export function generateVisitReport(
 
   doc.save(`cetinler-rapor-${year}-${String(month + 1).padStart(2, '0')}.pdf`)
 }
+
+// ─── Bayi Merch Prim Hakedişleri PDF ──────────────────────────
+interface BayiMerchRow {
+  supervizor: string
+  cariAdi:    string
+  subeAdi:    string
+  bayiMerch:  string
+  primHakdis: number
+  satisAdet:  number
+}
+
+export function generateBayiMerchPdf(
+  rows:       BayiMerchRow[],
+  yil:        number,
+  ay:         number,
+  baslik?:    string,   // ek başlık satırı (filtre bilgisi vb.)
+) {
+  const AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
+                 'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
+
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+  const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
+
+  const toplamPrim = rows.reduce((s, r) => s + r.primHakdis, 0)
+  const toplamAdet = rows.reduce((s, r) => s + r.satisAdet, 0)
+
+  const fmtPrim = (n: number) =>
+    n.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' ₺'
+
+  // ── Başlık ──────────────────────────────────────────────────
+  doc.setFillColor(30, 30, 40)
+  doc.rect(0, 0, pageW, 22, 'F')
+
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(14)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Bayi Merch Prim Hakedışleri', 14, 10)
+
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'normal')
+  doc.text(`${AYLAR[ay - 1]} ${yil}`, 14, 17)
+
+  // Özet kutusu (sağ üst)
+  doc.setFontSize(8)
+  doc.text(`${rows.length} satır`, pageW - 14, 10, { align: 'right' })
+  doc.text(`Toplam Adet: ${toplamAdet}`, pageW - 14, 15, { align: 'right' })
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'bold')
+  doc.text(`Toplam Prim: ${fmtPrim(toplamPrim)}`, pageW - 14, 20, { align: 'right' })
+
+  doc.setTextColor(0, 0, 0)
+
+  let startY = 26
+  if (baslik) {
+    doc.setFontSize(8)
+    doc.setTextColor(100)
+    doc.text(baslik, 14, startY)
+    startY += 5
+    doc.setTextColor(0)
+  }
+
+  // ── Tablo ───────────────────────────────────────────────────
+  autoTable(doc, {
+    startY,
+    head: [['#', 'Süpervizör', 'Cari Adı', 'Şube Adı', 'Bayi Merch', 'Satış Adet', 'Prim Hakedışi']],
+    body: rows.map((r, i) => [
+      i + 1,
+      r.supervizor,
+      r.cariAdi,
+      r.subeAdi,
+      r.bayiMerch,
+      r.satisAdet,
+      fmtPrim(r.primHakdis),
+    ]),
+    foot: [[
+      '',
+      '',
+      `Toplam: ${rows.length} satır`,
+      '',
+      '',
+      toplamAdet,
+      fmtPrim(toplamPrim),
+    ]],
+    headStyles: {
+      fillColor: [40, 40, 55],
+      textColor: 255,
+      fontStyle: 'bold',
+      fontSize: 8,
+      cellPadding: 3,
+    },
+    footStyles: {
+      fillColor: [40, 40, 55],
+      textColor: 255,
+      fontStyle: 'bold',
+      fontSize: 8,
+    },
+    bodyStyles: { fontSize: 7.5, cellPadding: 2.5 },
+    alternateRowStyles: { fillColor: [248, 249, 251] },
+    columnStyles: {
+      0: { cellWidth: 8,  halign: 'center' },
+      4: { cellWidth: 35 },
+      5: { cellWidth: 20, halign: 'center' },
+      6: { cellWidth: 28, halign: 'right', fontStyle: 'bold', textColor: [20, 120, 20] },
+    },
+    margin: { left: 10, right: 10 },
+    didDrawPage: (data) => {
+      // Alt footer: sayfa numarası + tarih
+      doc.setFontSize(7)
+      doc.setTextColor(160)
+      const pageNum = (doc as jsPDF & { internal: { getCurrentPageInfo: () => { pageNumber: number } } })
+        .internal.getCurrentPageInfo().pageNumber
+      const total = doc.getNumberOfPages()
+      doc.text(
+        `Sayfa ${pageNum} / ${total}   |   ${new Date().toLocaleDateString('tr-TR')}`,
+        pageW / 2, pageH - 5, { align: 'center' }
+      )
+      doc.setTextColor(0)
+    },
+  })
+
+  doc.save(`bayi-merch-prim-${yil}-${String(ay).padStart(2, '0')}.pdf`)
+}
