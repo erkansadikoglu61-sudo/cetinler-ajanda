@@ -179,14 +179,45 @@ export function AnalizView() {
     }
   }, [cariStokMap])
 
-  // ── A1: Sipariş Tahmini ───────────────────────────────────
-  const reorderList = useMemo(() =>
-    cariStokMap
-      .map(r => ({ ...r, oran: (r.sellout / r.sellin) * 100 }))
-      .filter(r => r.oran >= 75)
-      .sort((a, b) => b.oran - a.oran)
-      .slice(0, 30),
-    [cariStokMap])
+  // ── A1: Sipariş Tahmini — müşteri bazlı gruplama ──────────
+  const reorderList = useMemo(() => {
+    interface CariEntry {
+      cariIsim: string; bsyAdi: string; bsyKod: string
+      primary:   { stokKodu: string; oran: number }[]   // sellout ≥ %50
+      secondary: { stokKodu: string; oran: number }[]   // sellout < %50 (doldurma için)
+    }
+    const map = new Map<string, CariEntry>()
+
+    cariStokMap.forEach(r => {
+      const oran = r.sellin > 0 ? (r.sellout / r.sellin) * 100 : 0
+      const cur = map.get(r.cariIsim) ?? {
+        cariIsim: r.cariIsim, bsyAdi: r.bsyAdi, bsyKod: r.bsyKod,
+        primary: [], secondary: [],
+      }
+      if (oran >= 50) {
+        cur.primary.push({ stokKodu: r.stokKodu, oran })
+      } else if (oran > 0) {
+        cur.secondary.push({ stokKodu: r.stokKodu, oran })
+      }
+      map.set(r.cariIsim, cur)
+    })
+
+    return [...map.values()]
+      .filter(c => c.primary.length > 0)
+      .map(c => {
+        c.primary.sort((a, b) => b.oran - a.oran)
+        c.secondary.sort((a, b) => b.oran - a.oran)
+        // En az 5 ürün için secondary'den tamamla
+        const combined = [...c.primary, ...c.secondary.slice(0, Math.max(0, 5 - c.primary.length))]
+        return {
+          cariIsim: c.cariIsim, bsyAdi: c.bsyAdi,
+          combined,
+          primaryCount: c.primary.length,
+          maxOran: c.primary[0]?.oran ?? 0,
+        }
+      })
+      .sort((a, b) => b.primaryCount - a.primaryCount || b.maxOran - a.maxOran)
+  }, [cariStokMap])
 
   // ── A2: Donuk Stok ────────────────────────────────────────
   const deadStockList = useMemo(() =>
@@ -469,30 +500,44 @@ export function AnalizView() {
           {/* ── A1: Sipariş Tahmini ───────────────────── */}
           <Section icon={<ShoppingCart size={14} />}
             title="Yeniden Sipariş Tahmini"
-            subtitle="Müşterinin sattığı adet, satın aldığı adetin %75'ini geçen kombinasyonlar — iletişime geçmek için doğru zaman"
+            subtitle="Sellout/Sellin ≥%50 olan ürünleri bulunan müşteriler — koyu mavi = ≥%50 (kesin öneri) · gri = tamamlayıcı"
             color="blue" count={reorderList.length}>
             {reorderList.length === 0 ? (
               <p className="text-xs text-gray-400 text-center py-6">Bu dönem için uygun veri yok</p>
             ) : (
               <div className="divide-y divide-gray-50">
                 {reorderList.map((r, i) => (
-                  <div key={i} className={clsx('flex items-center gap-2 px-4 py-2.5 text-xs hover:bg-gray-50', r.oran >= 100 && 'bg-red-50/40')}>
-                    <span className="text-gray-400 w-5 text-right flex-shrink-0 font-mono">{i+1}.</span>
+                  <div key={i} className="flex items-start gap-2 px-4 py-3 text-xs hover:bg-gray-50">
+                    <span className="text-gray-400 w-5 text-right flex-shrink-0 font-mono mt-0.5">{i+1}.</span>
                     <div className="flex-1 min-w-0">
-                      <span className="font-semibold text-gray-800 block truncate">{r.cariIsim}</span>
-                      <span className="text-gray-400 text-[10px]">{r.stokKodu} — {r.stokAdi.slice(0,40)}</span>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="font-semibold text-gray-800">{r.cariIsim}</span>
+                        <span className="text-[9px] text-gray-400">{r.bsyAdi.split(' ').slice(0,2).join(' ')}</span>
+                      </div>
+                      {/* Stok kodları yan yana */}
+                      <p className="font-mono tracking-wide leading-relaxed break-words">
+                        {r.combined.map((s, si) => (
+                          <span key={s.stokKodu}>
+                            {si > 0 && <span className="text-gray-300 mx-0.5 select-none">—</span>}
+                            <span className={si < r.primaryCount
+                              ? 'text-blue-700 font-bold text-[12px]'
+                              : 'text-gray-400 text-[11px]'}>
+                              {s.stokKodu}
+                            </span>
+                          </span>
+                        ))}
+                      </p>
                     </div>
-                    <div className="text-right space-y-0.5 flex-shrink-0">
-                      <OranBadge oran={r.oran} />
-                      <div className="text-[9px] text-gray-400 tabular-nums">↓{fmtNum(r.sellin)} ↑{fmtNum(r.sellout)}</div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span className="text-[10px] bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
+                        {r.primaryCount} ürün ≥%50
+                      </span>
+                      <span className={clsx('text-[9px] rounded px-1.5 py-0.5 whitespace-nowrap',
+                        r.maxOran >= 100 ? 'bg-red-100 text-red-700 font-bold' :
+                        r.maxOran >= 80  ? 'bg-amber-100 text-amber-700' : 'bg-sky-50 text-sky-600')}>
+                        {r.maxOran >= 100 ? '🔴 Acil' : r.maxOran >= 80 ? '🟡 Yakın' : '🔵 Takip'}
+                      </span>
                     </div>
-                    <span className={clsx('text-[9px] rounded px-1.5 py-0.5 flex-shrink-0',
-                      r.oran >= 100 ? 'bg-red-100 text-red-700 font-bold' :
-                      r.oran >= 80  ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-600')}>
-                      {r.oran >= 100 ? '🔴 Acil' : r.oran >= 80 ? '🟡 Yakın' : '🔵 İzle'}
-                    </span>
-                    <span className="text-[9px] text-gray-400 flex-shrink-0">{r.bsyAdi.split(' ')[0]}</span>
-                    <span className="text-[9px] bg-gray-100 text-gray-500 rounded px-1 flex-shrink-0">{marka(r.kategori)}</span>
                   </div>
                 ))}
               </div>
