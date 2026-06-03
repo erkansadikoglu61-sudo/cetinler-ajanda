@@ -301,7 +301,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
               <th className="text-left px-3 py-2.5 font-semibold min-w-[110px]">Bitiş</th>
               <th className="text-left px-3 py-2.5 font-semibold min-w-[180px]">Cari Adı</th>
               <th className="text-left px-3 py-2.5 font-semibold min-w-[160px]">Şube Adı</th>
-              <th className="text-right px-3 py-2.5 font-semibold min-w-[120px]">Bayi Merch (₺)</th>
+              <th className="text-right px-3 py-2.5 font-semibold min-w-[130px]" title="Standart prim üstüne EKLENİR. Örn: 350 yazınca → standart(150) + 350 = 500₺">Ek Bayi Merch (₺)</th>
               <th className="text-right px-3 py-2.5 font-semibold min-w-[140px]">Koşullu Destek (₺)</th>
               <th className="text-center px-3 py-2.5 font-semibold min-w-[110px]" title="Standart prim oranıyla çarpılır. Örn: 2 = 2 katı prim">Prim Çarpanı ×</th>
               <th className="px-3 py-2.5 w-16"></th>

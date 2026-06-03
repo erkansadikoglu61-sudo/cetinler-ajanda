@@ -143,14 +143,16 @@ export async function GET(req: Request) {
     const satisAdet = parseFloat(cells[COL.SATILAN_ADET]) || 0
     const standardRate = primMap.get(stokKodu) ?? null
 
-    // Özel kural varsa uygula; önce prim_carpan, sonra bayi_merch override
+    // Özel kural varsa uygula
     const ozelRule = findOzelRule(stokKodu, cells[COL.CARI_ISIM], cells[COL.SUBE_ADI])
     let bayiMerchPrim: number | null
     if (ozelRule) {
       if (ozelRule.prim_carpan != null && standardRate != null) {
-        bayiMerchPrim = standardRate * ozelRule.prim_carpan  // çarpan: standart × N
+        // Çarpan: standart oran × N
+        bayiMerchPrim = standardRate * ozelRule.prim_carpan
       } else if (ozelRule.bayi_merch != null) {
-        bayiMerchPrim = ozelRule.bayi_merch  // sabit tutar override
+        // Ek prim: standart oran + ekstra tutar (bayi_merch, REPLACE değil ADDITIVE)
+        bayiMerchPrim = (standardRate ?? 0) + ozelRule.bayi_merch
       } else {
         bayiMerchPrim = standardRate
       }
