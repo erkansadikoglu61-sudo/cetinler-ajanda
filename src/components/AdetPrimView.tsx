@@ -444,7 +444,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
   )
 }
 
-export function AdetPrimTablosu() {
+export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
   const now = new Date()
   const [yil, setYil] = useState(now.getFullYear())
   const [ay,  setAy]  = useState(now.getMonth() + 1)
@@ -542,21 +542,25 @@ export function AdetPrimTablosu() {
           </button>
         )}
 
-        {/* Sub-tabs */}
+        {/* Sub-tabs — Özel Primler sadece admin */}
         <div className="flex items-center gap-1 ml-2 bg-gray-100 rounded-lg p-0.5">
-          {(['genel','ozel'] as const).map(v => (
-            <button key={v} onClick={() => setView(v)}
+          <button onClick={() => setView('genel')}
+            className={clsx('px-3 py-1 text-xs rounded-md font-medium transition-colors',
+              view === 'genel' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
+            Genel Primler
+          </button>
+          {isAdmin && (
+            <button onClick={() => setView('ozel')}
               className={clsx('px-3 py-1 text-xs rounded-md font-medium transition-colors',
-                view === v ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              )}>
-              {v === 'genel' ? 'Genel Primler' : 'Özel Primler'}
+                view === 'ozel' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
+              Özel Primler
             </button>
-          ))}
+          )}
         </div>
 
         <div className="flex-1" />
 
-        {view === 'genel' && (
+        {view === 'genel' && isAdmin && (
           <>
             {msg && (
               <span className={clsx('text-[10px] px-2 py-0.5 rounded-full border',
@@ -587,7 +591,7 @@ export function AdetPrimTablosu() {
 
       {/* İçerik */}
       <div className="flex-1 overflow-auto p-4">
-        {view === 'ozel' ? (
+        {view === 'ozel' && isAdmin ? (
           <OzelPrimler yil={yil} ay={ay} />
         ) : null}
         {view === 'genel' && <>
@@ -668,7 +672,11 @@ interface HakdisRow {
   satisAdet:   number
 }
 
-export function BayiMerchHakdis() {
+export function BayiMerchHakdis({
+  supervisorFilter = null,
+}: {
+  supervisorFilter?: string[] | null   // null = tümü (admin), dizi = sadece bu süpervizörler
+}) {
   const now = new Date()
   const [yil, setYil] = useState(now.getFullYear())
   const [ay,  setAy]  = useState(now.getMonth() + 1)
@@ -696,6 +704,8 @@ export function BayiMerchHakdis() {
   useEffect(() => { load() }, [load])
 
   const filtered = rows.filter(r => {
+    // Süpervizör filtresi (BSY/Sup rolleri için)
+    if (supervisorFilter !== null && !supervisorFilter.includes(r.supervizor)) return false
     if (cariQ && !r.cariAdi.toLowerCase().includes(cariQ.toLowerCase())) return false
     if (subeQ && !r.subeAdi.toLowerCase().includes(subeQ.toLowerCase())) return false
     return true

@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Menu, ChevronLeft, ChevronRight, BarChart2, Plus, X, Trash2,
@@ -1416,9 +1416,27 @@ export default function AppPage() {
   const isBsyOrAdmin = currentProfile?.role === 'admin'
     || currentProfile?.role === 'bsy'
   const isBsy = currentProfile?.role === 'bsy'
+  const isSup = currentProfile?.role === 'sup'
 
   // Süpervizör ve Jr. Süpervizör → sadece Sellout + Noktalarımız
   const isSupOrJr = currentProfile?.role === 'sup' || currentProfile?.role === 'jr'
+
+  // Primler sayfası için süpervizör filtresi
+  // null = tümünü göster (admin), dizi = sadece bu süpervizörler
+  const primSupervisorFilter = useMemo(() => {
+    if (!currentProfile) return []
+    if (currentProfile.role === 'admin') return null
+    if (currentProfile.role === 'sup') return [currentProfile.full_name]
+    if (currentProfile.role === 'bsy') {
+      const linkedSupIds = bsyLinks
+        .filter(l => l.bsy_id === currentProfile.id)
+        .map(l => l.sup_id)
+      return team
+        .filter(p => p.role === 'sup' && linkedSupIds.includes(p.id))
+        .map(p => p.full_name)
+    }
+    return []
+  }, [currentProfile, bsyLinks, team])
 
   // Auth redirect
   useEffect(() => {
@@ -1631,8 +1649,8 @@ export default function AppPage() {
                   <BarChart2 size={15} /> Analiz
                 </button>
               )}
-              {/* Primler grubu (sadece admin) */}
-              {currentProfile?.role === 'admin' && (
+              {/* Primler — admin + BSY + Süpervizör */}
+              {(currentProfile?.role === 'admin' || isBsy || isSup) && (
                 <button
                   onClick={() => { if (!['adet-prim','bayi-merch'].includes(tab)) setTab('adet-prim') }}
                   className={clsx(
@@ -1710,7 +1728,7 @@ export default function AppPage() {
             </div>
           )}
           {/* Primler alt sekmeleri (admin) */}
-          {currentProfile?.role === 'admin' && ['adet-prim','bayi-merch'].includes(tab) && (
+          {(currentProfile?.role === 'admin' || isBsy || isSup) && ['adet-prim','bayi-merch'].includes(tab) && (
             <div className="hidden md:flex items-center gap-1 px-3 pb-1.5">
               {([
                 { key: 'adet-prim' as const,  label: 'Adet Prim Tablosu' },
@@ -1836,14 +1854,14 @@ export default function AppPage() {
               <AnalizView currentProfile={currentProfile} active={tab === 'analiz'} />
             </div>
           )}
-          {tab === 'adet-prim' && currentProfile?.role === 'admin' && (
+          {tab === 'adet-prim' && (currentProfile?.role === 'admin' || isBsy || isSup) && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
-              <AdetPrimTablosu />
+              <AdetPrimTablosu isAdmin={currentProfile?.role === 'admin'} />
             </div>
           )}
-          {tab === 'bayi-merch' && currentProfile?.role === 'admin' && (
+          {tab === 'bayi-merch' && (currentProfile?.role === 'admin' || isBsy || isSup) && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
-              <BayiMerchHakdis />
+              <BayiMerchHakdis supervisorFilter={primSupervisorFilter} />
             </div>
           )}
         </>
