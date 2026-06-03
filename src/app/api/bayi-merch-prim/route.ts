@@ -74,30 +74,42 @@ export async function GET(req: Request) {
 
   // 2. Özel prim kuralları (prim_ozel) — cari/şube/stok bazlı overrides
   interface OzelPrimRow {
-    stok_kodu:   string[] | null
-    grup_kodu:   string[] | null
-    cari_adi:    string[] | null
-    sube_adi:    string[] | null
-    bayi_merch:  number | null
-    prim_carpan: number | null
+    stok_kodu:        string[] | null
+    grup_kodu:        string[] | null
+    cari_adi:         string[] | null
+    sube_adi:         string[] | null
+    bayi_merch:       number | null
+    prim_carpan:      number | null
+    tarih_baslangic:  string | null   // 'YYYY-MM-DD'
+    tarih_bitis:      string | null   // 'YYYY-MM-DD'
   }
   let ozelPrimRows: OzelPrimRow[] = []
   try {
+    // ay filtresi yok — tüm yıl kurallarını çek, tarih aralığıyla eşleştir
     const { data } = await sb
       .from('prim_ozel')
-      .select('stok_kodu, grup_kodu, cari_adi, sube_adi, bayi_merch, prim_carpan')
+      .select('stok_kodu, grup_kodu, cari_adi, sube_adi, bayi_merch, prim_carpan, tarih_baslangic, tarih_bitis')
       .eq('yil', yil)
-      .eq('ay', ay)
     if (data) ozelPrimRows = data as OzelPrimRow[]
   } catch { /* ignore */ }
 
-  /** Bir satır için prim_ozel'de eşleşen kuralı bul */
+  // Dönemin ilk ve son günü (tarih karşılaştırması için)
+  const donemIlk = `${yil}-${String(ay).padStart(2,'0')}-01`
+  const nextMonth = ay === 12 ? `${yil + 1}-01-01` : `${yil}-${String(ay + 1).padStart(2,'0')}-01`
+  // Son gün: bir sonraki ayın ilk gününden 1 gün önce (string karşılaştırma)
+  const donemSon = new Date(new Date(nextMonth).getTime() - 86400000)
+    .toISOString().slice(0, 10)
+
+  /** Bir satır için prim_ozel'de eşleşen kuralı bul (tarih aralığı kontrolü dahil) */
   function findOzelRule(stokKodu: string, cariAdi: string, subeAdi: string): OzelPrimRow | undefined {
     for (const rule of ozelPrimRows) {
       const stokOk = !rule.stok_kodu || rule.stok_kodu.some(s => s.toUpperCase() === stokKodu.toUpperCase())
       const cariOk = !rule.cari_adi  || rule.cari_adi.some(c => c === cariAdi)
       const subeOk = !rule.sube_adi  || rule.sube_adi.some(s => s === subeAdi)
-      if (stokOk && cariOk && subeOk) return rule
+      // Tarih aralığı: kural döneme kesiyor mu?
+      const basOk = !rule.tarih_baslangic || rule.tarih_baslangic <= donemSon
+      const bitOk = !rule.tarih_bitis     || rule.tarih_bitis     >= donemIlk
+      if (stokOk && cariOk && subeOk && basOk && bitOk) return rule
     }
     return undefined
   }

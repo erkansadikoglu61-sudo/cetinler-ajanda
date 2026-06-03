@@ -180,7 +180,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const r = await fetch(`/api/prim-ozel?yil=${yil}&ay=${ay}`)
+      const r = await fetch(`/api/prim-ozel?yil=${yil}`)  // ay filtresi yok — tarih aralığı kısıtı satırda
       const d = await r.json()
       setRows((d.rows ?? []).map((x: Record<string,unknown>) => ({
         id: x.id, stokKodu: x.stok_kodu ?? null, grupKodu: x.grup_kodu ?? null,

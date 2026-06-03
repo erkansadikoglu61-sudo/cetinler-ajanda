@@ -8,18 +8,17 @@ function sb() {
   )
 }
 
-// GET /api/prim-ozel?yil=&ay=
+// GET /api/prim-ozel?yil=
+// ay filtresi yok — tarih_baslangic/tarih_bitis kısıtı her satırda ayrıca tanımlanır
 export async function GET(req: Request) {
   const sp  = new URL(req.url).searchParams
   const yil = parseInt(sp.get('yil') ?? String(new Date().getFullYear()))
-  const ay  = parseInt(sp.get('ay')  ?? String(new Date().getMonth() + 1))
 
   const { data, error } = await sb()
     .from('prim_ozel')
     .select('*')
     .eq('yil', yil)
-    .eq('ay', ay)
-    .order('created_at', { ascending: true })
+    .order('tarih_baslangic', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ rows: data ?? [] })
