@@ -181,42 +181,26 @@ export function AnalizView() {
 
   // ── A1: Sipariş Tahmini — müşteri bazlı gruplama ──────────
   const reorderList = useMemo(() => {
-    interface CariEntry {
-      cariIsim: string; bsyAdi: string; bsyKod: string
-      primary:   { stokKodu: string; oran: number }[]   // sellout ≥ %50
-      secondary: { stokKodu: string; oran: number }[]   // sellout < %50 (doldurma için)
-    }
-    const map = new Map<string, CariEntry>()
+    const map = new Map<string, {
+      cariIsim: string; bsyAdi: string
+      urunler: { stokKodu: string; oran: number }[]
+    }>()
 
     cariStokMap.forEach(r => {
       const oran = r.sellin > 0 ? (r.sellout / r.sellin) * 100 : 0
-      const cur = map.get(r.cariIsim) ?? {
-        cariIsim: r.cariIsim, bsyAdi: r.bsyAdi, bsyKod: r.bsyKod,
-        primary: [], secondary: [],
-      }
-      if (oran >= 50) {
-        cur.primary.push({ stokKodu: r.stokKodu, oran })
-      } else if (oran > 0) {
-        cur.secondary.push({ stokKodu: r.stokKodu, oran })
-      }
+      if (oran < 50) return
+      const cur = map.get(r.cariIsim) ?? { cariIsim: r.cariIsim, bsyAdi: r.bsyAdi, urunler: [] }
+      cur.urunler.push({ stokKodu: r.stokKodu, oran })
       map.set(r.cariIsim, cur)
     })
 
     return [...map.values()]
-      .filter(c => c.primary.length > 0)
       .map(c => {
-        c.primary.sort((a, b) => b.oran - a.oran)
-        c.secondary.sort((a, b) => b.oran - a.oran)
-        // En az 5 ürün için secondary'den tamamla
-        const combined = [...c.primary, ...c.secondary.slice(0, Math.max(0, 5 - c.primary.length))]
-        return {
-          cariIsim: c.cariIsim, bsyAdi: c.bsyAdi,
-          combined,
-          primaryCount: c.primary.length,
-          maxOran: c.primary[0]?.oran ?? 0,
-        }
+        c.urunler.sort((a, b) => b.oran - a.oran)
+        c.urunler = c.urunler.slice(0, 10)   // max 10 ürün
+        return { ...c, maxOran: c.urunler[0]?.oran ?? 0 }
       })
-      .sort((a, b) => b.primaryCount - a.primaryCount || b.maxOran - a.maxOran)
+      .sort((a, b) => b.maxOran - a.maxOran)
   }, [cariStokMap])
 
   // ── A2: Donuk Stok ────────────────────────────────────────
@@ -500,43 +484,44 @@ export function AnalizView() {
           {/* ── A1: Sipariş Tahmini ───────────────────── */}
           <Section icon={<ShoppingCart size={14} />}
             title="Yeniden Sipariş Tahmini"
-            subtitle="Sellout/Sellin ≥%50 olan ürünleri bulunan müşteriler — koyu mavi = ≥%50 (kesin öneri) · gri = tamamlayıcı"
+            subtitle="Sellout/Sellin ≥%50 ürünler, yüksekten düşüğe sıralı · 🔴 ≥%70 acil · 🔵 %50–69 yakın · max 10 ürün"
             color="blue" count={reorderList.length}>
             {reorderList.length === 0 ? (
               <p className="text-xs text-gray-400 text-center py-6">Bu dönem için uygun veri yok</p>
             ) : (
               <div className="divide-y divide-gray-50">
                 {reorderList.map((r, i) => (
-                  <div key={i} className="flex items-start gap-2 px-4 py-3 text-xs hover:bg-gray-50">
+                  <div key={i} className="flex items-start gap-3 px-4 py-3 text-xs hover:bg-gray-50">
                     <span className="text-gray-400 w-5 text-right flex-shrink-0 font-mono mt-0.5">{i+1}.</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className="font-semibold text-gray-800">{r.cariIsim}</span>
-                        <span className="text-[9px] text-gray-400">{r.bsyAdi.split(' ').slice(0,2).join(' ')}</span>
-                      </div>
-                      {/* Stok kodları yan yana */}
-                      <p className="font-mono tracking-wide leading-relaxed break-words">
-                        {r.combined.map((s, si) => (
-                          <span key={s.stokKodu}>
-                            {si > 0 && <span className="text-gray-300 mx-0.5 select-none">—</span>}
-                            <span className={si < r.primaryCount
-                              ? 'text-blue-700 font-bold text-[12px]'
-                              : 'text-gray-400 text-[11px]'}>
+
+                    {/* Müşteri adı */}
+                    <div className="w-44 flex-shrink-0">
+                      <p className="font-semibold text-gray-800 leading-tight">{r.cariIsim}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">{r.bsyAdi.split(' ').slice(0,2).join(' ')}</p>
+                    </div>
+
+                    {/* Stok kodları + oranları */}
+                    <div className="flex-1 flex flex-wrap gap-x-0 gap-y-1 items-center">
+                      {r.urunler.map((s, si) => {
+                        const acil = s.oran >= 70
+                        return (
+                          <span key={s.stokKodu} className="flex items-center">
+                            {si > 0 && <span className="text-gray-300 mx-1.5 font-light select-none">—</span>}
+                            <span className={clsx(
+                              'font-mono font-semibold',
+                              acil ? 'text-red-600' : 'text-blue-600'
+                            )}>
                               {s.stokKodu}
                             </span>
+                            <span className={clsx(
+                              'ml-0.5 text-[10px]',
+                              acil ? 'text-red-400 font-semibold' : 'text-gray-400'
+                            )}>
+                              ({Math.round(s.oran)}%)
+                            </span>
                           </span>
-                        ))}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <span className="text-[10px] bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
-                        {r.primaryCount} ürün ≥%50
-                      </span>
-                      <span className={clsx('text-[9px] rounded px-1.5 py-0.5 whitespace-nowrap',
-                        r.maxOran >= 100 ? 'bg-red-100 text-red-700 font-bold' :
-                        r.maxOran >= 80  ? 'bg-amber-100 text-amber-700' : 'bg-sky-50 text-sky-600')}>
-                        {r.maxOran >= 100 ? '🔴 Acil' : r.maxOran >= 80 ? '🟡 Yakın' : '🔵 Takip'}
-                      </span>
+                        )
+                      })}
                     </div>
                   </div>
                 ))}
