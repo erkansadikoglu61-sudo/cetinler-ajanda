@@ -670,12 +670,15 @@ interface HakdisRow {
   bayiMerch:   string
   primHakdis:  number
   satisAdet:   number
+  bsyKod:      string
 }
 
 export function BayiMerchHakdis({
   supervisorFilter = null,
+  bsyKodFilter = null,
 }: {
-  supervisorFilter?: string[] | null   // null = tümü (admin), dizi = sadece bu süpervizörler
+  supervisorFilter?: string[] | null   // null = tümü, dizi = sadece bu süpervizörler (Sup için)
+  bsyKodFilter?: string | null          // BSY kodu (BSY rolü için)
 }) {
   const now = new Date()
   const [yil, setYil] = useState(now.getFullYear())
@@ -704,7 +707,9 @@ export function BayiMerchHakdis({
   useEffect(() => { load() }, [load])
 
   const filtered = rows.filter(r => {
-    // Süpervizör filtresi (BSY/Sup rolleri için)
+    // BSY kodu filtresi (BSY rolü — kendi bağlı carileri)
+    if (bsyKodFilter !== null && r.bsyKod !== bsyKodFilter) return false
+    // Süpervizör filtresi (Süpervizör rolü)
     if (supervisorFilter !== null && !supervisorFilter.includes(r.supervizor)) return false
     if (cariQ && !r.cariAdi.toLowerCase().includes(cariQ.toLowerCase())) return false
     if (subeQ && !r.subeAdi.toLowerCase().includes(subeQ.toLowerCase())) return false

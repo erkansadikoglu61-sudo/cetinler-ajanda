@@ -21,6 +21,7 @@ const COL = {
   SUPERVISOR_ADI: 9,
   DONEM:          12,
   MERCH_TIPI:     14,
+  BSY_KOD:        16,
 } as const
 
 function decodeHtml(s: string): string {
@@ -41,6 +42,7 @@ interface HakdisRow {
   bayiMerch:    string
   primHakdis:   number
   satisAdet:    number
+  bsyKod:       string   // PHP kolonundan gelen BSY kodu (KB1, IB1, vb.)
 }
 
 export async function GET(req: Request) {
@@ -129,7 +131,7 @@ export async function GET(req: Request) {
   // 3. Parse HTML table rows
   // Rows are separated by </tr> — split and process each
   const parts = html.split('</tr>')
-  const aggMap = new Map<string, { supervizor: string; cariAdi: string; subeAdi: string; bayiMerch: string; primHakdis: number; satisAdet: number }>()
+  const aggMap = new Map<string, { supervizor: string; cariAdi: string; subeAdi: string; bayiMerch: string; primHakdis: number; satisAdet: number; bsyKod: string }>()
 
   const tdRe = /<td[^>]*>(.*?)<\/td>/g
 
@@ -187,6 +189,7 @@ export async function GET(req: Request) {
         bayiMerch:   cells[COL.MERCH_PERSONEL],
         primHakdis:  prim,
         satisAdet:   satisAdet,
+        bsyKod:      cells[COL.BSY_KOD] ?? '',
       })
     }
   }

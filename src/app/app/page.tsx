@@ -21,6 +21,7 @@ import { TASK_TYPES, VISIT_TYPES, MONTHS_TR, DAYS_SHORT, ROLE_LABELS } from '@/l
 import { generateVisitReport } from '@/lib/pdf'
 import { SelloutView } from '@/components/SelloutView'
 import { BsyView } from '@/components/BsyView'
+import { BSY_NAME_TO_KOD } from '@/lib/bsy'
 import { BsyTakipView } from '@/components/BsyTakipView'
 import { GenelRaporlarView } from '@/components/GenelRaporlarView'
 import { KpiView } from '@/components/KpiView'
@@ -1421,22 +1422,18 @@ export default function AppPage() {
   // Süpervizör ve Jr. Süpervizör → sadece Sellout + Noktalarımız
   const isSupOrJr = currentProfile?.role === 'sup' || currentProfile?.role === 'jr'
 
-  // Primler sayfası için süpervizör filtresi
-  // null = tümünü göster (admin), dizi = sadece bu süpervizörler
-  const primSupervisorFilter = useMemo(() => {
-    if (!currentProfile) return []
-    if (currentProfile.role === 'admin') return null
-    if (currentProfile.role === 'sup') return [currentProfile.full_name]
+  // Primler sayfası filtreleri
+  const { primSupervisorFilter, primBsyKod } = useMemo(() => {
+    if (!currentProfile) return { primSupervisorFilter: [] as string[], primBsyKod: null as string | null }
+    if (currentProfile.role === 'admin') return { primSupervisorFilter: null, primBsyKod: null }
+    if (currentProfile.role === 'sup') return { primSupervisorFilter: [currentProfile.full_name], primBsyKod: null }
     if (currentProfile.role === 'bsy') {
-      const linkedSupIds = bsyLinks
-        .filter(l => l.bsy_id === currentProfile.id)
-        .map(l => l.sup_id)
-      return team
-        .filter(p => p.role === 'sup' && linkedSupIds.includes(p.id))
-        .map(p => p.full_name)
+      // BSY_NAME_TO_KOD: lowercase isim → kod (KB1, IB1, vb.)
+      const bsyKod = BSY_NAME_TO_KOD[currentProfile.full_name.toLocaleLowerCase('tr')] ?? null
+      return { primSupervisorFilter: null, primBsyKod: bsyKod }
     }
-    return []
-  }, [currentProfile, bsyLinks, team])
+    return { primSupervisorFilter: [] as string[], primBsyKod: null as string | null }
+  }, [currentProfile])
 
   // Auth redirect
   useEffect(() => {
@@ -1861,7 +1858,10 @@ export default function AppPage() {
           )}
           {tab === 'bayi-merch' && (currentProfile?.role === 'admin' || isBsy || isSup) && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
-              <BayiMerchHakdis supervisorFilter={primSupervisorFilter} />
+              <BayiMerchHakdis
+                supervisorFilter={primSupervisorFilter}
+                bsyKodFilter={primBsyKod}
+              />
             </div>
           )}
         </>
