@@ -1,9 +1,16 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import { RefreshCw, ChevronDown, TrendingUp, AlertTriangle, Zap, Users, BarChart2, ShoppingCart } from 'lucide-react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { RefreshCw, TrendingUp, AlertTriangle, Zap, Users, BarChart2, ShoppingCart, GitCompare, Clock } from 'lucide-react'
 import clsx from 'clsx'
 import { useSellout } from '@/hooks/useSellout'
+
+// ─── Sabitler ─────────────────────────────────────────────────
+const ANALIZ_YIL   = 2026
+const REFRESH_MS   = 5 * 60 * 1000   // 5 dakikada bir otomatik yenile
+
+const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
+                   'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
 
 // ─── Tipler ───────────────────────────────────────────────────
 interface SellinRow {
@@ -16,17 +23,18 @@ interface CariStokEntry {
   cariIsim: string; cariKod: string
   bsyAdi: string;  bsyKod: string
   stokKodu: string; stokAdi: string; kategori: string
-  sellin: number; sellout: number
+  sellin: number; sellout: number; ay: number
 }
 
-const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
-                   'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
-
+// ─── Format yardımcıları ──────────────────────────────────────
 function fmtNum(n: number) {
   return n.toLocaleString('tr-TR', { maximumFractionDigits: 0 })
 }
 function pctStr(n: number) {
   return `%${n.toFixed(1)}`
+}
+function fmtTime(d: Date) {
+  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
 }
 
 // ─── Bölüm başlığı bileşeni ───────────────────────────────────
@@ -34,21 +42,18 @@ function Section({
   icon, title, subtitle, color = 'gray', count, children,
 }: {
   icon: React.ReactNode; title: string; subtitle: string
-  color?: 'green' | 'red' | 'amber' | 'blue' | 'violet' | 'gray'
+  color?: 'green' | 'red' | 'amber' | 'blue' | 'violet' | 'gray' | 'teal' | 'orange'
   count?: number; children: React.ReactNode
 }) {
-  const headerCls = {
-    green:  'bg-green-600',
-    red:    'bg-red-600',
-    amber:  'bg-amber-500',
-    blue:   'bg-blue-600',
-    violet: 'bg-violet-600',
-    gray:   'bg-gray-700',
-  }[color]
-
+  const headerCls: Record<string, string> = {
+    green:  'bg-green-600',   red:    'bg-red-600',
+    amber:  'bg-amber-500',   blue:   'bg-blue-600',
+    violet: 'bg-violet-600',  gray:   'bg-gray-700',
+    teal:   'bg-teal-600',    orange: 'bg-orange-500',
+  }
   return (
     <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-      <div className={clsx('px-4 py-3 text-white flex items-start gap-2', headerCls)}>
+      <div className={clsx('px-4 py-3 text-white flex items-start gap-2', headerCls[color])}>
         <span className="mt-0.5 flex-shrink-0">{icon}</span>
         <div className="flex-1">
           <div className="flex items-center gap-2">
@@ -65,116 +70,116 @@ function Section({
   )
 }
 
-// ─── Oran badge ───────────────────────────────────────────────
 function OranBadge({ oran }: { oran: number }) {
   const cls = oran >= 100 ? 'bg-red-100 text-red-700 font-bold'
             : oran >= 80  ? 'bg-amber-100 text-amber-700 font-semibold'
             : oran >= 50  ? 'bg-yellow-100 text-yellow-700'
                           : 'bg-gray-100 text-gray-500'
-  return (
-    <span className={clsx('text-[10px] rounded px-1.5 py-0.5 tabular-nums', cls)}>
-      {pctStr(oran)}
-    </span>
-  )
+  return <span className={clsx('text-[10px] rounded px-1.5 py-0.5 tabular-nums', cls)}>{pctStr(oran)}</span>
 }
 
-// ─── Risk badge ───────────────────────────────────────────────
 function RiskBadge({ oran }: { oran: number }) {
-  const cls = oran < 5   ? 'bg-red-100 text-red-700 font-bold'
-            : oran < 15  ? 'bg-orange-100 text-orange-700 font-semibold'
-                         : 'bg-amber-100 text-amber-700'
-  return (
-    <span className={clsx('text-[10px] rounded px-1.5 py-0.5 tabular-nums', cls)}>
-      {pctStr(oran)}
-    </span>
-  )
+  const cls = oran < 5  ? 'bg-red-100 text-red-700 font-bold'
+            : oran < 15 ? 'bg-orange-100 text-orange-700 font-semibold'
+                        : 'bg-amber-100 text-amber-700'
+  return <span className={clsx('text-[10px] rounded px-1.5 py-0.5 tabular-nums', cls)}>{pctStr(oran)}</span>
 }
+
+function StatusBadge({ oran }: { oran: number }) {
+  if (oran >= 85) return <span className="text-[10px] rounded px-1.5 py-0.5 bg-green-100 text-green-700">🟢 Mükemmel</span>
+  if (oran >= 65) return <span className="text-[10px] rounded px-1.5 py-0.5 bg-blue-100 text-blue-700">🔵 İyi</span>
+  if (oran >= 40) return <span className="text-[10px] rounded px-1.5 py-0.5 bg-yellow-100 text-yellow-700">🟡 Orta</span>
+  if (oran >= 20) return <span className="text-[10px] rounded px-1.5 py-0.5 bg-orange-100 text-orange-700">🟠 Zayıf</span>
+  return <span className="text-[10px] rounded px-1.5 py-0.5 bg-red-100 text-red-700">🔴 Kritik</span>
+}
+
+const marka = (k: string) => k === 'EKEA' ? 'ELX' : k === 'RELUX' ? 'RLX' : k
 
 // ─── Ana bileşen ──────────────────────────────────────────────
 export function AnalizView() {
-  const now = new Date()
-  const [sellinRows,   setSellinRows]   = useState<SellinRow[]>([])
-  const [yillar,       setYillar]       = useState<number[]>([])
-  const [loading,      setLoading]      = useState(false)
-  const [filterYil,    setFilterYil]    = useState('')
-  const [filterAy,     setFilterAy]     = useState('')
+  const [sellinRows, setSellinRows] = useState<SellinRow[]>([])
+  const [loading,    setLoading]    = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const loadSellin = useCallback(async () => {
     setLoading(true)
     try {
       const res  = await fetch('/api/sellin-sellout')
       const json = await res.json()
-      const rows: SellinRow[] = json.rows ?? []
-      const yils: number[]    = json.yillar ?? []
-      setSellinRows(rows)
-      setYillar(yils)
-      if (yils.length) setFilterYil(String(Math.max(...yils)))
+      setSellinRows(json.rows ?? [])
+      setLastUpdate(new Date())
     } finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { loadSellin() }, [loadSellin])
+  // İlk yükleme + otomatik yenileme
+  useEffect(() => {
+    loadSellin()
+    timerRef.current = setInterval(loadSellin, REFRESH_MS)
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [loadSellin])
 
   const { rows: selloutRows, loading: soLoading, reload: reloadSo } = useSellout(true)
 
-  // ── Filtrelenmiş setler ────────────────────────────────────
+  // ── Sadece 2026 verisi ─────────────────────────────────────
   const filtSellin = useMemo(() =>
-    sellinRows.filter(r => {
-      if (r.kategori !== 'EKEA' && r.kategori !== 'RELUX') return false
-      if (filterYil && r.yil !== parseInt(filterYil)) return false
-      if (filterAy  && r.ay  !== parseInt(filterAy))  return false
-      return true
-    }), [sellinRows, filterYil, filterAy])
+    sellinRows.filter(r =>
+      r.yil === ANALIZ_YIL &&
+      (r.kategori === 'EKEA' || r.kategori === 'RELUX')
+    ), [sellinRows])
 
   const filtSellout = useMemo(() =>
     selloutRows.filter(r => {
+      if (!r.donem.startsWith(String(ANALIZ_YIL))) return false
       const gk = r.grup_kodu.toUpperCase()
-      if (gk !== 'EKEA' && gk !== 'RELUX') return false
-      if (filterYil && r.donem.split('-')[0] !== filterYil) return false
-      if (filterAy) {
-        const soAy = parseInt(r.donem.split('-')[1] ?? '0')
-        if (soAy !== parseInt(filterAy)) return false
-      }
-      return true
-    }), [selloutRows, filterYil, filterAy])
+      return gk === 'EKEA' || gk === 'RELUX'
+    }), [selloutRows])
 
-  // ── Cari × Stok bazlı master harita ───────────────────────
+  // ── Cari × Stok master harita ─────────────────────────────
   const cariStokMap: CariStokEntry[] = useMemo(() => {
     const map = new Map<string, CariStokEntry>()
-
     filtSellin.forEach(r => {
       const key = `${r.cariIsim}||${r.stokKodu.toUpperCase()}`
       const cur = map.get(key) ?? {
         cariIsim: r.cariIsim, cariKod: r.cariKod,
         bsyAdi: r.bsyAdi, bsyKod: r.bsyKod,
         stokKodu: r.stokKodu.toUpperCase(), stokAdi: r.stokAdi,
-        kategori: r.kategori, sellin: 0, sellout: 0,
+        kategori: r.kategori, sellin: 0, sellout: 0, ay: r.ay,
       }
       cur.sellin += r.adet
+      if (r.ay > cur.ay) cur.ay = r.ay
       map.set(key, cur)
     })
-
     filtSellout.forEach(r => {
       const key = `${r.cari_isim}||${r.stok_kodu.toUpperCase()}`
       const cur = map.get(key)
-      if (cur) { cur.sellout += r.satilan_adet }
+      if (cur) cur.sellout += r.satilan_adet
     })
-
     return [...map.values()].filter(r => r.sellin > 0)
   }, [filtSellin, filtSellout])
 
-  // ── Özet KPI'lar ──────────────────────────────────────────
+  // ── Aktif aylar ───────────────────────────────────────────
+  const activeMonths = useMemo(() => {
+    const s = new Set<number>()
+    filtSellin.forEach(r => s.add(r.ay))
+    return [...s].sort((a, b) => a - b)
+  }, [filtSellin])
+
+  // ── KPI özeti ─────────────────────────────────────────────
   const kpi = useMemo(() => {
     const totalSellin  = cariStokMap.reduce((s, r) => s + r.sellin,  0)
     const totalSellout = cariStokMap.reduce((s, r) => s + r.sellout, 0)
-    const acilSiparis  = cariStokMap.filter(r => r.sellout / r.sellin >= 1.0).length
-    const yakinSiparis = cariStokMap.filter(r => { const o = r.sellout/r.sellin; return o >= 0.75 && o < 1.0 }).length
-    const donukStok    = cariStokMap.filter(r => r.sellin >= 3 && r.sellout / r.sellin < 0.25).length
-    const saglikliMus  = new Set(cariStokMap.filter(r => r.sellout / r.sellin >= 0.70).map(r => r.cariIsim)).size
-    return { totalSellin, totalSellout, acilSiparis, yakinSiparis, donukStok, saglikliMus,
-             genel: totalSellin > 0 ? (totalSellout / totalSellin) * 100 : 0 }
+    const acil   = cariStokMap.filter(r => r.sellout / r.sellin >= 1.0).length
+    const yakin  = cariStokMap.filter(r => { const o = r.sellout/r.sellin; return o >= 0.75 && o < 1.0 }).length
+    const donuk  = cariStokMap.filter(r => r.sellin >= 3 && r.sellout / r.sellin < 0.25).length
+    const saglik = new Set(cariStokMap.filter(r => r.sellout / r.sellin >= 0.70).map(r => r.cariIsim)).size
+    return {
+      totalSellin, totalSellout, acil, yakin, donuk, saglik,
+      genel: totalSellin > 0 ? (totalSellout / totalSellin) * 100 : 0,
+    }
   }, [cariStokMap])
 
-  // ── Analiz 1: Sipariş Tahmini ─────────────────────────────
+  // ── A1: Sipariş Tahmini ───────────────────────────────────
   const reorderList = useMemo(() =>
     cariStokMap
       .map(r => ({ ...r, oran: (r.sellout / r.sellin) * 100 }))
@@ -183,7 +188,7 @@ export function AnalizView() {
       .slice(0, 30),
     [cariStokMap])
 
-  // ── Analiz 2: Hareketsiz / Donuk Stok ─────────────────────
+  // ── A2: Donuk Stok ────────────────────────────────────────
   const deadStockList = useMemo(() =>
     cariStokMap
       .filter(r => r.sellin >= 3)
@@ -193,48 +198,26 @@ export function AnalizView() {
       .slice(0, 30),
     [cariStokMap])
 
-  // ── Analiz 3: En Hızlı Satan Ürünler ──────────────────────
-  const fastMovers = useMemo(() => {
+  // ── A3: En Hızlı/Yavaş Ürünler ───────────────────────────
+  const productMap = useMemo(() => {
     const map = new Map<string, { stokKodu: string; stokAdi: string; kategori: string; sellin: number; sellout: number; cariSet: Set<string> }>()
     cariStokMap.forEach(r => {
       const cur = map.get(r.stokKodu) ?? { stokKodu: r.stokKodu, stokAdi: r.stokAdi, kategori: r.kategori, sellin: 0, sellout: 0, cariSet: new Set() }
-      cur.sellin  += r.sellin
-      cur.sellout += r.sellout
-      cur.cariSet.add(r.cariIsim)
+      cur.sellin += r.sellin; cur.sellout += r.sellout; cur.cariSet.add(r.cariIsim)
       map.set(r.stokKodu, cur)
     })
-    return [...map.values()]
-      .filter(r => r.sellin >= 5)
-      .map(r => ({ ...r, oran: (r.sellout / r.sellin) * 100, cariSayisi: r.cariSet.size }))
-      .sort((a, b) => b.oran - a.oran)
-      .slice(0, 15)
+    return [...map.values()].map(r => ({ ...r, oran: (r.sellout / r.sellin) * 100, cariSayisi: r.cariSet.size }))
   }, [cariStokMap])
 
-  // ── Analiz 4: En Yavaş / Sorunlu Ürünler ─────────────────
-  const slowMovers = useMemo(() => {
-    const map = new Map<string, { stokKodu: string; stokAdi: string; kategori: string; sellin: number; sellout: number; cariSet: Set<string> }>()
-    cariStokMap.forEach(r => {
-      const cur = map.get(r.stokKodu) ?? { stokKodu: r.stokKodu, stokAdi: r.stokAdi, kategori: r.kategori, sellin: 0, sellout: 0, cariSet: new Set() }
-      cur.sellin  += r.sellin
-      cur.sellout += r.sellout
-      cur.cariSet.add(r.cariIsim)
-      map.set(r.stokKodu, cur)
-    })
-    return [...map.values()]
-      .filter(r => r.sellin >= 10)
-      .map(r => ({ ...r, oran: (r.sellout / r.sellin) * 100, cariSayisi: r.cariSet.size }))
-      .sort((a, b) => a.oran - b.oran)
-      .slice(0, 15)
-  }, [cariStokMap])
+  const fastMovers = useMemo(() => productMap.filter(r => r.sellin >= 5).sort((a, b) => b.oran - a.oran).slice(0, 15), [productMap])
+  const slowMovers = useMemo(() => productMap.filter(r => r.sellin >= 10).sort((a, b) => a.oran - b.oran).slice(0, 15), [productMap])
 
-  // ── Analiz 5: Müşteri Sağlık Endeksi ──────────────────────
+  // ── A4: Müşteri Sağlık ────────────────────────────────────
   const customerHealth = useMemo(() => {
     const map = new Map<string, { cariIsim: string; bsyAdi: string; sellin: number; sellout: number; stokSet: Set<string> }>()
     cariStokMap.forEach(r => {
       const cur = map.get(r.cariIsim) ?? { cariIsim: r.cariIsim, bsyAdi: r.bsyAdi, sellin: 0, sellout: 0, stokSet: new Set() }
-      cur.sellin  += r.sellin
-      cur.sellout += r.sellout
-      cur.stokSet.add(r.stokKodu)
+      cur.sellin += r.sellin; cur.sellout += r.sellout; cur.stokSet.add(r.stokKodu)
       map.set(r.cariIsim, cur)
     })
     return [...map.values()]
@@ -243,15 +226,13 @@ export function AnalizView() {
       .sort((a, b) => b.oran - a.oran)
   }, [cariStokMap])
 
-  // ── Analiz 6: BSY Portföy ─────────────────────────────────
+  // ── A5: BSY Portföy ───────────────────────────────────────
   const bsyPortfoy = useMemo(() => {
     const map = new Map<string, { bsyAdi: string; bsyKod: string; sellin: number; sellout: number; cariSet: Set<string>; stokSet: Set<string> }>()
     cariStokMap.forEach(r => {
       const cur = map.get(r.bsyKod) ?? { bsyAdi: r.bsyAdi, bsyKod: r.bsyKod, sellin: 0, sellout: 0, cariSet: new Set(), stokSet: new Set() }
-      cur.sellin  += r.sellin
-      cur.sellout += r.sellout
-      cur.cariSet.add(r.cariIsim)
-      cur.stokSet.add(r.stokKodu)
+      cur.sellin += r.sellin; cur.sellout += r.sellout
+      cur.cariSet.add(r.cariIsim); cur.stokSet.add(r.stokKodu)
       map.set(r.bsyKod, cur)
     })
     return [...map.values()]
@@ -259,8 +240,83 @@ export function AnalizView() {
       .sort((a, b) => b.oran - a.oran)
   }, [cariStokMap])
 
+  // ── A6: Aylık Trend (yalnızca 2026) ──────────────────────
+  const aylikTrend = useMemo(() => {
+    return activeMonths.map(ay => {
+      const aySellin   = filtSellin.filter(r => r.ay === ay)
+      const aysSo = filtSellout.filter(r => parseInt(r.donem.split('-')[1] ?? '0') === ay)
+      const totalSi  = aySellin.reduce((s, r) => s + r.adet, 0)
+      const totalSo  = aysSo.reduce((s, r) => s + r.satilan_adet, 0)
+      // Unique müşteri ve ürün sayısı
+      const musSet   = new Set(aySellin.map(r => r.cariIsim))
+      const stokSet  = new Set(aySellin.map(r => r.stokKodu.toUpperCase()))
+      return {
+        ay, sellin: totalSi, sellout: totalSo,
+        oran: totalSi > 0 ? (totalSo / totalSi) * 100 : 0,
+        musteriSayisi: musSet.size, stokSayisi: stokSet.size,
+      }
+    })
+  }, [filtSellin, filtSellout, activeMonths])
+
+  // ── A7: Marka Karşılaştırması (ELX vs RELUX) ─────────────
+  const markaKarsilastirma = useMemo(() => {
+    const elxSI  = filtSellin.filter(r => r.kategori === 'EKEA').reduce((s, r) => s + r.adet, 0)
+    const relxSI = filtSellin.filter(r => r.kategori === 'RELUX').reduce((s, r) => s + r.adet, 0)
+    const elxSO  = filtSellout.filter(r => r.grup_kodu.toUpperCase() === 'EKEA').reduce((s, r) => s + r.satilan_adet, 0)
+    const relxSO = filtSellout.filter(r => r.grup_kodu.toUpperCase() === 'RELUX').reduce((s, r) => s + r.satilan_adet, 0)
+    const elxMus  = new Set(filtSellin.filter(r => r.kategori === 'EKEA').map(r => r.cariIsim)).size
+    const relxMus = new Set(filtSellin.filter(r => r.kategori === 'RELUX').map(r => r.cariIsim)).size
+    const elxStok  = new Set(filtSellin.filter(r => r.kategori === 'EKEA').map(r => r.stokKodu.toUpperCase())).size
+    const relxStok = new Set(filtSellin.filter(r => r.kategori === 'RELUX').map(r => r.stokKodu.toUpperCase())).size
+    return [
+      { marka: 'Electrolux', key: 'EKEA',  sellin: elxSI,  sellout: elxSO,  oran: elxSI  > 0 ? (elxSO  / elxSI)  * 100 : 0, musteriSayisi: elxMus,  stokSayisi: elxStok,  color: '#003087' },
+      { marka: 'Relux',      key: 'RELUX', sellin: relxSI, sellout: relxSO, oran: relxSI > 0 ? (relxSO / relxSI) * 100 : 0, musteriSayisi: relxMus, stokSayisi: relxStok, color: '#6b21a8' },
+    ]
+  }, [filtSellin, filtSellout])
+
+  // ── A8: Çapraz Satış Fırsatı ──────────────────────────────
+  // ELX alan ama RELUX almayan müşteriler ve tersi
+  const caprazFirsat = useMemo(() => {
+    const elxMus  = new Set(filtSellin.filter(r => r.kategori === 'EKEA').map(r => r.cariIsim))
+    const relxMus = new Set(filtSellin.filter(r => r.kategori === 'RELUX').map(r => r.cariIsim))
+
+    // Müşteri bazında BSY map
+    const bsyMap = new Map<string, string>()
+    filtSellin.forEach(r => bsyMap.set(r.cariIsim, r.bsyAdi))
+
+    // Müşteri bazında toplam sellin
+    const sellinMus = new Map<string, { elx: number; relux: number }>()
+    filtSellin.forEach(r => {
+      const cur = sellinMus.get(r.cariIsim) ?? { elx: 0, relux: 0 }
+      if (r.kategori === 'EKEA')  cur.elx   += r.adet
+      if (r.kategori === 'RELUX') cur.relux += r.adet
+      sellinMus.set(r.cariIsim, cur)
+    })
+
+    const sadElx  = [...elxMus].filter(c => !relxMus.has(c))
+      .map(c => ({ cariIsim: c, bsyAdi: bsyMap.get(c) ?? '', elxAdet: sellinMus.get(c)?.elx ?? 0, reluxAdet: 0 }))
+      .sort((a, b) => b.elxAdet - a.elxAdet)
+      .slice(0, 15)
+
+    const sadRelx = [...relxMus].filter(c => !elxMus.has(c))
+      .map(c => ({ cariIsim: c, bsyAdi: bsyMap.get(c) ?? '', elxAdet: 0, reluxAdet: sellinMus.get(c)?.relux ?? 0 }))
+      .sort((a, b) => b.reluxAdet - a.reluxAdet)
+      .slice(0, 15)
+
+    return { sadElx, sadRelx }
+  }, [filtSellin])
+
+  // ── A9: En Değerli Açık Stok (donuk adet × olası sıklık) ─
+  // "Satılmayı bekleyen" değer: müşteride bekleyen adet, aciliyet derecesi
+  const topBekleyenler = useMemo(() =>
+    cariStokMap
+      .map(r => ({ ...r, bekleyen: r.sellin - r.sellout, oran: (r.sellout / r.sellin) * 100 }))
+      .filter(r => r.bekleyen > 2)
+      .sort((a, b) => b.bekleyen - a.bekleyen)
+      .slice(0, 20),
+    [cariStokMap])
+
   const isLoadingAny = loading || soLoading
-  const marka = (k: string) => k === 'EKEA' ? 'ELX' : k === 'RELUX' ? 'RLX' : k
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -268,36 +324,25 @@ export function AnalizView() {
       {/* Üst bar */}
       <div className="flex-shrink-0 flex flex-wrap items-center gap-2 px-4 py-2 bg-white border-b border-gray-100">
         <BarChart2 size={14} className="text-brand-600" />
-        <span className="text-xs font-semibold text-gray-700">Satış Analizi</span>
-
-        <div className="relative">
-          <select value={filterYil} onChange={e => setFilterYil(e.target.value)}
-            className="appearance-none pl-2 pr-6 py-1 text-xs border border-gray-200 rounded-lg bg-white font-medium text-brand-700 focus:outline-none focus:border-brand-400">
-            <option value="">Tüm Yıllar</option>
-            {yillar.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <ChevronDown size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-        </div>
-
-        <div className="relative">
-          <select value={filterAy} onChange={e => setFilterAy(e.target.value)}
-            className="appearance-none pl-2 pr-6 py-1 text-xs border border-gray-200 rounded-lg bg-white font-medium text-gray-600 focus:outline-none focus:border-brand-400">
-            <option value="">Tüm Aylar</option>
-            {MONTHS_TR.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
-          </select>
-          <ChevronDown size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-        </div>
+        <span className="text-xs font-bold text-gray-700">Satış Analizi</span>
+        <span className="text-[10px] bg-brand-100 text-brand-700 rounded-full px-2 py-0.5 font-semibold">{ANALIZ_YIL}</span>
 
         <button onClick={() => { loadSellin(); reloadSo() }} disabled={isLoadingAny}
-          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-50" title="Yenile">
+          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-50" title="Şimdi yenile">
           <RefreshCw size={14} className={isLoadingAny ? 'animate-spin' : ''} />
         </button>
 
         <div className="flex-1" />
-        {!isLoadingAny && (
-          <span className="text-[10px] text-gray-400">
-            {cariStokMap.length} kombinasyon · {filterYil || 'Tüm yıllar'}{filterAy ? ' / ' + MONTHS_TR[parseInt(filterAy)-1] : ''}
+
+        {lastUpdate && (
+          <span className="flex items-center gap-1 text-[10px] text-gray-400">
+            <Clock size={10} />
+            Son güncelleme: {fmtTime(lastUpdate)}
+            <span className="opacity-60">· 5dk'da bir otomatik yenilenir</span>
           </span>
+        )}
+        {!isLoadingAny && cariStokMap.length > 0 && (
+          <span className="text-[10px] text-gray-400">{cariStokMap.length} kombinasyon</span>
         )}
       </div>
 
@@ -309,37 +354,123 @@ export function AnalizView() {
 
       {!isLoadingAny && cariStokMap.length === 0 && (
         <div className="flex-1 flex items-center justify-center text-xs text-gray-400">
-          Seçili dönem için veri bulunamadı.
+          {ANALIZ_YIL} yılı için sellin/sellout verisi bulunamadı.
         </div>
       )}
 
       {!isLoadingAny && cariStokMap.length > 0 && (
         <div className="flex-1 overflow-auto p-4 space-y-5">
 
-          {/* ── KPI Kartları ─────────────────────────────── */}
+          {/* ── KPI Kartları ─────────────────────────── */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: 'Genel Sellout Oranı', value: pctStr(kpi.genel), sub: `${fmtNum(kpi.totalSellout)} / ${fmtNum(kpi.totalSellin)} adet`, color: kpi.genel >= 70 ? 'bg-green-600' : kpi.genel >= 50 ? 'bg-amber-500' : 'bg-red-600' },
-              { label: 'Acil Sipariş Beklenen', value: String(kpi.acilSiparis + kpi.yakinSiparis), sub: `${kpi.acilSiparis} acil · ${kpi.yakinSiparis} yakın`, color: 'bg-blue-600' },
-              { label: 'Donuk Stok Riski', value: String(kpi.donukStok), sub: 'Stok %25 altında satan', color: kpi.donukStok > 10 ? 'bg-red-600' : 'bg-amber-500' },
-              { label: 'Sağlıklı Müşteri', value: String(kpi.saglikliMus), sub: '%70+ sellout oranıyla', color: 'bg-green-600' },
+              { label: 'Sipariş Beklenen', value: String(kpi.acil + kpi.yakin), sub: `${kpi.acil} acil · ${kpi.yakin} yakın kombinasyon`, color: 'bg-blue-600' },
+              { label: 'Donuk Stok Riski', value: String(kpi.donuk), sub: '%25 altında satan kombinasyon', color: kpi.donuk > 10 ? 'bg-red-600' : 'bg-amber-500' },
+              { label: 'Sağlıklı Müşteri', value: String(kpi.saglik), sub: '%70+ sellout oranıyla', color: 'bg-green-600' },
             ].map(k => (
               <div key={k.label} className={clsx('rounded-xl p-3 text-white', k.color)}>
-                <p className="text-lg font-bold leading-tight">{k.value}</p>
-                <p className="text-[10px] opacity-80 mt-0.5">{k.label}</p>
+                <p className="text-xl font-bold leading-tight">{k.value}</p>
+                <p className="text-[10px] opacity-80 mt-0.5 font-semibold">{k.label}</p>
                 <p className="text-[9px] opacity-60 mt-0.5">{k.sub}</p>
               </div>
             ))}
           </div>
 
-          {/* ── Analiz 1: Sipariş Tahmini ─────────────── */}
-          <Section
-            icon={<ShoppingCart size={14} />}
+          {/* ── A6: Aylık Trend ──────────────────────── */}
+          {aylikTrend.length > 0 && (
+            <Section icon={<TrendingUp size={14} />}
+              title={`${ANALIZ_YIL} Aylık Sellin → Sellout Trendi`}
+              subtitle="Aylara göre satışa verilen ve satılan adet karşılaştırması — sellout oranı düşen aylar dikkat gerektiriyor"
+              color="teal">
+              <div className="overflow-x-auto">
+                <table className="text-xs w-full border-collapse min-w-[500px]">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="text-left px-4 py-2 font-semibold text-gray-500">Ay</th>
+                      <th className="text-right px-3 py-2 font-semibold text-gray-500">Sellin</th>
+                      <th className="text-right px-3 py-2 font-semibold text-gray-500">Sellout</th>
+                      <th className="text-center px-3 py-2 font-semibold text-gray-500">Oran</th>
+                      <th className="text-left px-3 py-2 font-semibold text-gray-500 min-w-[160px]">İlerleme</th>
+                      <th className="text-right px-3 py-2 font-semibold text-gray-500">Müşteri</th>
+                      <th className="text-right px-3 py-2 font-semibold text-gray-500">Ürün</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {aylikTrend.map((r, i) => (
+                      <tr key={r.ay} className={clsx('border-b border-gray-50', i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30')}>
+                        <td className="px-4 py-2 font-semibold text-gray-800">{MONTHS_TR[r.ay - 1]}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-gray-700">{fmtNum(r.sellin)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-gray-700">{fmtNum(r.sellout)}</td>
+                        <td className="px-3 py-2 text-center">
+                          <OranBadge oran={r.oran} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-1.5">
+                            <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden min-w-[80px]">
+                              <div className={clsx('h-2 rounded-full',
+                                r.oran >= 80 ? 'bg-green-500' : r.oran >= 50 ? 'bg-amber-400' : 'bg-red-400')}
+                                style={{ width: `${Math.min(r.oran, 100)}%` }} />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-gray-500">{r.musteriSayisi}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-gray-500">{r.stokSayisi}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Section>
+          )}
+
+          {/* ── A7: Marka Karşılaştırması ─────────────── */}
+          <Section icon={<GitCompare size={14} />}
+            title="Electrolux vs Relux Karşılaştırması"
+            subtitle="İki markanın sellin/sellout performansı, müşteri ve ürün çeşitliliği"
+            color="violet">
+            <div className="grid grid-cols-2 divide-x divide-gray-100">
+              {markaKarsilastirma.map(m => (
+                <div key={m.key} className="p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: m.color }} />
+                    <span className="text-sm font-bold text-gray-800">{m.marka}</span>
+                    <span className={clsx('ml-auto text-xs font-bold',
+                      m.oran >= 70 ? 'text-green-600' : m.oran >= 45 ? 'text-amber-600' : 'text-red-500')}>
+                      {pctStr(m.oran)}
+                    </span>
+                  </div>
+                  <div className="bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                    <div className="h-2.5 rounded-full" style={{ width: `${Math.min(m.oran, 100)}%`, backgroundColor: m.color }} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="bg-gray-50 rounded-lg p-2">
+                      <p className="text-gray-400">Sellin</p>
+                      <p className="font-bold text-gray-800 text-sm">{fmtNum(m.sellin)}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-2">
+                      <p className="text-gray-400">Sellout</p>
+                      <p className="font-bold text-gray-800 text-sm">{fmtNum(m.sellout)}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-2">
+                      <p className="text-gray-400">Müşteri</p>
+                      <p className="font-bold text-gray-800 text-sm">{m.musteriSayisi}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-2">
+                      <p className="text-gray-400">Ürün Çeşidi</p>
+                      <p className="font-bold text-gray-800 text-sm">{m.stokSayisi}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+
+          {/* ── A1: Sipariş Tahmini ───────────────────── */}
+          <Section icon={<ShoppingCart size={14} />}
             title="Yeniden Sipariş Tahmini"
-            subtitle="Sellout/Sellin oranı ≥%75 olan ürünler — bu müşterilerle iletişime geçmek için doğru zaman"
-            color="blue"
-            count={reorderList.length}
-          >
+            subtitle="Müşterinin sattığı adet, satın aldığı adetin %75'ini geçen kombinasyonlar — iletişime geçmek için doğru zaman"
+            color="blue" count={reorderList.length}>
             {reorderList.length === 0 ? (
               <p className="text-xs text-gray-400 text-center py-6">Bu dönem için uygun veri yok</p>
             ) : (
@@ -348,16 +479,12 @@ export function AnalizView() {
                   <div key={i} className={clsx('flex items-center gap-2 px-4 py-2.5 text-xs hover:bg-gray-50', r.oran >= 100 && 'bg-red-50/40')}>
                     <span className="text-gray-400 w-5 text-right flex-shrink-0 font-mono">{i+1}.</span>
                     <div className="flex-1 min-w-0">
-                      <span className="font-semibold text-gray-800 truncate block">{r.cariIsim}</span>
-                      <span className="text-gray-500 truncate block">{r.stokKodu}
-                        <span className="ml-1 text-[10px] text-gray-400">{r.stokAdi}</span>
-                      </span>
+                      <span className="font-semibold text-gray-800 block truncate">{r.cariIsim}</span>
+                      <span className="text-gray-400 text-[10px]">{r.stokKodu} — {r.stokAdi.slice(0,40)}</span>
                     </div>
-                    <div className="text-right flex-shrink-0 space-y-0.5">
+                    <div className="text-right space-y-0.5 flex-shrink-0">
                       <OranBadge oran={r.oran} />
-                      <div className="text-[9px] text-gray-400 tabular-nums">
-                        ↓{fmtNum(r.sellin)} → ↑{fmtNum(r.sellout)}
-                      </div>
+                      <div className="text-[9px] text-gray-400 tabular-nums">↓{fmtNum(r.sellin)} ↑{fmtNum(r.sellout)}</div>
                     </div>
                     <span className={clsx('text-[9px] rounded px-1.5 py-0.5 flex-shrink-0',
                       r.oran >= 100 ? 'bg-red-100 text-red-700 font-bold' :
@@ -372,32 +499,53 @@ export function AnalizView() {
             )}
           </Section>
 
-          {/* ── Analiz 2: Donuk Stok ──────────────────── */}
-          <Section
-            icon={<AlertTriangle size={14} />}
+          {/* ── A9: Müşteride Bekleyen Stok (adet bazlı) ─ */}
+          <Section icon={<AlertTriangle size={14} />}
+            title="Müşteride Bekleyen En Yüksek Stok (Adet)"
+            subtitle="(Sellin − Sellout) farkı en yüksek kombinasyonlar — müşteride birikmiş stok takip listesi"
+            color="orange" count={topBekleyenler.length}>
+            {topBekleyenler.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-6">Veri yok</p>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {topBekleyenler.map((r, i) => (
+                  <div key={i} className="flex items-center gap-2 px-4 py-2.5 text-xs hover:bg-gray-50">
+                    <span className="text-gray-400 w-5 text-right font-mono flex-shrink-0">{i+1}.</span>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-semibold text-gray-800 block truncate">{r.cariIsim}</span>
+                      <span className="text-gray-400 text-[10px]">{r.stokKodu} — {r.stokAdi.slice(0,40)}</span>
+                    </div>
+                    <div className="text-right flex-shrink-0 space-y-0.5">
+                      <span className="block font-bold text-orange-600 tabular-nums">{fmtNum(r.bekleyen)} adet bekliyor</span>
+                      <div className="text-[9px] text-gray-400 tabular-nums">↓{fmtNum(r.sellin)} ↑{fmtNum(r.sellout)} · <OranBadge oran={r.oran} /></div>
+                    </div>
+                    <span className="text-[9px] text-gray-400 flex-shrink-0">{r.bsyAdi.split(' ')[0]}</span>
+                    <span className="text-[9px] bg-gray-100 text-gray-500 rounded px-1 flex-shrink-0">{marka(r.kategori)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+          {/* ── A2: Donuk Stok ───────────────────────── */}
+          <Section icon={<AlertTriangle size={14} />}
             title="Hareketsiz / Donuk Stok Riski"
-            subtitle="En az 3 adet sellin yapılan ama sellout oranı %25'in altında kalan ürünler — müşteride stok birikmiş"
-            color="red"
-            count={deadStockList.length}
-          >
+            subtitle="En az 3 adet sellin yapılmış ama sellout oranı %25'in altında kalan kombinasyonlar — müşteride stok birikmiş, iade riski"
+            color="red" count={deadStockList.length}>
             {deadStockList.length === 0 ? (
               <p className="text-xs text-gray-400 text-center py-6">Bu dönem için uygun veri yok</p>
             ) : (
               <div className="divide-y divide-gray-50">
                 {deadStockList.map((r, i) => (
                   <div key={i} className="flex items-center gap-2 px-4 py-2.5 text-xs hover:bg-gray-50">
-                    <span className="text-gray-400 w-5 text-right flex-shrink-0 font-mono">{i+1}.</span>
+                    <span className="text-gray-400 w-5 text-right font-mono flex-shrink-0">{i+1}.</span>
                     <div className="flex-1 min-w-0">
-                      <span className="font-semibold text-gray-800 truncate block">{r.cariIsim}</span>
-                      <span className="text-gray-500 truncate block">{r.stokKodu}
-                        <span className="ml-1 text-[10px] text-gray-400">{r.stokAdi}</span>
-                      </span>
+                      <span className="font-semibold text-gray-800 block truncate">{r.cariIsim}</span>
+                      <span className="text-gray-400 text-[10px]">{r.stokKodu} — {r.stokAdi.slice(0,40)}</span>
                     </div>
                     <div className="text-right flex-shrink-0 space-y-0.5">
                       <RiskBadge oran={r.oran} />
-                      <div className="text-[9px] text-gray-400 tabular-nums">
-                        ↓{fmtNum(r.sellin)} → ↑{fmtNum(r.sellout)}
-                      </div>
+                      <div className="text-[9px] text-gray-400 tabular-nums">↓{fmtNum(r.sellin)} ↑{fmtNum(r.sellout)}</div>
                     </div>
                     <span className={clsx('text-[9px] rounded px-1.5 py-0.5 flex-shrink-0',
                       r.oran < 5 ? 'bg-red-100 text-red-700 font-bold' : 'bg-orange-100 text-orange-700')}>
@@ -411,47 +559,83 @@ export function AnalizView() {
             )}
           </Section>
 
-          {/* ── Analiz 3 + 4: Ürün Hız Analizi ──────── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* ── A8: Çapraz Satış ─────────────────────── */}
+          <Section icon={<Zap size={14} />}
+            title="Çapraz Satış Fırsatı"
+            subtitle="Yalnızca bir markadan alan müşteriler — diğer markayı da sunmak için fırsat"
+            color="green">
+            <div className="grid grid-cols-2 divide-x divide-gray-100">
+              {/* Sadece ELX alanlar */}
+              <div className="p-3">
+                <p className="text-[11px] font-bold text-blue-700 mb-2 px-1">
+                  Electrolux aldı, Relux almadı ({caprazFirsat.sadElx.length})
+                </p>
+                {caprazFirsat.sadElx.length === 0 ? (
+                  <p className="text-[10px] text-gray-400 px-1">Yok</p>
+                ) : caprazFirsat.sadElx.map((r, i) => (
+                  <div key={i} className="flex items-center gap-1 px-1 py-1.5 border-b border-gray-50 text-xs last:border-0">
+                    <span className="text-gray-400 w-4 text-right font-mono">{i+1}.</span>
+                    <span className="flex-1 truncate text-gray-800 font-medium">{r.cariIsim}</span>
+                    <span className="text-[10px] bg-blue-50 text-blue-600 rounded px-1 flex-shrink-0">{fmtNum(r.elxAdet)} adet</span>
+                    <span className="text-[9px] text-gray-400 flex-shrink-0">{r.bsyAdi.split(' ')[0]}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Sadece RELUX alanlar */}
+              <div className="p-3">
+                <p className="text-[11px] font-bold text-purple-700 mb-2 px-1">
+                  Relux aldı, Electrolux almadı ({caprazFirsat.sadRelx.length})
+                </p>
+                {caprazFirsat.sadRelx.length === 0 ? (
+                  <p className="text-[10px] text-gray-400 px-1">Yok</p>
+                ) : caprazFirsat.sadRelx.map((r, i) => (
+                  <div key={i} className="flex items-center gap-1 px-1 py-1.5 border-b border-gray-50 text-xs last:border-0">
+                    <span className="text-gray-400 w-4 text-right font-mono">{i+1}.</span>
+                    <span className="flex-1 truncate text-gray-800 font-medium">{r.cariIsim}</span>
+                    <span className="text-[10px] bg-purple-50 text-purple-600 rounded px-1 flex-shrink-0">{fmtNum(r.reluxAdet)} adet</span>
+                    <span className="text-[9px] text-gray-400 flex-shrink-0">{r.bsyAdi.split(' ')[0]}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Section>
 
-            <Section
-              icon={<Zap size={14} />}
+          {/* ── A3+A4: Ürün Hız Analizi ─────────────── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Section icon={<Zap size={14} />}
               title="En Hızlı Satan Ürünler"
               subtitle="Sellout/Sellin oranı en yüksek stoklar (min 5 sellin)"
-              color="green"
-            >
+              color="green">
               <div className="divide-y divide-gray-50">
                 {fastMovers.map((r, i) => (
                   <div key={i} className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50">
                     <span className="text-gray-400 w-4 text-right font-mono">{i+1}.</span>
                     <div className="flex-1 min-w-0">
                       <span className="font-semibold text-gray-800">{r.stokKodu}</span>
-                      <span className="text-[10px] text-gray-500 ml-1">{r.stokAdi.slice(0, 30)}</span>
+                      <span className="text-[10px] text-gray-500 ml-1 truncate">{r.stokAdi.slice(0,28)}</span>
                     </div>
                     <OranBadge oran={r.oran} />
-                    <span className="text-[9px] text-gray-400">{r.cariSayisi} müş.</span>
+                    <span className="text-[9px] text-gray-400">{r.cariSayisi}m</span>
                     <span className="text-[9px] bg-gray-100 text-gray-500 rounded px-1">{marka(r.kategori)}</span>
                   </div>
                 ))}
               </div>
             </Section>
 
-            <Section
-              icon={<AlertTriangle size={14} />}
+            <Section icon={<AlertTriangle size={14} />}
               title="En Yavaş Satan Ürünler"
               subtitle="Sellout/Sellin oranı en düşük stoklar (min 10 sellin)"
-              color="amber"
-            >
+              color="amber">
               <div className="divide-y divide-gray-50">
                 {slowMovers.map((r, i) => (
                   <div key={i} className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50">
                     <span className="text-gray-400 w-4 text-right font-mono">{i+1}.</span>
                     <div className="flex-1 min-w-0">
                       <span className="font-semibold text-gray-800">{r.stokKodu}</span>
-                      <span className="text-[10px] text-gray-500 ml-1">{r.stokAdi.slice(0, 30)}</span>
+                      <span className="text-[10px] text-gray-500 ml-1 truncate">{r.stokAdi.slice(0,28)}</span>
                     </div>
                     <RiskBadge oran={r.oran} />
-                    <span className="text-[9px] text-gray-400">{r.cariSayisi} müş.</span>
+                    <span className="text-[9px] text-gray-400">{r.cariSayisi}m</span>
                     <span className="text-[9px] bg-gray-100 text-gray-500 rounded px-1">{marka(r.kategori)}</span>
                   </div>
                 ))}
@@ -459,94 +643,72 @@ export function AnalizView() {
             </Section>
           </div>
 
-          {/* ── Analiz 5: Müşteri Sağlık Endeksi ─────── */}
-          <Section
-            icon={<Users size={14} />}
+          {/* ── A5: Müşteri Sağlık ───────────────────── */}
+          <Section icon={<Users size={14} />}
             title="Müşteri Sağlık Endeksi"
-            subtitle="Müşteri bazında toplam sellout/sellin oranı — yüksek oran = sağlıklı ilişki ve tekrar sipariş potansiyeli"
-            color="violet"
-          >
+            subtitle="Müşteri bazında toplam sellout/sellin oranı — yüksek oran sağlıklı ilişki ve tekrar sipariş sinyali verir"
+            color="violet">
             <div className="overflow-x-auto">
               <table className="text-xs w-full border-collapse">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="text-left px-4 py-2 font-semibold text-gray-500">#</th>
+                    <th className="text-left px-4 py-2 font-semibold text-gray-500 w-8">#</th>
                     <th className="text-left px-3 py-2 font-semibold text-gray-500">Müşteri</th>
                     <th className="text-left px-3 py-2 font-semibold text-gray-500">BSY</th>
                     <th className="text-right px-3 py-2 font-semibold text-gray-500">Sellin</th>
                     <th className="text-right px-3 py-2 font-semibold text-gray-500">Sellout</th>
                     <th className="text-center px-3 py-2 font-semibold text-gray-500">Oran</th>
+                    <th className="text-center px-3 py-2 font-semibold text-gray-500">Ürün</th>
                     <th className="text-center px-3 py-2 font-semibold text-gray-500">Durum</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {customerHealth.map((r, i) => {
-                    const badge = r.oran >= 85 ? { label: '🟢 Mükemmel',  cls: 'bg-green-100 text-green-700' }
-                                : r.oran >= 65 ? { label: '🔵 İyi',        cls: 'bg-blue-100 text-blue-700' }
-                                : r.oran >= 40 ? { label: '🟡 Orta',       cls: 'bg-yellow-100 text-yellow-700' }
-                                : r.oran >= 20 ? { label: '🟠 Zayıf',      cls: 'bg-orange-100 text-orange-700' }
-                                :               { label: '🔴 Kritik',     cls: 'bg-red-100 text-red-700' }
-                    return (
-                      <tr key={r.cariIsim} className={clsx('border-b border-gray-50 hover:bg-gray-50', i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30')}>
-                        <td className="px-4 py-2 text-gray-400 font-mono">{i+1}</td>
-                        <td className="px-3 py-2 font-semibold text-gray-800 max-w-[200px] truncate">{r.cariIsim}</td>
-                        <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.bsyAdi.split(' ').slice(0,2).join(' ')}</td>
-                        <td className="px-3 py-2 text-right text-gray-700 tabular-nums">{fmtNum(r.sellin)}</td>
-                        <td className="px-3 py-2 text-right text-gray-700 tabular-nums">{fmtNum(r.sellout)}</td>
-                        <td className="px-3 py-2 text-center">
-                          <span className={clsx('text-[10px] rounded px-1.5 py-0.5 tabular-nums font-semibold',
-                            r.oran >= 70 ? 'bg-green-100 text-green-700' :
-                            r.oran >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700')}>
-                            {pctStr(r.oran)}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <span className={clsx('text-[10px] rounded px-1.5 py-0.5', badge.cls)}>{badge.label}</span>
-                        </td>
-                      </tr>
-                    )
-                  })}
+                  {customerHealth.map((r, i) => (
+                    <tr key={r.cariIsim} className={clsx('border-b border-gray-50 hover:bg-gray-50', i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30')}>
+                      <td className="px-4 py-2 text-gray-400 font-mono">{i+1}</td>
+                      <td className="px-3 py-2 font-semibold text-gray-800 max-w-[180px] truncate">{r.cariIsim}</td>
+                      <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.bsyAdi.split(' ').slice(0,2).join(' ')}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-gray-700">{fmtNum(r.sellin)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-gray-700">{fmtNum(r.sellout)}</td>
+                      <td className="px-3 py-2 text-center"><OranBadge oran={r.oran} /></td>
+                      <td className="px-3 py-2 text-center text-gray-500">{r.stokSayisi}</td>
+                      <td className="px-3 py-2 text-center"><StatusBadge oran={r.oran} /></td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           </Section>
 
-          {/* ── Analiz 6: BSY Portföy ─────────────────── */}
-          <Section
-            icon={<TrendingUp size={14} />}
+          {/* ── A6 (BSY): Portföy ────────────────────── */}
+          <Section icon={<TrendingUp size={14} />}
             title="BSY Portföy Performansı"
             subtitle="BSY bazında müşteri sellout sağlığı — hangi BSY'nin portföyü daha hızlı satıyor?"
-            color="gray"
-          >
+            color="gray">
             <div className="divide-y divide-gray-50">
-              {bsyPortfoy.map((r, i) => {
-                const barW = Math.min(r.oran, 100)
-                return (
-                  <div key={r.bsyKod} className="px-4 py-3 flex items-center gap-3 hover:bg-gray-50">
-                    <span className="text-gray-400 font-mono text-xs w-5">{i+1}.</span>
-                    <div className="w-28 flex-shrink-0">
-                      <p className="text-xs font-semibold text-gray-800 truncate">{r.bsyAdi.split(' ').slice(0,2).join(' ')}</p>
-                      <p className="text-[10px] text-gray-400">{r.cariSayisi} müşteri · {r.stokSayisi} ürün</p>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
-                          <div className={clsx('h-2 rounded-full transition-all',
-                            r.oran >= 70 ? 'bg-green-500' : r.oran >= 40 ? 'bg-amber-400' : 'bg-red-400')}
-                            style={{ width: `${barW}%` }} />
-                        </div>
-                        <span className={clsx('text-xs font-semibold tabular-nums w-14 text-right',
-                          r.oran >= 70 ? 'text-green-600' : r.oran >= 40 ? 'text-amber-600' : 'text-red-500')}>
-                          {pctStr(r.oran)}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-gray-400 mt-0.5">
-                        {fmtNum(r.sellout)} / {fmtNum(r.sellin)} adet
-                      </p>
-                    </div>
+              {bsyPortfoy.map((r, i) => (
+                <div key={r.bsyKod} className="px-4 py-3 flex items-center gap-3 hover:bg-gray-50">
+                  <span className="text-gray-400 font-mono text-xs w-5">{i+1}.</span>
+                  <div className="w-32 flex-shrink-0">
+                    <p className="text-xs font-semibold text-gray-800">{r.bsyAdi.split(' ').slice(0,2).join(' ')}</p>
+                    <p className="text-[10px] text-gray-400">{r.cariSayisi} müş · {r.stokSayisi} ürün</p>
                   </div>
-                )
-              })}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                        <div className={clsx('h-2 rounded-full',
+                          r.oran >= 70 ? 'bg-green-500' : r.oran >= 40 ? 'bg-amber-400' : 'bg-red-400')}
+                          style={{ width: `${Math.min(r.oran, 100)}%` }} />
+                      </div>
+                      <span className={clsx('text-xs font-bold tabular-nums w-14 text-right',
+                        r.oran >= 70 ? 'text-green-600' : r.oran >= 40 ? 'text-amber-600' : 'text-red-500')}>
+                        {pctStr(r.oran)}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{fmtNum(r.sellout)} / {fmtNum(r.sellin)} adet</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </Section>
 
