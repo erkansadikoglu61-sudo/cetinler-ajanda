@@ -26,6 +26,20 @@ interface CariStokEntry {
   sellin: number; sellout: number; ay: number
 }
 
+// ─── Renk varyantı birleştirme ────────────────────────────────
+const STOK_BIRLESIM: Record<string, string> = {
+  'RMS9200B': 'RMS9200', 'RMS9200P': 'RMS9200',
+  'AS8200B':  'AS8200',  'AS8200P':  'AS8200',
+  'RHD6165W': 'RHD6165', 'RHD6165G': 'RHD6165',
+  'RHD9190W': 'RHD9190', 'RHD9190B': 'RHD9190',
+  'RHS8900B': 'RHS8900', 'RHS8900P': 'RHS8900',
+  'RHS9000B': 'RHS9000', 'RHS9000P': 'RHS9000',
+}
+function normStok(kodu: string): string {
+  const up = kodu.toUpperCase()
+  return STOK_BIRLESIM[up] ?? up
+}
+
 // ─── Format yardımcıları ──────────────────────────────────────
 function fmtNum(n: number) {
   return n.toLocaleString('tr-TR', { maximumFractionDigits: 0 })
@@ -139,11 +153,12 @@ export function AnalizView() {
   const cariStokMap: CariStokEntry[] = useMemo(() => {
     const map = new Map<string, CariStokEntry>()
     filtSellin.forEach(r => {
-      const key = `${r.cariIsim}||${r.stokKodu.toUpperCase()}`
-      const cur = map.get(key) ?? {
+      const stok = normStok(r.stokKodu)
+      const key  = `${r.cariIsim}||${stok}`
+      const cur  = map.get(key) ?? {
         cariIsim: r.cariIsim, cariKod: r.cariKod,
         bsyAdi: r.bsyAdi, bsyKod: r.bsyKod,
-        stokKodu: r.stokKodu.toUpperCase(), stokAdi: r.stokAdi,
+        stokKodu: stok, stokAdi: r.stokAdi,
         kategori: r.kategori, sellin: 0, sellout: 0, ay: r.ay,
       }
       cur.sellin += r.adet
@@ -151,8 +166,9 @@ export function AnalizView() {
       map.set(key, cur)
     })
     filtSellout.forEach(r => {
-      const key = `${r.cari_isim}||${r.stok_kodu.toUpperCase()}`
-      const cur = map.get(key)
+      const stok = normStok(r.stok_kodu)
+      const key  = `${r.cari_isim}||${stok}`
+      const cur  = map.get(key)
       if (cur) cur.sellout += r.satilan_adet
     })
     return [...map.values()].filter(r => r.sellin > 0)
