@@ -74,31 +74,32 @@ export async function GET(req: Request) {
 
   // 2. Özel prim kuralları (prim_ozel) — cari/şube/stok bazlı overrides
   interface OzelPrimRow {
-    stok_kodu:      string[] | null
-    grup_kodu:      string[] | null
-    cari_adi:       string[] | null
-    sube_adi:       string[] | null
-    bayi_merch:     number | null
+    stok_kodu:   string[] | null
+    grup_kodu:   string[] | null
+    cari_adi:    string[] | null
+    sube_adi:    string[] | null
+    bayi_merch:  number | null
+    prim_carpan: number | null
   }
   let ozelPrimRows: OzelPrimRow[] = []
   try {
     const { data } = await sb
       .from('prim_ozel')
-      .select('stok_kodu, grup_kodu, cari_adi, sube_adi, bayi_merch')
+      .select('stok_kodu, grup_kodu, cari_adi, sube_adi, bayi_merch, prim_carpan')
       .eq('yil', yil)
       .eq('ay', ay)
     if (data) ozelPrimRows = data as OzelPrimRow[]
   } catch { /* ignore */ }
 
-  /** Bir satır için prim_ozel tablosundan eşleşen bayi_merch oranını bul */
-  function findOzelPrim(stokKodu: string, cariAdi: string, subeAdi: string): number | null | undefined {
+  /** Bir satır için prim_ozel'de eşleşen kuralı bul */
+  function findOzelRule(stokKodu: string, cariAdi: string, subeAdi: string): OzelPrimRow | undefined {
     for (const rule of ozelPrimRows) {
-      const stokOk  = !rule.stok_kodu || rule.stok_kodu.some(s => s.toUpperCase() === stokKodu.toUpperCase())
-      const cariOk  = !rule.cari_adi  || rule.cari_adi.some(c => c === cariAdi)
-      const subeOk  = !rule.sube_adi  || rule.sube_adi.some(s => s === subeAdi)
-      if (stokOk && cariOk && subeOk) return rule.bayi_merch
+      const stokOk = !rule.stok_kodu || rule.stok_kodu.some(s => s.toUpperCase() === stokKodu.toUpperCase())
+      const cariOk = !rule.cari_adi  || rule.cari_adi.some(c => c === cariAdi)
+      const subeOk = !rule.sube_adi  || rule.sube_adi.some(s => s === subeAdi)
+      if (stokOk && cariOk && subeOk) return rule
     }
-    return undefined   // eşleşme yok → genel primMap kullan
+    return undefined
   }
 
   // 2. Fetch external HTML (cached 15 min at Next.js data cache)
@@ -138,12 +139,25 @@ export async function GET(req: Request) {
     // Only include "Bayi Merch" — skip "Çetinler Merch"
     if (cells[COL.MERCH_TIPI] !== 'Bayi Merch') continue
 
-    const stokKodu    = cells[COL.STOK_KODU].toUpperCase()
-    const satisAdet   = parseFloat(cells[COL.SATILAN_ADET]) || 0
-    // Önce prim_ozel'de eşleşme ara; yoksa genel primMap'e bak
-    const ozelRate    = findOzelPrim(stokKodu, cells[COL.CARI_ISIM], cells[COL.SUBE_ADI])
-    const bayiMerchPrim = ozelRate !== undefined ? ozelRate : (primMap.get(stokKodu) ?? null)
-    const prim        = bayiMerchPrim != null ? satisAdet * bayiMerchPrim : 0
+    const stokKodu  = cells[COL.STOK_KODU].toUpperCase()
+    const satisAdet = parseFloat(cells[COL.SATILAN_ADET]) || 0
+    const standardRate = primMap.get(stokKodu) ?? null
+
+    // Özel kural varsa uygula; önce prim_carpan, sonra bayi_merch override
+    const ozelRule = findOzelRule(stokKodu, cells[COL.CARI_ISIM], cells[COL.SUBE_ADI])
+    let bayiMerchPrim: number | null
+    if (ozelRule) {
+      if (ozelRule.prim_carpan != null && standardRate != null) {
+        bayiMerchPrim = standardRate * ozelRule.prim_carpan  // çarpan: standart × N
+      } else if (ozelRule.bayi_merch != null) {
+        bayiMerchPrim = ozelRule.bayi_merch  // sabit tutar override
+      } else {
+        bayiMerchPrim = standardRate
+      }
+    } else {
+      bayiMerchPrim = standardRate
+    }
+    const prim = bayiMerchPrim != null ? satisAdet * bayiMerchPrim : 0
 
     const key = `${cells[COL.SUPERVISOR_ADI]}||${cells[COL.CARI_ISIM]}||${cells[COL.SUBE_ADI]}||${cells[COL.MERCH_PERSONEL]}`
 

@@ -140,10 +140,12 @@ interface OzelRow {
   subeAdi:         string[] | null   // null = Tümü
   bayiMerch:       number | null
   kosulluDestek:   number | null
+  primCarpan:      number | null     // Standart primle çarpılır (ör: 2 = 2 katı prim)
 }
 
 const EMPTY_OZEL = (yil: number, ay: number): Omit<OzelRow,'id'> => ({
-  stokKodu: null, grupKodu: null, yil, ay, tarihBaslangic: null, tarihBitis: null, cariAdi: null, subeAdi: null, bayiMerch: null, kosulluDestek: null
+  stokKodu: null, grupKodu: null, yil, ay, tarihBaslangic: null, tarihBitis: null,
+  cariAdi: null, subeAdi: null, bayiMerch: null, kosulluDestek: null, primCarpan: null,
 })
 
 // Helper: display an array value in read-only cells
@@ -185,7 +187,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
         yil: x.yil, ay: x.ay,
         tarihBaslangic: x.tarih_baslangic, tarihBitis: x.tarih_bitis,
         cariAdi: x.cari_adi ?? null, subeAdi: x.sube_adi ?? null,
-        bayiMerch: x.bayi_merch, kosulluDestek: x.kosullu_destek
+        bayiMerch: x.bayi_merch, kosulluDestek: x.kosullu_destek, primCarpan: x.prim_carpan ?? null,
       })))
     } finally { setLoading(false) }
   }, [yil, ay])
@@ -234,7 +236,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
         yil: d.row.yil, ay: d.row.ay,
         tarihBaslangic: d.row.tarih_baslangic, tarihBitis: d.row.tarih_bitis,
         cariAdi: d.row.cari_adi ?? null, subeAdi: d.row.sube_adi ?? null,
-        bayiMerch: d.row.bayi_merch, kosulluDestek: d.row.kosullu_destek
+        bayiMerch: d.row.bayi_merch, kosulluDestek: d.row.kosullu_destek, primCarpan: d.row.prim_carpan ?? null,
       }])
       setNewRow(EMPTY_OZEL(yil, ay)); setAdding(false); setMsg('✓ Eklendi')
     } catch (e) { setMsg('✗ ' + String(e)) }
@@ -301,6 +303,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
               <th className="text-left px-3 py-2.5 font-semibold min-w-[160px]">Şube Adı</th>
               <th className="text-right px-3 py-2.5 font-semibold min-w-[120px]">Bayi Merch (₺)</th>
               <th className="text-right px-3 py-2.5 font-semibold min-w-[140px]">Koşullu Destek (₺)</th>
+              <th className="text-center px-3 py-2.5 font-semibold min-w-[110px]" title="Standart prim oranıyla çarpılır. Örn: 2 = 2 katı prim">Prim Çarpanı ×</th>
               <th className="px-3 py-2.5 w-16"></th>
             </tr>
           </thead>
@@ -337,6 +340,10 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
                 <td className="px-2 py-1.5">
                   <input type="number" value={numVal(newRow.kosulluDestek)} onChange={e => setNewRow(p => ({ ...p, kosulluDestek: parseNum(e.target.value) }))}
                     placeholder="—" className={inputCls + ' text-right'} />
+                </td>
+                <td className="px-2 py-1.5">
+                  <input type="number" step="0.1" min="0" value={numVal(newRow.primCarpan)} onChange={e => setNewRow(p => ({ ...p, primCarpan: parseNum(e.target.value) }))}
+                    placeholder="—" className={inputCls + ' text-center'} title="Standart prim × bu sayı. Örn: 2 = 2 katı prim" />
                 </td>
                 <td className="px-2 py-1.5">
                   <div className="flex gap-1 justify-end">
@@ -399,6 +406,13 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
                       ? <input type="number" value={numVal(eVal('kosulluDestek', row) as number | null)} onChange={e => setEditBuf(p => ({ ...p, kosulluDestek: parseNum(e.target.value) }))} className={inputCls + ' text-right'} />
                       : row.kosulluDestek != null ? `${row.kosulluDestek} ₺` : <span className="text-gray-300">—</span>}
                   </td>
+                  <td className="px-3 py-2 text-center tabular-nums text-gray-800">
+                    {isEdit
+                      ? <input type="number" step="0.1" min="0" value={numVal(eVal('primCarpan', row) as number | null)} onChange={e => setEditBuf(p => ({ ...p, primCarpan: parseNum(e.target.value) }))} className={inputCls + ' text-center'} />
+                      : row.primCarpan != null
+                        ? <span className="font-bold text-violet-600">×{row.primCarpan}</span>
+                        : <span className="text-gray-300">—</span>}
+                  </td>
                   <td className="px-3 py-2">
                     <div className="flex gap-1 justify-end">
                       {isEdit ? (
@@ -412,7 +426,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
                         <>
                           <button onClick={() => {
                             setEditId(row.id)
-                            setEditBuf({ stokKodu: row.stokKodu, grupKodu: row.grupKodu, tarihBaslangic: row.tarihBaslangic, tarihBitis: row.tarihBitis, cariAdi: row.cariAdi, subeAdi: row.subeAdi, bayiMerch: row.bayiMerch, kosulluDestek: row.kosulluDestek })
+                            setEditBuf({ stokKodu: row.stokKodu, grupKodu: row.grupKodu, tarihBaslangic: row.tarihBaslangic, tarihBitis: row.tarihBitis, cariAdi: row.cariAdi, subeAdi: row.subeAdi, bayiMerch: row.bayiMerch, kosulluDestek: row.kosulluDestek, primCarpan: row.primCarpan })
                           }} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg"><Edit2 size={11} /></button>
                           <button onClick={() => deleteRow(row.id)}
                             className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={11} /></button>

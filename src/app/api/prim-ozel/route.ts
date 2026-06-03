@@ -42,6 +42,7 @@ export async function POST(req: Request) {
         sube_adi:         body.subeAdi         ?? null,   // text[] | null
         bayi_merch:       body.bayiMerch       ?? null,
         kosullu_destek:   body.kosulluDestek   ?? null,
+        prim_carpan:      body.primCarpan       ?? null,
       })
       .select()
       .single()
@@ -69,6 +70,7 @@ export async function PUT(req: Request) {
         sube_adi:         body.subeAdi         ?? null,
         bayi_merch:       body.bayiMerch       ?? null,
         kosullu_destek:   body.kosulluDestek   ?? null,
+        prim_carpan:      body.primCarpan       ?? null,
       })
       .eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
