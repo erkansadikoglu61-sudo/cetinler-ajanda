@@ -157,6 +157,76 @@ export function generateVisitReport(
   doc.save(`cetinler-rapor-${year}-${String(month + 1).padStart(2, '0')}.pdf`)
 }
 
+// ─── Adet Prim Tablosu PDF ────────────────────────────────────
+interface AdetPrimRow {
+  stokKodu:      string
+  bayiMerch:     number | null
+  kosulluDestek: number | null
+}
+
+export function generateAdetPrimPdf(rows: AdetPrimRow[], yil: number, ay: number) {
+  const AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
+                 'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
+
+  // ── Başlık ──────────────────────────────────────────────────
+  doc.setFillColor(30, 30, 40)
+  doc.rect(0, 0, pageW, 20, 'F')
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(13)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Adet Prim Tablosu', 14, 10)
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.text(`${AYLAR[ay - 1]} ${yil}  ·  ${rows.length} ürün`, 14, 16)
+  doc.setTextColor(0)
+
+  // ── Tablo ───────────────────────────────────────────────────
+  autoTable(doc, {
+    startY: 24,
+    head: [['#', 'Stok Kodu', 'Bayi Merch (₺)', 'Koşullu Destek (₺)']],
+    body: rows.map((r, i) => [
+      i + 1,
+      r.stokKodu,
+      r.bayiMerch != null ? r.bayiMerch.toLocaleString('tr-TR') + ' ₺' : '—',
+      r.kosulluDestek != null ? r.kosulluDestek.toLocaleString('tr-TR') + ' ₺' : '—',
+    ]),
+    headStyles: {
+      fillColor: [40, 40, 55],
+      textColor: 255,
+      fontStyle: 'bold',
+      fontSize: 8.5,
+      cellPadding: 3,
+    },
+    bodyStyles: { fontSize: 8, cellPadding: 3 },
+    alternateRowStyles: { fillColor: [248, 249, 251] },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' },
+      1: { cellWidth: 50, fontStyle: 'bold' },
+      2: { halign: 'right' },
+      3: { halign: 'right' },
+    },
+    margin: { left: 14, right: 14 },
+    didDrawPage: () => {
+      doc.setFontSize(7)
+      doc.setTextColor(160)
+      const total = doc.getNumberOfPages()
+      const cur   = (doc as jsPDF & { internal: { getCurrentPageInfo: () => { pageNumber: number } } })
+        .internal.getCurrentPageInfo().pageNumber
+      doc.text(
+        `Sayfa ${cur} / ${total}   |   ${new Date().toLocaleDateString('tr-TR')}`,
+        pageW / 2, pageH - 5, { align: 'center' }
+      )
+      doc.setTextColor(0)
+    },
+  })
+
+  doc.save(`adet-prim-tablosu-${yil}-${String(ay).padStart(2, '0')}.pdf`)
+}
+
 // ─── Bayi Merch Prim Hakedişleri PDF ──────────────────────────
 interface BayiMerchRow {
   supervizor: string
