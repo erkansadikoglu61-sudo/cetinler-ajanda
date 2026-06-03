@@ -6,11 +6,7 @@ import clsx from 'clsx'
 import { useSellout } from '@/hooks/useSellout'
 
 // ─── Sabitler ─────────────────────────────────────────────────
-// Sellin: 01.07.2025 ve sonrası
-const SELLIN_YIL_BASLANGIC = 2025
-const SELLIN_AY_BASLANGIC  = 7
-// Sellout: 01.01.2026 ve sonrası
-const SELLOUT_YIL_BASLANGIC = 2026
+const ANALIZ_YIL = 2026
 const REFRESH_MS = 5 * 60 * 1000   // 5 dakikada bir otomatik yenile
 
 const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
@@ -139,19 +135,16 @@ export function AnalizView() {
 
   const { rows: selloutRows, loading: soLoading, reload: reloadSo } = useSellout(true)
 
-  // ── Sellin: 01.07.2025'ten itibaren ──────────────────────
+  // ── Sadece 2026 verisi ────────────────────────────────────
   const filtSellin = useMemo(() =>
-    sellinRows.filter(r => {
-      if (r.kategori !== 'EKEA' && r.kategori !== 'RELUX') return false
-      if (r.yil === SELLIN_YIL_BASLANGIC) return r.ay >= SELLIN_AY_BASLANGIC
-      return r.yil > SELLIN_YIL_BASLANGIC
-    }), [sellinRows])
+    sellinRows.filter(r =>
+      r.yil === ANALIZ_YIL &&
+      (r.kategori === 'EKEA' || r.kategori === 'RELUX')
+    ), [sellinRows])
 
-  // ── Sellout: 01.01.2026'dan itibaren ─────────────────────
   const filtSellout = useMemo(() =>
     selloutRows.filter(r => {
-      const yil = parseInt(r.donem.split('-')[0] ?? '0')
-      if (yil < SELLOUT_YIL_BASLANGIC) return false
+      if (!r.donem.startsWith(String(ANALIZ_YIL))) return false
       const gk = r.grup_kodu.toUpperCase()
       return gk === 'EKEA' || gk === 'RELUX'
     }), [selloutRows])
@@ -181,7 +174,7 @@ export function AnalizView() {
     return [...map.values()].filter(r => r.sellin > 0)
   }, [filtSellin, filtSellout])
 
-  // ── Aktif yıl-ay kombinasyonları ──────────────────────────
+  // ── Aktif aylar (2026) ────────────────────────────────────
   const activeYilAylar = useMemo(() => {
     const s = new Set<string>()
     filtSellin.forEach(r => s.add(`${r.yil}-${String(r.ay).padStart(2,'0')}`))
@@ -367,9 +360,7 @@ export function AnalizView() {
       <div className="flex-shrink-0 flex flex-wrap items-center gap-2 px-4 py-2 bg-white border-b border-gray-100">
         <BarChart2 size={14} className="text-brand-600" />
         <span className="text-xs font-bold text-gray-700">Satış Analizi</span>
-        <span className="text-[10px] bg-brand-100 text-brand-700 rounded-full px-2 py-0.5 font-semibold">
-          Sellin: Tem 2025→ · Sellout: Oca 2026→
-        </span>
+        <span className="text-[10px] bg-brand-100 text-brand-700 rounded-full px-2 py-0.5 font-semibold">{ANALIZ_YIL}</span>
 
         <button onClick={() => { loadSellin(); reloadSo() }} disabled={isLoadingAny}
           className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-50" title="Şimdi yenile">
@@ -398,7 +389,7 @@ export function AnalizView() {
 
       {!isLoadingAny && cariStokMap.length === 0 && (
         <div className="flex-1 flex items-center justify-center text-xs text-gray-400">
-          Seçili dönem için sellin/sellout verisi bulunamadı.
+          {ANALIZ_YIL} yılı için sellin/sellout verisi bulunamadı.
         </div>
       )}
 
@@ -424,7 +415,7 @@ export function AnalizView() {
           {/* ── A6: Aylık Trend ──────────────────────── */}
           {aylikTrend.length > 0 && (
             <Section icon={<TrendingUp size={14} />}
-              title="Aylık Sellin → Sellout Trendi (Tem 2025 – Güncel)"
+              title={`${ANALIZ_YIL} Aylık Sellin → Sellout Trendi`}
               subtitle="Aylara göre satışa verilen ve satılan adet karşılaştırması — sellout oranı düşen aylar dikkat gerektiriyor"
               color="teal">
               <div className="overflow-x-auto">
