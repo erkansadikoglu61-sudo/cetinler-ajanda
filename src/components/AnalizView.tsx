@@ -6,8 +6,12 @@ import clsx from 'clsx'
 import { useSellout } from '@/hooks/useSellout'
 
 // ─── Sabitler ─────────────────────────────────────────────────
-const ANALIZ_YIL   = 2026
-const REFRESH_MS   = 5 * 60 * 1000   // 5 dakikada bir otomatik yenile
+// Sellin: 01.07.2025 ve sonrası
+const SELLIN_YIL_BASLANGIC = 2025
+const SELLIN_AY_BASLANGIC  = 7
+// Sellout: 01.01.2026 ve sonrası
+const SELLOUT_YIL_BASLANGIC = 2026
+const REFRESH_MS = 5 * 60 * 1000   // 5 dakikada bir otomatik yenile
 
 const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
                    'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
@@ -135,16 +139,19 @@ export function AnalizView() {
 
   const { rows: selloutRows, loading: soLoading, reload: reloadSo } = useSellout(true)
 
-  // ── Sadece 2026 verisi ─────────────────────────────────────
+  // ── Sellin: 01.07.2025'ten itibaren ──────────────────────
   const filtSellin = useMemo(() =>
-    sellinRows.filter(r =>
-      r.yil === ANALIZ_YIL &&
-      (r.kategori === 'EKEA' || r.kategori === 'RELUX')
-    ), [sellinRows])
+    sellinRows.filter(r => {
+      if (r.kategori !== 'EKEA' && r.kategori !== 'RELUX') return false
+      if (r.yil === SELLIN_YIL_BASLANGIC) return r.ay >= SELLIN_AY_BASLANGIC
+      return r.yil > SELLIN_YIL_BASLANGIC
+    }), [sellinRows])
 
+  // ── Sellout: 01.01.2026'dan itibaren ─────────────────────
   const filtSellout = useMemo(() =>
     selloutRows.filter(r => {
-      if (!r.donem.startsWith(String(ANALIZ_YIL))) return false
+      const yil = parseInt(r.donem.split('-')[0] ?? '0')
+      if (yil < SELLOUT_YIL_BASLANGIC) return false
       const gk = r.grup_kodu.toUpperCase()
       return gk === 'EKEA' || gk === 'RELUX'
     }), [selloutRows])
@@ -174,11 +181,11 @@ export function AnalizView() {
     return [...map.values()].filter(r => r.sellin > 0)
   }, [filtSellin, filtSellout])
 
-  // ── Aktif aylar ───────────────────────────────────────────
-  const activeMonths = useMemo(() => {
-    const s = new Set<number>()
-    filtSellin.forEach(r => s.add(r.ay))
-    return [...s].sort((a, b) => a - b)
+  // ── Aktif yıl-ay kombinasyonları ──────────────────────────
+  const activeYilAylar = useMemo(() => {
+    const s = new Set<string>()
+    filtSellin.forEach(r => s.add(`${r.yil}-${String(r.ay).padStart(2,'0')}`))
+    return [...s].sort()
   }, [filtSellin])
 
   // ── KPI özeti ─────────────────────────────────────────────
@@ -271,23 +278,27 @@ export function AnalizView() {
       .sort((a, b) => b.oran - a.oran)
   }, [cariStokMap])
 
-  // ── A6: Aylık Trend (yalnızca 2026) ──────────────────────
+  // ── A6: Aylık Trend ───────────────────────────────────────
   const aylikTrend = useMemo(() => {
-    return activeMonths.map(ay => {
-      const aySellin   = filtSellin.filter(r => r.ay === ay)
-      const aysSo = filtSellout.filter(r => parseInt(r.donem.split('-')[1] ?? '0') === ay)
+    return activeYilAylar.map(yilAy => {
+      const [yilStr, ayStr] = yilAy.split('-')
+      const yil = parseInt(yilStr); const ay = parseInt(ayStr)
+      const aySellin = filtSellin.filter(r => r.yil === yil && r.ay === ay)
+      // Sellout: sadece 2026 ve sonrası var
+      const aysSo = filtSellout.filter(r => r.donem.startsWith(yilAy))
       const totalSi  = aySellin.reduce((s, r) => s + r.adet, 0)
       const totalSo  = aysSo.reduce((s, r) => s + r.satilan_adet, 0)
-      // Unique müşteri ve ürün sayısı
       const musSet   = new Set(aySellin.map(r => r.cariIsim))
-      const stokSet  = new Set(aySellin.map(r => r.stokKodu.toUpperCase()))
+      const stokSet  = new Set(aySellin.map(r => normStok(r.stokKodu)))
       return {
-        ay, sellin: totalSi, sellout: totalSo,
+        yilAy, yil, ay,
+        label: `${MONTHS_TR[ay-1]} ${yil}`,
+        sellin: totalSi, sellout: totalSo,
         oran: totalSi > 0 ? (totalSo / totalSi) * 100 : 0,
         musteriSayisi: musSet.size, stokSayisi: stokSet.size,
       }
     })
-  }, [filtSellin, filtSellout, activeMonths])
+  }, [filtSellin, filtSellout, activeYilAylar])
 
   // ── A7: Marka Karşılaştırması (ELX vs RELUX) ─────────────
   const markaKarsilastirma = useMemo(() => {
@@ -356,7 +367,9 @@ export function AnalizView() {
       <div className="flex-shrink-0 flex flex-wrap items-center gap-2 px-4 py-2 bg-white border-b border-gray-100">
         <BarChart2 size={14} className="text-brand-600" />
         <span className="text-xs font-bold text-gray-700">Satış Analizi</span>
-        <span className="text-[10px] bg-brand-100 text-brand-700 rounded-full px-2 py-0.5 font-semibold">{ANALIZ_YIL}</span>
+        <span className="text-[10px] bg-brand-100 text-brand-700 rounded-full px-2 py-0.5 font-semibold">
+          Sellin: Tem 2025→ · Sellout: Oca 2026→
+        </span>
 
         <button onClick={() => { loadSellin(); reloadSo() }} disabled={isLoadingAny}
           className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-50" title="Şimdi yenile">
@@ -385,7 +398,7 @@ export function AnalizView() {
 
       {!isLoadingAny && cariStokMap.length === 0 && (
         <div className="flex-1 flex items-center justify-center text-xs text-gray-400">
-          {ANALIZ_YIL} yılı için sellin/sellout verisi bulunamadı.
+          Seçili dönem için sellin/sellout verisi bulunamadı.
         </div>
       )}
 
@@ -411,7 +424,7 @@ export function AnalizView() {
           {/* ── A6: Aylık Trend ──────────────────────── */}
           {aylikTrend.length > 0 && (
             <Section icon={<TrendingUp size={14} />}
-              title={`${ANALIZ_YIL} Aylık Sellin → Sellout Trendi`}
+              title="Aylık Sellin → Sellout Trendi (Tem 2025 – Güncel)"
               subtitle="Aylara göre satışa verilen ve satılan adet karşılaştırması — sellout oranı düşen aylar dikkat gerektiriyor"
               color="teal">
               <div className="overflow-x-auto">
@@ -430,7 +443,7 @@ export function AnalizView() {
                   <tbody>
                     {aylikTrend.map((r, i) => (
                       <tr key={r.ay} className={clsx('border-b border-gray-50', i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30')}>
-                        <td className="px-4 py-2 font-semibold text-gray-800">{MONTHS_TR[r.ay - 1]}</td>
+                        <td className="px-4 py-2 font-semibold text-gray-800">{r.label}</td>
                         <td className="px-3 py-2 text-right tabular-nums text-gray-700">{fmtNum(r.sellin)}</td>
                         <td className="px-3 py-2 text-right tabular-nums text-gray-700">{fmtNum(r.sellout)}</td>
                         <td className="px-3 py-2 text-center">
