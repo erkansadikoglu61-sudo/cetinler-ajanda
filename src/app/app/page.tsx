@@ -28,7 +28,8 @@ import { NoktalarimizView } from '@/components/NoktalarimizView'
 import { KullanicilarView } from '@/components/KullanicilarView'
 import { SellinSelloutView } from '@/components/SellinSelloutView'
 import { AdetPrimTablosu, BayiMerchHakdis } from '@/components/AdetPrimView'
-type TabType = 'month' | 'week' | 'day' | 'report' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'bsy-takip' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch'
+import { AnalizView } from '@/components/AnalizView'
+type TabType = 'month' | 'week' | 'day' | 'report' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'bsy-takip' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'analiz'
 
 // Renk hex'ine alpha ekle
 function hexWithAlpha(hex: string, alpha: string) {
@@ -1618,6 +1619,18 @@ export default function AppPage() {
                 <Store size={15} /> Noktalarımız
               </button>
 
+              {/* Satış Analizi (sadece admin) */}
+              {currentProfile?.role === 'admin' && (
+                <button
+                  onClick={() => setTab('analiz')}
+                  className={clsx(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                    tab === 'analiz' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                  )}
+                >
+                  <BarChart2 size={15} /> Analiz
+                </button>
+              )}
               {/* Primler grubu (sadece admin) */}
               {currentProfile?.role === 'admin' && (
                 <button
@@ -1818,6 +1831,11 @@ export default function AppPage() {
               />
             </div>
           )}
+          {tab === 'analiz' && currentProfile?.role === 'admin' && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <AnalizView />
+            </div>
+          )}
           {tab === 'adet-prim' && currentProfile?.role === 'admin' && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
               <AdetPrimTablosu />
@@ -1832,7 +1850,7 @@ export default function AppPage() {
       )}
 
       {/* FAB — sadece admin takvim sekmelerinde görünür */}
-      {currentProfile?.role === 'admin' && tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'bsy-takip' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && (
+      {currentProfile?.role === 'admin' && tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'bsy-takip' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && (
         <button
           onClick={handleAddTask}
           className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
