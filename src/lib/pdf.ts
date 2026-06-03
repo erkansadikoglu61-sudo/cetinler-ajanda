@@ -187,12 +187,11 @@ export function generateAdetPrimPdf(rows: AdetPrimRow[], yil: number, ay: number
   // ── Tablo ───────────────────────────────────────────────────
   autoTable(doc, {
     startY: 24,
-    head: [['#', 'Stok Kodu', 'Bayi Merch (₺)', 'Koşullu Destek (₺)']],
+    head: [['#', 'Stok Kodu', 'Bayi Merch (₺)']],
     body: rows.map((r, i) => [
       i + 1,
       r.stokKodu,
       r.bayiMerch != null ? r.bayiMerch.toLocaleString('tr-TR') + ' ₺' : '—',
-      r.kosulluDestek != null ? r.kosulluDestek.toLocaleString('tr-TR') + ' ₺' : '—',
     ]),
     headStyles: {
       fillColor: [40, 40, 55],
@@ -205,9 +204,8 @@ export function generateAdetPrimPdf(rows: AdetPrimRow[], yil: number, ay: number
     alternateRowStyles: { fillColor: [248, 249, 251] },
     columnStyles: {
       0: { cellWidth: 10, halign: 'center' },
-      1: { cellWidth: 50, fontStyle: 'bold' },
+      1: { cellWidth: 60, fontStyle: 'bold' },
       2: { halign: 'right' },
-      3: { halign: 'right' },
     },
     margin: { left: 14, right: 14 },
     didDrawPage: () => {
