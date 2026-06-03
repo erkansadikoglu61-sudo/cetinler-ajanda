@@ -4,10 +4,12 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { RefreshCw, TrendingUp, AlertTriangle, Zap, Users, BarChart2, ShoppingCart, GitCompare, Clock } from 'lucide-react'
 import clsx from 'clsx'
 import { useSellout } from '@/hooks/useSellout'
+import { BSY_NAME_TO_KOD } from '@/lib/bsy'
+import type { Profile } from '@/lib/supabase'
 
 // ─── Sabitler ─────────────────────────────────────────────────
 const ANALIZ_YIL = 2026
-const REFRESH_MS = 5 * 60 * 1000   // 5 dakikada bir otomatik yenile
+const REFRESH_MS = 60 * 60 * 1000  // 1 saatte bir otomatik yenile
 
 const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
                    'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
@@ -110,7 +112,14 @@ function StatusBadge({ oran }: { oran: number }) {
 const marka = (k: string) => k === 'EKEA' ? 'ELX' : k === 'RELUX' ? 'RLX' : k
 
 // ─── Ana bileşen ──────────────────────────────────────────────
-export function AnalizView() {
+export function AnalizView({ currentProfile, active }: { currentProfile: Profile; active: boolean }) {
+  const isAdmin = currentProfile.role === 'admin'
+  const isBsy   = currentProfile.role === 'bsy'
+  // BSY kodu — BSY kullanıcısı sadece kendi portföyünü görür
+  const bsyKod  = isBsy
+    ? (BSY_NAME_TO_KOD[currentProfile.full_name.toLocaleLowerCase('tr')] ?? '')
+    : ''
+
   const [sellinRows, setSellinRows] = useState<SellinRow[]>([])
   const [loading,    setLoading]    = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
@@ -126,28 +135,41 @@ export function AnalizView() {
     } finally { setLoading(false) }
   }, [])
 
-  // İlk yükleme + otomatik yenileme
+  // İlk yükleme + 1 saatlik otomatik yenileme + sekme değişince yenile
   useEffect(() => {
+    if (!active) return
     loadSellin()
     timerRef.current = setInterval(loadSellin, REFRESH_MS)
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [loadSellin])
+  }, [active, loadSellin])
 
-  const { rows: selloutRows, loading: soLoading, reload: reloadSo } = useSellout(true)
+  // Tarayıcı sekmesi / penceresi geri odaklanınca yenile
+  useEffect(() => {
+    if (!active) return
+    const onVisible = () => { if (document.visibilityState === 'visible') loadSellin() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [active, loadSellin])
 
-  // ── Sadece 2026 verisi ────────────────────────────────────
+  const { rows: selloutRows, loading: soLoading, reload: reloadSo } = useSellout(active)
+
+  // ── Sadece 2026 + BSY kısıtı ─────────────────────────────
   const filtSellin = useMemo(() =>
-    sellinRows.filter(r =>
-      r.yil === ANALIZ_YIL &&
-      (r.kategori === 'EKEA' || r.kategori === 'RELUX')
-    ), [sellinRows])
+    sellinRows.filter(r => {
+      if (r.yil !== ANALIZ_YIL) return false
+      if (r.kategori !== 'EKEA' && r.kategori !== 'RELUX') return false
+      if (isBsy && bsyKod && r.bsyKod !== bsyKod) return false
+      return true
+    }), [sellinRows, isBsy, bsyKod])
 
   const filtSellout = useMemo(() =>
     selloutRows.filter(r => {
       if (!r.donem.startsWith(String(ANALIZ_YIL))) return false
       const gk = r.grup_kodu.toUpperCase()
-      return gk === 'EKEA' || gk === 'RELUX'
-    }), [selloutRows])
+      if (gk !== 'EKEA' && gk !== 'RELUX') return false
+      if (isBsy && bsyKod && r.bsy !== bsyKod) return false
+      return true
+    }), [selloutRows, isBsy, bsyKod])
 
   // ── Cari × Stok master harita ─────────────────────────────
   const cariStokMap: CariStokEntry[] = useMemo(() => {
@@ -361,6 +383,11 @@ export function AnalizView() {
         <BarChart2 size={14} className="text-brand-600" />
         <span className="text-xs font-bold text-gray-700">Satış Analizi</span>
         <span className="text-[10px] bg-brand-100 text-brand-700 rounded-full px-2 py-0.5 font-semibold">{ANALIZ_YIL}</span>
+        {isBsy && (
+          <span className="text-[10px] bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
+            {currentProfile.full_name} portföyü
+          </span>
+        )}
 
         <button onClick={() => { loadSellin(); reloadSo() }} disabled={isLoadingAny}
           className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-50" title="Şimdi yenile">
@@ -730,8 +757,8 @@ export function AnalizView() {
             </div>
           </Section>
 
-          {/* ── A6 (BSY): Portföy ────────────────────── */}
-          <Section icon={<TrendingUp size={14} />}
+          {/* ── A6 (BSY): Portföy — sadece admin ─────── */}
+          {isAdmin && <Section icon={<TrendingUp size={14} />}
             title="BSY Portföy Performansı"
             subtitle="BSY bazında müşteri sellout sağlığı — hangi BSY'nin portföyü daha hızlı satıyor?"
             color="gray">
@@ -760,7 +787,7 @@ export function AnalizView() {
                 </div>
               ))}
             </div>
-          </Section>
+          </Section>}
 
         </div>
       )}

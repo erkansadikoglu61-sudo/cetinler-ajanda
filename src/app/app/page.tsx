@@ -1619,8 +1619,8 @@ export default function AppPage() {
                 <Store size={15} /> Noktalarımız
               </button>
 
-              {/* Satış Analizi (sadece admin) */}
-              {currentProfile?.role === 'admin' && (
+              {/* Satış Analizi — admin + BSY */}
+              {isBsyOrAdmin && (
                 <button
                   onClick={() => setTab('analiz')}
                   className={clsx(
@@ -1831,9 +1831,9 @@ export default function AppPage() {
               />
             </div>
           )}
-          {tab === 'analiz' && currentProfile?.role === 'admin' && (
+          {tab === 'analiz' && isBsyOrAdmin && currentProfile && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
-              <AnalizView />
+              <AnalizView currentProfile={currentProfile} active={tab === 'analiz'} />
             </div>
           )}
           {tab === 'adet-prim' && currentProfile?.role === 'admin' && (
