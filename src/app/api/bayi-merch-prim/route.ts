@@ -21,7 +21,7 @@ const COL = {
   SUPERVISOR_ADI: 9,
   DONEM:          12,
   MERCH_TIPI:     14,
-}
+} as const
 
 function decodeHtml(s: string): string {
   return s
@@ -49,16 +49,17 @@ export async function GET(req: Request) {
   const ay  = parseInt(sp.get('ay')  ?? String(new Date().getMonth() + 1))
   const donem = `${yil}-${String(ay).padStart(2, '0')}`
 
-  // 1. Fetch prim rates (DB overrides + defaults)
+  const sb = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
+  // 1. Genel prim oranları: defaults → adet_prim_override ile üzerine yaz
   const primMap = new Map<string, number | null>()
   for (const r of ADET_PRIM_DEFAULTS) {
     primMap.set(r.stokKodu, r.bayiMerch)
   }
   try {
-    const sb = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
     const { data } = await sb
       .from('adet_prim_override')
       .select('stok_kodu, bayi_merch')
@@ -70,6 +71,35 @@ export async function GET(req: Request) {
       }
     }
   } catch { /* use defaults */ }
+
+  // 2. Özel prim kuralları (prim_ozel) — cari/şube/stok bazlı overrides
+  interface OzelPrimRow {
+    stok_kodu:      string[] | null
+    grup_kodu:      string[] | null
+    cari_adi:       string[] | null
+    sube_adi:       string[] | null
+    bayi_merch:     number | null
+  }
+  let ozelPrimRows: OzelPrimRow[] = []
+  try {
+    const { data } = await sb
+      .from('prim_ozel')
+      .select('stok_kodu, grup_kodu, cari_adi, sube_adi, bayi_merch')
+      .eq('yil', yil)
+      .eq('ay', ay)
+    if (data) ozelPrimRows = data as OzelPrimRow[]
+  } catch { /* ignore */ }
+
+  /** Bir satır için prim_ozel tablosundan eşleşen bayi_merch oranını bul */
+  function findOzelPrim(stokKodu: string, cariAdi: string, subeAdi: string): number | null | undefined {
+    for (const rule of ozelPrimRows) {
+      const stokOk  = !rule.stok_kodu || rule.stok_kodu.some(s => s.toUpperCase() === stokKodu.toUpperCase())
+      const cariOk  = !rule.cari_adi  || rule.cari_adi.some(c => c === cariAdi)
+      const subeOk  = !rule.sube_adi  || rule.sube_adi.some(s => s === subeAdi)
+      if (stokOk && cariOk && subeOk) return rule.bayi_merch
+    }
+    return undefined   // eşleşme yok → genel primMap kullan
+  }
 
   // 2. Fetch external HTML (cached 15 min at Next.js data cache)
   let html = ''
@@ -110,7 +140,9 @@ export async function GET(req: Request) {
 
     const stokKodu    = cells[COL.STOK_KODU].toUpperCase()
     const satisAdet   = parseFloat(cells[COL.SATILAN_ADET]) || 0
-    const bayiMerchPrim = primMap.get(stokKodu) ?? null
+    // Önce prim_ozel'de eşleşme ara; yoksa genel primMap'e bak
+    const ozelRate    = findOzelPrim(stokKodu, cells[COL.CARI_ISIM], cells[COL.SUBE_ADI])
+    const bayiMerchPrim = ozelRate !== undefined ? ozelRate : (primMap.get(stokKodu) ?? null)
     const prim        = bayiMerchPrim != null ? satisAdet * bayiMerchPrim : 0
 
     const key = `${cells[COL.SUPERVISOR_ADI]}||${cells[COL.CARI_ISIM]}||${cells[COL.SUBE_ADI]}||${cells[COL.MERCH_PERSONEL]}`
