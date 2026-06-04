@@ -682,21 +682,21 @@ function BsyKisiTable({
                 <td className={cellCls + ' text-gray-800'}>{elxGerc !== 0 ? fmtCur(elxGerc) : '—'}</td>
                 <OranCell gerc={elxGerc} hedef={elx.hedefCiro} className={pctCls} />
                 <td className={cellCls + (params !== null && elxPrim > 0 ? ' text-green-600 font-semibold' : ' text-gray-300')}>
-                  {params !== null && elx.hedefCiro > 0 ? fmtCur(elxPrim) : '—'}
+                  {params !== null && elxPrim > 0 ? fmtCur(elxPrim) : '—'}
                 </td>
                 {/* RELUX */}
                 <td className={cellCls + ' text-gray-700'}>{relux.hedefCiro > 0 ? fmtCur(relux.hedefCiro) : '—'}</td>
                 <td className={cellCls + ' text-gray-800'}>{reluxGerc !== 0 ? fmtCur(reluxGerc) : '—'}</td>
                 <OranCell gerc={reluxGerc} hedef={relux.hedefCiro} className={pctCls} />
                 <td className={cellCls + (params !== null && reluxPrim > 0 ? ' text-green-600 font-semibold' : ' text-gray-300')}>
-                  {params !== null && relux.hedefCiro > 0 ? fmtCur(reluxPrim) : '—'}
+                  {params !== null && reluxPrim > 0 ? fmtCur(reluxPrim) : '—'}
                 </td>
                 {/* TOPLAM */}
                 <td className={cellCls + ' font-semibold text-gray-700'}>{topHedef > 0 ? fmtCur(topHedef) : '—'}</td>
                 <td className={cellCls + ' font-semibold text-gray-800'}>{topGerc !== 0 ? fmtCur(topGerc) : '—'}</td>
                 <OranCell gerc={topGerc} hedef={topHedef} className={pctCls + ' font-semibold'} />
                 <td className={cellCls + (topPrim > 0 ? ' text-green-600 font-semibold' : ' text-gray-300')}>
-                  {topHedef > 0 || topPrim > 0 ? fmtCur(topPrim) : '—'}
+                  {topPrim > 0 ? fmtCur(topPrim) : '—'}
                 </td>
               </tr>
             )
