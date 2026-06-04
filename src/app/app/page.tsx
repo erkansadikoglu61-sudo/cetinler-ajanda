@@ -1696,7 +1696,7 @@ export default function AppPage() {
           {isBsyOrAdmin && ['bsy','kpi','genel-raporlar'].includes(tab) && (
             <div className="hidden md:flex items-center gap-1 px-3 pb-1.5">
               {([
-                { key: 'bsy'            as const, icon: Target,   label: 'BSY' },
+                { key: 'bsy'            as const, icon: Target,   label: 'Ciro ve Tahsilat Takip' },
                 { key: 'kpi'            as const, icon: Activity,  label: 'Özel Hedefler' },
                 { key: 'genel-raporlar' as const, icon: BarChart2, label: 'Genel Raporlar' },
               ] as const).map(({ key, icon: Icon, label }) => (
@@ -1878,7 +1878,7 @@ export default function AppPage() {
               { key: 'day'     as const, icon: CalendarDays,  label: 'Gün'    },
               { key: 'report'  as const, icon: FileText,      label: 'Rapor'  },
             ] : []),
-            ...(isBsyOrAdmin ? [{ key: 'bsy'       as const, icon: Target,     label: 'BSY'      }] : []),
+            ...(isBsyOrAdmin ? [{ key: 'bsy'       as const, icon: Target,     label: 'Ciro ve Tahsilat Takip'      }] : []),
             ...(isBsyOrAdmin ? [{ key: 'sellinout'  as const, icon: BarChart2,  label: 'S.In/Out' }] : []),
             { key: 'sellout'      as const, icon: TrendingUp, label: 'Sellout'  },
             ...(isBsyOrAdmin ? [{ key: 'kpi' as const, icon: Activity, label: 'KPI'  }] : []),
