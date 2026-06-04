@@ -1,8 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, Gift, Award, ChevronRight, Users, User } from 'lucide-react'
+import { RefreshCw, Gift, Award, ChevronRight, Users, User, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
+
+const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
+                   'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
 
 // ─── Kampanya Tanımları ───────────────────────────────────────────
 interface Kampanya {
@@ -296,8 +299,17 @@ function KampanyaBlok({ k, rows, loading, onRefresh }: {
 
 // ─── Ana Bileşen ─────────────────────────────────────────────────
 export function KpiView() {
+  const now = new Date()
+  const [yil, setYil] = useState(now.getFullYear())
+  const [ay,  setAy]  = useState(now.getMonth() + 1)
+
   const [rowsMap,    setRowsMap]    = useState<Record<string, BsyKpiRow[]>>({})
   const [loadingSet, setLoadingSet] = useState<Set<string>>(new Set())
+
+  // Seçili ay/yıl aralığında olan kampanyalar
+  const gorunenKampanyalar = KAMPANYALAR.filter(k =>
+    k.yil === yil && k.ayBaslangic <= ay && k.ayBitis >= ay
+  )
 
   const load = useCallback(async (k: Kampanya) => {
     setLoadingSet(prev => new Set(prev).add(k.id))
@@ -313,35 +325,81 @@ export function KpiView() {
     }
   }, [])
 
+  // Görünen kampanyaları yükle
   useEffect(() => {
-    KAMPANYALAR.forEach(k => load(k))
-  }, [load])
+    gorunenKampanyalar.forEach(k => {
+      if (!rowsMap[k.id]) load(k)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yil, ay, load])
 
-  // İkişerli satırlara böl: [k1,k2], [k3,k4], …
+  // Tüm yıl seçenekleri (kampanyalardan topla)
+  const yillar = [...new Set(KAMPANYALAR.map(k => k.yil))].sort()
+
+  // İkişerli satırlara böl
   const satirlar: Kampanya[][] = []
-  for (let i = 0; i < KAMPANYALAR.length; i += 2) {
-    satirlar.push(KAMPANYALAR.slice(i, i + 2))
+  for (let i = 0; i < gorunenKampanyalar.length; i += 2) {
+    satirlar.push(gorunenKampanyalar.slice(i, i + 2))
   }
 
   return (
-    <div className="flex flex-col h-full overflow-auto bg-gray-50">
-      {satirlar.map((satir, si) => (
-        <div
-          key={si}
-          className="grid border-b border-gray-200 divide-x divide-gray-200"
-          style={{ gridTemplateColumns: `repeat(${satir.length}, minmax(0, 1fr))` }}
-        >
-          {satir.map(k => (
-            <KampanyaBlok
-              key={k.id}
-              k={k}
-              rows={rowsMap[k.id] ?? []}
-              loading={loadingSet.has(k.id)}
-              onRefresh={() => load(k)}
-            />
-          ))}
+    <div className="flex flex-col h-full bg-gray-50">
+
+      {/* Filtre çubuğu */}
+      <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-100">
+        <span className="text-xs font-semibold text-gray-600">Özel Hedefler</span>
+
+        {/* Yıl */}
+        <div className="relative">
+          <select value={yil} onChange={e => setYil(Number(e.target.value))}
+            className="appearance-none pl-2 pr-6 py-1 text-xs border border-gray-200 rounded-lg bg-white font-medium text-brand-700 focus:outline-none focus:border-brand-400">
+            {yillar.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <ChevronDown size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
         </div>
-      ))}
+
+        {/* Ay */}
+        <div className="relative">
+          <select value={ay} onChange={e => setAy(Number(e.target.value))}
+            className="appearance-none pl-2 pr-6 py-1 text-xs border border-gray-200 rounded-lg bg-white font-medium text-brand-700 focus:outline-none focus:border-brand-400">
+            {MONTHS_TR.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+          </select>
+          <ChevronDown size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        </div>
+
+        <span className="text-[10px] text-gray-400">
+          {gorunenKampanyalar.length > 0
+            ? `${gorunenKampanyalar.length} kampanya`
+            : 'Bu dönemde kampanya yok'}
+        </span>
+      </div>
+
+      {/* İçerik */}
+      <div className="flex-1 overflow-auto">
+        {gorunenKampanyalar.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-sm text-gray-400">
+            {MONTHS_TR[ay - 1]} {yil} döneminde tanımlı kampanya bulunmuyor.
+          </div>
+        ) : (
+          satirlar.map((satir, si) => (
+            <div
+              key={si}
+              className="grid border-b border-gray-200 divide-x divide-gray-200"
+              style={{ gridTemplateColumns: `repeat(${satir.length}, minmax(0, 1fr))` }}
+            >
+              {satir.map(k => (
+                <KampanyaBlok
+                  key={k.id}
+                  k={k}
+                  rows={rowsMap[k.id] ?? []}
+                  loading={loadingSet.has(k.id)}
+                  onRefresh={() => load(k)}
+                />
+              ))}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   )
 }
