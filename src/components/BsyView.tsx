@@ -43,15 +43,9 @@ function calcTieredPrimBsy(
   const achElx   = hedefElx   > 0 ? (gercElx   / hedefElx)   * 100 : 0
   const achRelux = hedefRelux > 0 ? (gercRelux / hedefRelux) * 100 : 0
 
-  // Baraj kontrolü: her iki markada da minimum eşiği (t1_thr = %80) aşmak zorunlu.
-  // Bir marka başarısız olursa BSY hiç prim alamaz.
-  const elxBaraj   = params[`elx_t1_thr`]   ?? 80
-  const reluxBaraj = params[`relux_t1_thr`] ?? 80
-  if ((hedefElx   > 0 && achElx   < elxBaraj) ||
-      (hedefRelux > 0 && achRelux < reluxBaraj)) {
-    return { elxPrim: 0, reluxPrim: 0, topPrim: 0 }
-  }
-
+  // Her marka bağımsız hesaplanır:
+  // ≥%80 → tier bazlı prim | <%80 → tierRate = 0 → prim = 0
+  // Sonra ① ② ③ sırayla toplama uygulanır.
   function tierRate(achPct: number, prefix: string): number {
     const tiers: [number, number][] = [4,3,2,1].map(i => [
       params[`${prefix}_t${i}_thr`] ?? 0, params[`${prefix}_t${i}_rate`] ?? 0,
@@ -59,24 +53,43 @@ function calcTieredPrimBsy(
     for (const [thr, rate] of tiers) { if (thr>0 && achPct>=thr) return rate }
     return 0
   }
-  let elxPrim   = gercElx   * tierRate(achElx,   'elx')   / 100
-  let reluxPrim = gercRelux * tierRate(achRelux, 'relux') / 100
-  // ① Düşük marka çarpanı
-  const c1 = params['carp1_thr'] ?? 50
-  if ((hedefElx>0 && achElx<c1) || (hedefRelux>0 && achRelux<c1)) {
-    elxPrim *= params['carp1_val'] ?? 0.70
-    reluxPrim *= params['carp1_val'] ?? 0.70
+  // 1. Marka bazında bağımsız prim (≥%80 tier var, <%80 tier=0)
+  const elxPrimBase   = gercElx   * tierRate(achElx,   'elx')   / 100
+  const reluxPrimBase = gercRelux * tierRate(achRelux, 'relux') / 100
+
+  // 2. Toplam hakedilen = iki marka toplamı
+  let toplam = elxPrimBase + reluxPrimBase
+
+  // 3. Çarpanlar sırayla TOPLAMA uygulanır:
+  // ① İki markadan birinde %50 altı → hakedişin %70'i
+  const c1thr = params['carp1_thr'] ?? 50
+  const c1val = params['carp1_val'] ?? 0.70
+  if ((hedefElx>0 && achElx<c1thr) || (hedefRelux>0 && achRelux<c1thr)) {
+    toplam *= c1val
   }
-  // ② Şirket toplam çarpanı
+
+  // ② Şirket toplam gerc. %80 altı → hakedişin yarısı
   const compAch = compHedef>0 ? (compGerc/compHedef)*100 : 0
-  if (compAch < (params['carp2_thr']??80)) {
-    elxPrim *= params['carp2_val'] ?? 0.50
-    reluxPrim *= params['carp2_val'] ?? 0.50
+  const c2thr = params['carp2_thr'] ?? 80
+  const c2val = params['carp2_val'] ?? 0.50
+  if (compAch < c2thr) {
+    toplam *= c2val
   }
-  // ③ Tahsilat çarpanı — sadece toplama uygulanır
-  const topBase = elxPrim + reluxPrim
-  const topPrim = topBase * (tahsilatOran >= (params['carp3_thr']??100) ? (params['carp3_val']??1.50) : 1)
-  return { elxPrim: Math.round(elxPrim), reluxPrim: Math.round(reluxPrim), topPrim: Math.round(topPrim) }
+
+  // ③ Tahsilat ≥%100 → 1,5 ile çarp
+  const c3thr = params['carp3_thr'] ?? 100
+  const c3val = params['carp3_val'] ?? 1.50
+  if (tahsilatOran >= c3thr) {
+    toplam *= c3val
+  }
+
+  // Marka bazındaki görüntü: oransal dağıt (ay≥5 Hakedilen Prim sütunları için)
+  const topBase = elxPrimBase + reluxPrimBase
+  const elxPrim   = topBase > 0 ? Math.round(toplam * elxPrimBase   / topBase) : 0
+  const reluxPrim = topBase > 0 ? Math.round(toplam * reluxPrimBase / topBase) : 0
+  const topPrim   = Math.round(toplam)
+
+  return { elxPrim, reluxPrim, topPrim }
 }
 
 function useBsyParametreler() {
