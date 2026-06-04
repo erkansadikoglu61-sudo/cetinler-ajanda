@@ -1694,7 +1694,7 @@ export default function AppPage() {
           )}
           {/* BSY alt sekmeleri */}
           {isBsyOrAdmin && ['bsy','kpi','genel-raporlar'].includes(tab) && (
-            <div className="hidden md:flex items-center gap-1 px-3 pb-1.5">
+            <div className="flex overflow-x-auto items-center gap-1 px-3 pb-1.5 scrollbar-none">
               {([
                 { key: 'bsy'            as const, icon: Target,   label: 'Ciro ve Tahsilat Takip' },
                 { key: 'kpi'            as const, icon: Activity,  label: 'Özel Hedefler' },
@@ -1713,7 +1713,7 @@ export default function AppPage() {
           )}
           {/* Primler alt sekmeleri (admin) */}
           {(currentProfile?.role === 'admin' || isBsy || isSup) && ['adet-prim','bayi-merch'].includes(tab) && (
-            <div className="hidden md:flex items-center gap-1 px-3 pb-1.5">
+            <div className="flex overflow-x-auto items-center gap-1 px-3 pb-1.5 scrollbar-none">
               {([
                 { key: 'adet-prim' as const,  label: 'Adet Prim Tablosu' },
                 { key: 'bayi-merch' as const,  label: 'Bayi Merch Prim Hakedişleri' },
@@ -1731,7 +1731,7 @@ export default function AppPage() {
           )}
           {/* Noktalarımız alt sekmeleri */}
           {['noktalar','kullanicilar'].includes(tab) && (
-            <div className="hidden md:flex items-center gap-1 px-3 pb-1.5">
+            <div className="flex overflow-x-auto items-center gap-1 px-3 pb-1.5 scrollbar-none">
               {([
                 { key: 'noktalar'     as const, icon: Store, label: 'Noktalarımız' },
                 { key: 'kullanicilar' as const, icon: Users, label: 'Kullanıcılar' },
@@ -1867,46 +1867,48 @@ export default function AppPage() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-20 safe-bottom">
         <div className={clsx(
           'grid h-16',
-          currentProfile?.role === 'jr'   ? 'grid-cols-4'  :
-          isSup                            ? 'grid-cols-5'  :
-          isBsy                            ? 'grid-cols-9'  :
-          currentProfile?.role === 'admin' ? 'grid-cols-13' : 'grid-cols-8'
+          currentProfile?.role === 'admin' ? 'grid-cols-12' :
+          isBsy                            ? 'grid-cols-7'  :
+          isSup                            ? 'grid-cols-4'  :
+                                             'grid-cols-3'
         )}>
           {([
             ...(currentProfile?.role === 'admin' ? [
-              { key: 'month'   as const, icon: Calendar,      label: 'Ay'      },
-              { key: 'week'    as const, icon: CalendarRange,  label: 'Hafta'   },
-              { key: 'day'     as const, icon: CalendarDays,   label: 'Gün'     },
-              { key: 'report'  as const, icon: FileText,       label: 'Rapor'   },
+              { key: 'month'   as const, icon: Calendar,     label: 'Ay'    },
+              { key: 'week'    as const, icon: CalendarRange, label: 'Hafta' },
+              { key: 'day'     as const, icon: CalendarDays,  label: 'Gün'   },
+              { key: 'report'  as const, icon: FileText,      label: 'Rapor' },
             ] : []),
-            ...(isBsyOrAdmin ? [{ key: 'bsy'       as const, icon: Target,    label: 'BSY'     }] : []),
-            ...(isBsyOrAdmin ? [{ key: 'sellinout'  as const, icon: BarChart2, label: 'S.In/Out'}] : []),
+            ...(isBsyOrAdmin ? [{ key: 'bsy'      as const, icon: Target,    label: 'BSY'     }] : []),
+            ...(isBsyOrAdmin ? [{ key: 'sellinout' as const, icon: BarChart2, label: 'S.In/Out'}] : []),
             { key: 'sellout' as const, icon: TrendingUp, label: 'Sellout' },
-            ...(isBsyOrAdmin ? [{ key: 'analiz'    as const, icon: BarChart2, label: 'Analiz'  }] : []),
-            ...(isBsyOrAdmin ? [{ key: 'kpi'       as const, icon: Activity,  label: 'KPI'     }] : []),
+            ...(isBsyOrAdmin ? [{ key: 'analiz'   as const, icon: BarChart2, label: 'Analiz'  }] : []),
+            { key: 'noktalar' as const, icon: Store, label: 'Noktalar' },
             ...((currentProfile?.role === 'admin' || isBsy || isSup)
-              ? [{ key: 'bayi-merch' as const, icon: Activity, label: 'Primler' }] : []),
-            { key: 'noktalar'     as const, icon: Store, label: 'Noktalar'  },
-            { key: 'kullanicilar' as const, icon: Users, label: 'Kullanıcı' },
+              ? [{ key: 'adet-prim' as const, icon: Activity, label: 'Primler' }] : []),
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
               onClick={() => setTab(key)}
               className={clsx(
-                'flex flex-col items-center justify-center gap-0.5 text-xs transition-colors',
-                tab === key ? 'text-brand-500' : 'text-gray-400'
+                'flex flex-col items-center justify-center gap-0.5 transition-colors',
+                (tab === key ||
+                  (key === 'bsy' && ['bsy','kpi','genel-raporlar'].includes(tab)) ||
+                  (key === 'noktalar' && tab === 'kullanicilar') ||
+                  (key === 'adet-prim' && tab === 'bayi-merch'))
+                  ? 'text-brand-500' : 'text-gray-400'
               )}
             >
-              <Icon size={20} />
-              <span className="text-[10px]">{label}</span>
+              <Icon size={19} />
+              <span className="text-[9px] leading-tight">{label}</span>
             </button>
           ))}
           <button
             onClick={async () => { await signOut(); router.replace('/login') }}
-            className="flex flex-col items-center justify-center gap-0.5 text-xs text-gray-400"
+            className="flex flex-col items-center justify-center gap-0.5 text-gray-400"
           >
-            <LogOut size={20} />
-            <span className="text-[10px]">Çıkış</span>
+            <LogOut size={19} />
+            <span className="text-[9px] leading-tight">Çıkış</span>
           </button>
         </div>
       </div>
