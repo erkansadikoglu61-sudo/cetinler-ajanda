@@ -1675,7 +1675,7 @@ export default function AppPage() {
           {/* Alt sekmeler satırı (gruplu sekmelerde gösterilir) */}
           {/* Takvim alt sekmeleri */}
           {currentProfile?.role === 'admin' && ['month','week','day'].includes(tab) && (
-            <div className="hidden md:flex items-center gap-1 px-3 pb-1.5">
+            <div className="flex overflow-x-auto items-center gap-1 px-3 pb-1.5 scrollbar-none">
               {([
                 { key: 'month' as const, icon: Calendar,     label: 'Ay' },
                 { key: 'week'  as const, icon: CalendarRange, label: 'Hafta' },
@@ -1867,17 +1867,15 @@ export default function AppPage() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-20 safe-bottom">
         <div className={clsx(
           'grid h-16',
-          currentProfile?.role === 'admin' ? 'grid-cols-12' :
+          currentProfile?.role === 'admin' ? 'grid-cols-9' :
           isBsy                            ? 'grid-cols-7'  :
           isSup                            ? 'grid-cols-4'  :
                                              'grid-cols-3'
         )}>
           {([
             ...(currentProfile?.role === 'admin' ? [
-              { key: 'month'   as const, icon: Calendar,     label: 'Ay'    },
-              { key: 'week'    as const, icon: CalendarRange, label: 'Hafta' },
-              { key: 'day'     as const, icon: CalendarDays,  label: 'Gün'   },
-              { key: 'report'  as const, icon: FileText,      label: 'Rapor' },
+              { key: 'month'  as const, icon: Calendar, label: 'Takvim' },
+              { key: 'report' as const, icon: FileText,  label: 'Rapor'  },
             ] : []),
             ...(isBsyOrAdmin ? [{ key: 'bsy'      as const, icon: Target,    label: 'BSY'     }] : []),
             ...(isBsyOrAdmin ? [{ key: 'sellinout' as const, icon: BarChart2, label: 'S.In/Out'}] : []),
@@ -1889,10 +1887,11 @@ export default function AppPage() {
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
-              onClick={() => setTab(key)}
+              onClick={() => key === 'month' ? (!['month','week','day'].includes(tab) && setTab('month')) : setTab(key)}
               className={clsx(
                 'flex flex-col items-center justify-center gap-0.5 transition-colors',
                 (tab === key ||
+                  (key === 'month' && ['month','week','day'].includes(tab)) ||
                   (key === 'bsy' && ['bsy','kpi','genel-raporlar'].includes(tab)) ||
                   (key === 'noktalar' && tab === 'kullanicilar') ||
                   (key === 'adet-prim' && tab === 'bayi-merch'))
