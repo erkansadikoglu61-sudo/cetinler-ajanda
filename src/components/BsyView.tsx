@@ -522,28 +522,6 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
 
   const isYeniLayout = ay >= 5
 
-  // ── BSY Rapor verileri (IPL + RMS9200) ────────────────────────
-  interface RaporRow { bsyAdi: string; ay: number; adet: number }
-  const [iplRows,    setIplRows]    = useState<RaporRow[]>([])
-  const [rmsRows,    setRmsRows]    = useState<RaporRow[]>([])
-  const [iplAylar,   setIplAylar]   = useState<number[]>([])
-  const [rmsAylar,   setRmsAylar]   = useState<number[]>([])
-  const [raporLoading, setRaporLoading] = useState(false)
-
-  useEffect(() => {
-    setRaporLoading(true)
-    const iplKodlar = 'IPL9650,IPL9750,IPL9850,IPL9950'
-    const rmsKodlar = 'RMS9200P,RMS9200B'
-    Promise.all([
-      fetch(`/api/bsy-rapor?yil=${yil}&stokKodlar=${encodeURIComponent(iplKodlar)}`).then(r => r.json()),
-      fetch(`/api/bsy-rapor?yil=${yil}&stokKodlar=${encodeURIComponent(rmsKodlar)}`).then(r => r.json()),
-    ]).then(([ipl, rms]) => {
-      setIplRows(ipl.rows ?? [])
-      setIplAylar(ipl.aylar ?? [])
-      setRmsRows(rms.rows ?? [])
-      setRmsAylar(rms.aylar ?? [])
-    }).finally(() => setRaporLoading(false))
-  }, [yil])
 
   // ── Tahsilat verileri ──────────────────────────────────────────
   interface TahsilatRow { bsyAdi: string; acikHesap: number; hedef: number; gerceklesen: number; oran: number }
@@ -1096,40 +1074,6 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
             />
           )}
 
-          {/* ══════════════════════════════════════════════════
-               BSY RAPOR — IPL + RMS9200 Aylık Adet Tabloları
-          ══════════════════════════════════════════════════ */}
-          <div className="space-y-4 mt-2">
-            <h2 className="text-sm font-bold text-gray-800 border-b border-gray-200 pb-2">
-              BSY Rapor
-            </h2>
-
-            {raporLoading ? (
-              <div className="flex items-center justify-center py-8 gap-2 text-xs text-gray-400">
-                <RefreshCw size={13} className="animate-spin" /> Yükleniyor…
-              </div>
-            ) : (
-              <>
-                {/* IPL Tablosu */}
-                <BsyRaporTablosu
-                  baslik="IPL Serisi"
-                  altyazi="IPL9650 · IPL9750 · IPL9850 · IPL9950"
-                  rows={iplRows}
-                  aylar={iplAylar}
-                  renkClass="bg-[#0e7490]"
-                />
-
-                {/* RMS9200 Tablosu */}
-                <BsyRaporTablosu
-                  baslik="RMS9200 Serisi"
-                  altyazi="RMS9200P · RMS9200B"
-                  rows={rmsRows}
-                  aylar={rmsAylar}
-                  renkClass="bg-[#7c3aed]"
-                />
-              </>
-            )}
-          </div>
 
         </div>
       )}
