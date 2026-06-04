@@ -1867,23 +1867,27 @@ export default function AppPage() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-20 safe-bottom">
         <div className={clsx(
           'grid h-16',
-          isSupOrJr                        ? 'grid-cols-4'  :
-          isBsy                            ? 'grid-cols-7'  :
-          currentProfile?.role === 'admin' ? 'grid-cols-11' : 'grid-cols-8'
+          currentProfile?.role === 'jr'   ? 'grid-cols-4'  :
+          isSup                            ? 'grid-cols-5'  :
+          isBsy                            ? 'grid-cols-9'  :
+          currentProfile?.role === 'admin' ? 'grid-cols-13' : 'grid-cols-8'
         )}>
           {([
             ...(currentProfile?.role === 'admin' ? [
-              { key: 'month'   as const, icon: Calendar,     label: 'Ay'     },
-              { key: 'week'    as const, icon: CalendarRange, label: 'Hafta'  },
-              { key: 'day'     as const, icon: CalendarDays,  label: 'Gün'    },
-              { key: 'report'  as const, icon: FileText,      label: 'Rapor'  },
+              { key: 'month'   as const, icon: Calendar,      label: 'Ay'      },
+              { key: 'week'    as const, icon: CalendarRange,  label: 'Hafta'   },
+              { key: 'day'     as const, icon: CalendarDays,   label: 'Gün'     },
+              { key: 'report'  as const, icon: FileText,       label: 'Rapor'   },
             ] : []),
-            ...(isBsyOrAdmin ? [{ key: 'bsy'       as const, icon: Target,     label: 'Ciro ve Tahsilat Takip'      }] : []),
-            ...(isBsyOrAdmin ? [{ key: 'sellinout'  as const, icon: BarChart2,  label: 'S.In/Out' }] : []),
-            { key: 'sellout'      as const, icon: TrendingUp, label: 'Sellout'  },
-            ...(isBsyOrAdmin ? [{ key: 'kpi' as const, icon: Activity, label: 'KPI'  }] : []),
-            { key: 'noktalar'     as const, icon: Store,  label: 'Noktalar'  },
-            { key: 'kullanicilar' as const, icon: Users,  label: 'Kullanıcı' },
+            ...(isBsyOrAdmin ? [{ key: 'bsy'       as const, icon: Target,    label: 'BSY'     }] : []),
+            ...(isBsyOrAdmin ? [{ key: 'sellinout'  as const, icon: BarChart2, label: 'S.In/Out'}] : []),
+            { key: 'sellout' as const, icon: TrendingUp, label: 'Sellout' },
+            ...(isBsyOrAdmin ? [{ key: 'analiz'    as const, icon: BarChart2, label: 'Analiz'  }] : []),
+            ...(isBsyOrAdmin ? [{ key: 'kpi'       as const, icon: Activity,  label: 'KPI'     }] : []),
+            ...((currentProfile?.role === 'admin' || isBsy || isSup)
+              ? [{ key: 'bayi-merch' as const, icon: Activity, label: 'Primler' }] : []),
+            { key: 'noktalar'     as const, icon: Store, label: 'Noktalar'  },
+            { key: 'kullanicilar' as const, icon: Users, label: 'Kullanıcı' },
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -1894,7 +1898,7 @@ export default function AppPage() {
               )}
             >
               <Icon size={20} />
-              <span>{label}</span>
+              <span className="text-[10px]">{label}</span>
             </button>
           ))}
           <button
@@ -1902,7 +1906,7 @@ export default function AppPage() {
             className="flex flex-col items-center justify-center gap-0.5 text-xs text-gray-400"
           >
             <LogOut size={20} />
-            <span>Çıkış</span>
+            <span className="text-[10px]">Çıkış</span>
           </button>
         </div>
       </div>
