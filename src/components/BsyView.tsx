@@ -70,10 +70,11 @@ function calcTieredPrimBsy(
 }
 
 function useBsyParametreler() {
-  const [params, setParams] = useState<Params>({ ...DEFAULT_PARAMS })
+  const [params,  setParams]  = useState<Params>({ ...DEFAULT_PARAMS })
+  const [saving,  setSaving]  = useState(false)
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/bsy-parametreler')
+      const res  = await fetch('/api/bsy-parametreler')
       const json = await res.json()
       const map: Params = { ...DEFAULT_PARAMS }
       ;(json.rows ?? []).forEach((r: { key: string; value: number }) => { map[r.key] = r.value })
@@ -81,7 +82,118 @@ function useBsyParametreler() {
     } catch { /* ignore */ }
   }, [])
   useEffect(() => { load() }, [load])
-  return { params }
+  const save = useCallback(async (newParams: Params) => {
+    setSaving(true)
+    try {
+      const rows = Object.entries(newParams).map(([key, value]) => ({ key, label: key, value }))
+      await fetch('/api/bsy-parametreler', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows }),
+      })
+      setParams({ ...DEFAULT_PARAMS, ...newParams })
+    } finally { setSaving(false) }
+  }, [])
+  return { params, saving, save }
+}
+
+// ─── Parametre Giriş Modalı ───────────────────────────────────
+function ParametreGirModal({
+  params, saving, onSave, onClose,
+}: {
+  params: Params; saving: boolean
+  onSave: (p: Params) => Promise<void>; onClose: () => void
+}) {
+  const [vals, setVals] = useState<Params>({ ...params })
+  useEffect(() => { setVals({ ...params }) }, [params])
+  function set(key: string, val: string) { setVals(v => ({ ...v, [key]: parseFloat(val) || 0 })) }
+  const thrCls  = 'w-16 text-right text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:border-brand-400 tabular-nums bg-white'
+  const rateCls = 'w-20 text-right text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:border-brand-400 tabular-nums bg-white'
+  function TierTable({ prefix, headerBg }: { prefix: string; headerBg: string }) {
+    return (
+      <div className="rounded-xl border overflow-hidden" style={{ borderColor: headerBg + '40' }}>
+        <div className="text-white text-xs font-bold px-4 py-2.5 text-center" style={{ backgroundColor: headerBg }}>
+          {prefix === 'elx' ? 'Electrolux' : 'Relux'}
+        </div>
+        <table className="text-xs w-full border-collapse">
+          <thead><tr style={{ backgroundColor: headerBg + '15' }}>
+            <th className="px-3 py-2 text-left font-semibold border-b text-gray-700">Gerçekleşme</th>
+            <th className="px-3 py-2 text-center font-semibold border-b text-gray-700">Prim Oranı (%)</th>
+          </tr></thead>
+          <tbody>
+            {[1,2,3,4].map(i => (
+              <tr key={i} className="border-b border-gray-100 last:border-0">
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-1 text-gray-500">
+                    <span>≥</span>
+                    <input type="number" step="1" min="0" max="999"
+                      value={vals[`${prefix}_t${i}_thr`] ?? ''} onChange={e => set(`${prefix}_t${i}_thr`, e.target.value)} className={thrCls} />
+                    <span>%</span>
+                  </div>
+                </td>
+                <td className="px-3 py-2 text-center">
+                  <input type="number" step="0.01" min="0" max="100"
+                    value={vals[`${prefix}_t${i}_rate`] ?? ''} onChange={e => set(`${prefix}_t${i}_rate`, e.target.value)} className={rateCls} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <h2 className="text-sm font-bold text-gray-800">BSY Parametre Girişi</h2>
+          <div className="flex items-center gap-2">
+            <button onClick={() => onSave(vals)} disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold disabled:opacity-60">
+              {saving ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
+              {saving ? 'Kaydediliyor…' : 'Kaydet'}
+            </button>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={16} /></button>
+          </div>
+        </div>
+        <div className="overflow-auto flex-1 p-5 space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <TierTable prefix="elx"   headerBg="#003087" />
+            <TierTable prefix="relux" headerBg="#6b21a8" />
+          </div>
+          <div className="rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-gray-800 text-white text-xs font-bold px-4 py-2.5">Çarpanlar</div>
+            <div className="divide-y divide-gray-100 text-xs">
+              {[
+                { key: 'carp1', label: 'Markalardan biri', op: '<', suffix: '% ise prim ×', badge: '①', color: 'orange' },
+                { key: 'carp2', label: 'Şirket toplam gerc.', op: '<', suffix: '% ise prim ×', badge: '②', color: 'red' },
+                { key: 'carp3', label: 'Tahsilat gerçekleşmesi ≥', op: '', suffix: '% ise prim ×', badge: '③', color: 'green' },
+              ].map(({ key, label, op, suffix, badge, color }) => (
+                <div key={key} className="px-4 py-3 flex items-center gap-2 text-gray-700 flex-wrap">
+                  <span className={clsx('w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center flex-shrink-0',
+                    color==='orange'?'bg-orange-100 text-orange-700':color==='red'?'bg-red-100 text-red-700':'bg-green-100 text-green-700'
+                  )}>{badge}</span>
+                  <span className="flex-1 min-w-[120px]">{label}</span>
+                  {op && <span className="text-gray-400">{op}</span>}
+                  <input type="number" step="1" min="0" max="999"
+                    value={vals[`${key}_thr`]??''} onChange={e=>set(`${key}_thr`,e.target.value)} className={thrCls} />
+                  <span className="text-gray-400">{suffix}</span>
+                  <input type="number" step="0.01" min="0" max="100"
+                    value={vals[`${key}_val`]??''} onChange={e=>set(`${key}_val`,e.target.value)} className={rateCls} />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-3 text-[10px] text-gray-500 space-y-0.5">
+            <p className="font-semibold text-gray-600 text-xs mb-1">Hesaplama Sırası</p>
+            <p>1. Prim = Gerçekleşen Ciro × Kademeli Prim Oranı</p>
+            <p>2. ① Çarpanı: markalardan biri düşükse tüm prim × çarpan</p>
+            <p>3. ② Çarpanı: şirket toplamı düşükse tüm prim × çarpan</p>
+            <p>4. ③ Çarpanı: tahsilat hedefi aşıldıysa prim × çarpan</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ─── Format yardımcıları ───────────────────────────────────────
@@ -618,7 +730,8 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
   const [showKisiModal,   setShowKisiModal]   = useState(false)
   const [showParamModal,  setShowParamModal]  = useState(false)
 
-  const { params } = useBsyParametreler()
+  const { params, saving: paramSaving, save: saveParams } = useBsyParametreler()
+  const [showParamGirModal, setShowParamGirModal] = useState(false)
   // ay >= 5 → parametrik hesap; ay < 5 → DB manuel prims
   const activeParams = ay >= 5 ? params : null
   const [uploading,       setUploading]       = useState(false)
@@ -845,6 +958,17 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
           </>
         )}
 
+        {/* Parametre Gir — sadece admin */}
+        {isAdmin && (
+          <button
+            onClick={() => setShowParamGirModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold shadow-sm"
+          >
+            <SlidersHorizontal size={12} />
+            Parametre Gir
+          </button>
+        )}
+
         {/* Parametreler — admin ve BSY görebilir */}
         {(isAdmin || isBsy) && (
           <button
@@ -959,6 +1083,14 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
       )}
 
       {/* ── Parametreler Modalı ─────────────────────────────────── */}
+      {showParamGirModal && isAdmin && (
+        <ParametreGirModal
+          params={params}
+          saving={paramSaving}
+          onSave={async p => { await saveParams(p); setShowParamGirModal(false) }}
+          onClose={() => setShowParamGirModal(false)}
+        />
+      )}
       {showParamModal && (
         <ParametrelerModal isAdmin={isAdmin} onClose={() => setShowParamModal(false)} />
       )}
