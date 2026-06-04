@@ -22,7 +22,6 @@ import { generateVisitReport } from '@/lib/pdf'
 import { SelloutView } from '@/components/SelloutView'
 import { BsyView } from '@/components/BsyView'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
-import { BsyTakipView } from '@/components/BsyTakipView'
 import { GenelRaporlarView } from '@/components/GenelRaporlarView'
 import { KpiView } from '@/components/KpiView'
 import { NoktalarimizView } from '@/components/NoktalarimizView'
@@ -30,7 +29,7 @@ import { KullanicilarView } from '@/components/KullanicilarView'
 import { SellinSelloutView } from '@/components/SellinSelloutView'
 import { AdetPrimTablosu, BayiMerchHakdis } from '@/components/AdetPrimView'
 import { AnalizView } from '@/components/AnalizView'
-type TabType = 'month' | 'week' | 'day' | 'report' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'bsy-takip' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'analiz'
+type TabType = 'month' | 'week' | 'day' | 'report' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'analiz'
 
 // Renk hex'ine alpha ekle
 function hexWithAlpha(hex: string, alpha: string) {
@@ -1589,18 +1588,6 @@ export default function AppPage() {
                   <Target size={15} /> BSY
                 </button>
               )}
-              {/* BSY Takip — sadece admin */}
-              {currentProfile?.role === 'admin' && (
-                <button
-                  onClick={() => setTab('bsy-takip')}
-                  className={clsx(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                    tab === 'bsy-takip' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
-                  )}
-                >
-                  <Target size={15} /> BSY Takip
-                </button>
-              )}
               {/* S.In/Out */}
               {isBsyOrAdmin && (
                 <button
@@ -1827,11 +1814,6 @@ export default function AppPage() {
               <GenelRaporlarView />
             </div>
           )}
-          {tab === 'bsy-takip' && currentProfile?.role === 'admin' && (
-            <div className="flex-1 overflow-hidden flex flex-col h-full">
-              <BsyTakipView />
-            </div>
-          )}
           {tab === 'noktalar' && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
               <NoktalarimizView
@@ -1872,7 +1854,7 @@ export default function AppPage() {
       )}
 
       {/* FAB — sadece admin takvim sekmelerinde görünür */}
-      {currentProfile?.role === 'admin' && tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'bsy-takip' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && (
+      {currentProfile?.role === 'admin' && tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && (
         <button
           onClick={handleAddTask}
           className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
