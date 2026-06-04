@@ -496,7 +496,7 @@ function BsyKisiTable({
 }
 
 // ─── BsyView Bileşeni ─────────────────────────────────────────
-export function BsyView({ isAdmin = false, isBsy = false }: { isAdmin?: boolean; isBsy?: boolean }) {
+export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdmin?: boolean; isBsy?: boolean; bsyAdi?: string }) {
   const now = new Date()
   const [yil, setYil] = useState(now.getFullYear())
   const [ay,  setAy]  = useState(now.getMonth() + 1)
@@ -547,16 +547,23 @@ export function BsyView({ isAdmin = false, isBsy = false }: { isAdmin?: boolean;
 
   // ── Tahsilat verileri ──────────────────────────────────────────
   interface TahsilatRow { bsyAdi: string; acikHesap: number; hedef: number; gerceklesen: number; oran: number }
+  interface TahsilatDetayRow { bsyAdi: string; cariIsim: string; ay: number; tur: string; acikHesap: number; gerceklesen: number }
   const [tahsilatRows,    setTahsilatRows]    = useState<TahsilatRow[]>([])
+  const [tahsilatDetay,   setTahsilatDetay]   = useState<TahsilatDetayRow[]>([])
   const [tahsilatLoading, setTahsilatLoading] = useState(false)
 
   useEffect(() => {
     setTahsilatLoading(true)
     fetch(`/api/tahsilat?yil=${yil}&ay=${ay}`)
       .then(r => r.json())
-      .then(d => setTahsilatRows(d.rows ?? []))
+      .then(d => {
+        const allRows: TahsilatRow[] = d.rows ?? []
+        // BSY kullanıcısı sadece kendini görür
+        setTahsilatRows(isBsy && bsyAdi ? allRows.filter(r => r.bsyAdi === bsyAdi) : allRows)
+        setTahsilatDetay(d.detay ?? [])
+      })
       .finally(() => setTahsilatLoading(false))
-  }, [yil, ay])
+  }, [yil, ay, isBsy, bsyAdi])
 
   async function handleExcelUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -1077,6 +1084,18 @@ export function BsyView({ isAdmin = false, isBsy = false }: { isAdmin?: boolean;
             loading={tahsilatLoading}
           />
 
+          {/* ── Tahsilat Detayı ───────────────────────────── */}
+          {!tahsilatLoading && tahsilatDetay.length > 0 && (
+            <TahsilatDetayTablosu
+              detay={isBsy && bsyAdi
+                ? tahsilatDetay.filter(r => r.bsyAdi === bsyAdi)
+                : tahsilatDetay}
+              ay={ay}
+              yil={yil}
+              tekBsy={isBsy}
+            />
+          )}
+
           {/* ══════════════════════════════════════════════════
                BSY RAPOR — IPL + RMS9200 Aylık Adet Tabloları
           ══════════════════════════════════════════════════ */}
@@ -1258,6 +1277,77 @@ function TahsilatTablosu({
             </tfoot>
           </table>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Tahsilat Detay Tablosu ───────────────────────────────────
+interface DetayRow { bsyAdi: string; cariIsim: string; ay: number; tur: string; acikHesap: number; gerceklesen: number }
+
+function TahsilatDetayTablosu({
+  detay, ay, yil, tekBsy,
+}: {
+  detay:   DetayRow[]
+  ay:      number
+  yil:     number
+  tekBsy:  boolean   // BSY kullanıcısı → BSY sütunu gösterme
+}) {
+  const toplamGerc = detay.reduce((s, r) => s + r.gerceklesen, 0)
+  const toplamAcik = detay.reduce((s, r) => s + r.acikHesap,   0)
+
+  return (
+    <div className="space-y-0">
+      <div className="flex items-baseline gap-2 px-3 py-2 rounded-t-xl text-white text-xs font-bold bg-[#7c3aed]">
+        Tahsilat Detayı
+        <span className="font-normal opacity-80 text-[10px]">
+          {MONTHS_TR[ay - 1]} {yil} · Cari & Tahsilat Tipi Bazında
+        </span>
+      </div>
+      <div className="border border-t-0 border-gray-200 rounded-b-xl overflow-x-auto">
+        <table className="text-xs border-collapse w-full">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              {!tekBsy && <th className="text-left px-3 py-2 font-semibold text-gray-600 whitespace-nowrap">BSY</th>}
+              <th className="text-left px-3 py-2 font-semibold text-gray-600">Cari İsim</th>
+              <th className="text-right px-3 py-2 font-semibold text-gray-500 min-w-[120px]">Açık Hesap</th>
+              <th className="text-right px-3 py-2 font-semibold text-gray-500 min-w-[120px]">Gerçekleşen</th>
+              <th className="text-left px-3 py-2 font-semibold text-gray-500 min-w-[120px]">Tahsilat Tipi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {detay.map((r, i) => (
+              <tr key={i} className={clsx('border-b border-gray-50 last:border-0', i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40')}>
+                {!tekBsy && (
+                  <td className="px-3 py-2 text-gray-500 whitespace-nowrap text-[11px]">{r.bsyAdi}</td>
+                )}
+                <td className="px-3 py-2 font-medium text-gray-800">{r.cariIsim}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-gray-600">
+                  {r.acikHesap > 0 ? fmtCur(r.acikHesap) : '—'}
+                </td>
+                <td className={clsx('px-3 py-2 text-right tabular-nums font-semibold',
+                  r.gerceklesen > 0 ? 'text-green-700' : 'text-gray-300')}>
+                  {r.gerceklesen > 0 ? fmtCur(r.gerceklesen) : '—'}
+                </td>
+                <td className="px-3 py-2 text-gray-600">
+                  {r.tur ? (
+                    <span className="text-[10px] bg-violet-50 text-violet-700 rounded px-1.5 py-0.5 font-medium">
+                      {r.tur}
+                    </span>
+                  ) : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="bg-[#7c3aed] text-white text-[10px] font-semibold">
+              <td className="px-3 py-2" colSpan={tekBsy ? 1 : 2}>Toplam</td>
+              <td className="px-3 py-2 text-right tabular-nums">{fmtCur(toplamAcik)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{fmtCur(toplamGerc)}</td>
+              <td className="px-3 py-2" />
+            </tr>
+          </tfoot>
+        </table>
       </div>
     </div>
   )

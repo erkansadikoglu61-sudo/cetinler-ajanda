@@ -1805,7 +1805,11 @@ export default function AppPage() {
           )}
           {tab === 'bsy' && isBsyOrAdmin && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
-              <BsyView isAdmin={currentProfile?.role === 'admin'} isBsy={isBsy} />
+              <BsyView
+                isAdmin={currentProfile?.role === 'admin'}
+                isBsy={isBsy}
+                bsyAdi={isBsy ? (currentProfile?.full_name ?? '') : ''}
+              />
             </div>
           )}
           {tab === 'sellinout' && isBsyOrAdmin && (

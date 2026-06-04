@@ -33,14 +33,25 @@ function toNum(v: unknown): number {
 
 export interface TahsilatRow {
   bsyAdi:       string
-  acikHesap:    number   // Toplam (önceki ay açık hesap)
-  hedef:        number   // acikHesap * 0.90
+  acikHesap:    number
+  hedef:        number
   gerceklesen:  number
-  oran:         number   // gerceklesen / hedef * 100
+  oran:         number
+}
+
+// Cari bazında ay+tip detay satırı
+export interface TahsilatDetayRow {
+  bsyAdi:      string
+  cariIsim:    string
+  ay:          number
+  tur:         string   // tahsilat tipi (ör: NORMAL, İCRA, vb.)
+  acikHesap:   number   // cari bazında açık hesap (hedef datası'ndan)
+  gerceklesen: number
 }
 
 export interface TahsilatResponse {
-  rows: TahsilatRow[]
+  rows:  TahsilatRow[]
+  detay: TahsilatDetayRow[]
 }
 
 export async function GET(req: Request) {
@@ -49,7 +60,7 @@ export async function GET(req: Request) {
   const ay  = sp.get('ay')  ? parseInt(sp.get('ay')!)  : new Date().getMonth() + 1
 
   const buf = await getExcelBuffer()
-  if (!buf) return NextResponse.json<TahsilatResponse>({ rows: [] })
+  if (!buf) return NextResponse.json<TahsilatResponse>({ rows: [], detay: [] })
 
   const wb = XLSX.read(buf, { type: 'buffer', dense: true })
 
@@ -61,32 +72,36 @@ export async function GET(req: Request) {
     ? XLSX.utils.sheet_to_json(hedefSheet, { header: 1, defval: null })
     : []
 
-  // Dinamik olarak "Ay" sütun indeksini bul (başlık satırında arar)
+  // "Ay" sütun indeksini bul
   let hedefAyCol = -1
   if (hedefRaw.length > 0) {
     const header = hedefRaw[0] as unknown[]
     for (let c = 0; c < header.length; c++) {
-      if (String(header[c] ?? '').trim().toLowerCase() === 'ay') {
-        hedefAyCol = c
-        break
-      }
+      if (String(header[c] ?? '').trim().toLowerCase() === 'ay') { hedefAyCol = c; break }
     }
   }
 
-  // BSY kodu → açık hesap toplamı (Toplam sütunu, col 7)
+  // BSY kodu → BSY toplam açık hesap
   const acikHesapMap = new Map<string, number>()
+  // (bsyKod + cariIsim) → cari bazında açık hesap (detay için)
+  const cariAcikMap  = new Map<string, number>()   // key: `${bsyKod}||${cariIsim}`
+
   for (let i = 1; i < hedefRaw.length; i++) {
     const r = hedefRaw[i]
     if (!r) continue
-    const bsyKod = String(r[1] ?? '').trim().toUpperCase()
+    const bsyKod   = String(r[1] ?? '').trim().toUpperCase()
+    const cariIsim = String(r[2] ?? '').trim()
     if (!bsyKod) continue
-    // Eğer "Ay" sütunu varsa o aya ait satırları filtrele
     if (hedefAyCol >= 0) {
       const rowAy = typeof r[hedefAyCol] === 'number' ? r[hedefAyCol] : parseInt(String(r[hedefAyCol] ?? '0'))
       if (rowAy !== ay) continue
     }
     const toplam = toNum(r[7])
     acikHesapMap.set(bsyKod, (acikHesapMap.get(bsyKod) ?? 0) + toplam)
+    if (cariIsim) {
+      const ck = `${bsyKod}||${cariIsim}`
+      cariAcikMap.set(ck, (cariAcikMap.get(ck) ?? 0) + toplam)
+    }
   }
 
   // ── 2. Gerçekleşen Tahsilat ─────────────────────────────────────
@@ -97,23 +112,49 @@ export async function GET(req: Request) {
     ? XLSX.utils.sheet_to_json(gercSheet, { header: 1, defval: null })
     : []
 
-  // BSY adı → gerçekleşen tahsilat (filtrelenmiş ay+yıl)
+  // BSY → toplam (özet için)
   const gercMap = new Map<string, number>()
+  // BSY + cariIsim + ay + tur → tutar (detay için)
+  const detayMap = new Map<string, TahsilatDetayRow>()
+
   for (let i = 1; i < gercRaw.length; i++) {
     const r = gercRaw[i]
     if (!r) continue
-    const bsyAdi = String(r[0] ?? '').trim()
-    const rowAy  = typeof r[6] === 'number' ? r[6] : parseInt(String(r[6] ?? '0'))
-    const rowYil = typeof r[7] === 'number' ? r[7] : parseInt(String(r[7] ?? '0'))
-    if (!bsyAdi || rowAy !== ay || rowYil !== yil) continue
+    const bsyAdi   = String(r[0] ?? '').trim()
+    const cariIsim = String(r[2] ?? '').trim()
+    const rowAy    = typeof r[6] === 'number' ? r[6] : parseInt(String(r[6] ?? '0'))
+    const rowYil   = typeof r[7] === 'number' ? r[7] : parseInt(String(r[7] ?? '0'))
+    const tur      = String(r[8] ?? '').trim()
+    if (!bsyAdi || rowYil !== yil) continue
     const tutar = toNum(r[9])
-    gercMap.set(bsyAdi, (gercMap.get(bsyAdi) ?? 0) + tutar)
+
+    // Özet: sadece seçili ay
+    if (rowAy === ay) {
+      gercMap.set(bsyAdi, (gercMap.get(bsyAdi) ?? 0) + tutar)
+    }
+
+    // Detay: seçili ay'ın verileri
+    if (rowAy === ay && cariIsim) {
+      const dk = `${bsyAdi}||${cariIsim}||${rowAy}||${tur}`
+      const cur = detayMap.get(dk) ?? { bsyAdi, cariIsim, ay: rowAy, tur, acikHesap: 0, gerceklesen: 0 }
+      cur.gerceklesen += tutar
+      detayMap.set(dk, cur)
+    }
   }
 
-  // ── 3. Birleştir ────────────────────────────────────────────────
-  const rows: TahsilatRow[] = []
+  // Detay satırlarına cari bazında açık hesap ekle
+  // BSY adını koda çevirip cariAcikMap'ten al
+  const bsyNameToKod = Object.fromEntries(
+    Object.entries(BSY_KOD_TO_NAME).map(([k, v]) => [v.toLocaleLowerCase('tr'), k])
+  )
+  const detayRows: TahsilatDetayRow[] = [...detayMap.values()].map(row => {
+    const kod = bsyNameToKod[row.bsyAdi.toLocaleLowerCase('tr')] ?? ''
+    const ck  = `${kod}||${row.cariIsim}`
+    return { ...row, acikHesap: cariAcikMap.get(ck) ?? 0 }
+  }).sort((a, b) => a.bsyAdi.localeCompare(b.bsyAdi, 'tr') || a.cariIsim.localeCompare(b.cariIsim, 'tr') || a.ay - b.ay)
 
-  // BSY_KOD_TO_NAME içindeki tüm BSY'leri dahil et
+  // ── 3. Özet satırları ────────────────────────────────────────────
+  const rows: TahsilatRow[] = []
   for (const [kod, bsyAdi] of Object.entries(BSY_KOD_TO_NAME)) {
     const acikHesap   = acikHesapMap.get(kod) ?? 0
     const hedef       = acikHesap * 0.9
@@ -121,12 +162,8 @@ export async function GET(req: Request) {
     const oran        = hedef > 0 ? (gerceklesen / hedef) * 100 : 0
     rows.push({ bsyAdi, acikHesap, hedef, gerceklesen, oran })
   }
-
-  // Açık hesabı olmayanları gercekleşeni de yoksa gösterme
   const filtered = rows.filter(r => r.acikHesap > 0 || r.gerceklesen > 0)
-
-  // Gerçekleşen büyükten küçüğe
   filtered.sort((a, b) => b.gerceklesen - a.gerceklesen)
 
-  return NextResponse.json<TahsilatResponse>({ rows: filtered })
+  return NextResponse.json<TahsilatResponse>({ rows: filtered, detay: detayRows })
 }
