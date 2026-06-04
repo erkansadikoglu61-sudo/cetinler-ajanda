@@ -207,108 +207,121 @@ function HedefModal({ yil, ay, initial, saving, onSave, onClose }: HedefModalPro
 function KisiHedefModal({
   yil, ay, bsyAdlar, getKisiHedef, saving, onSave, onClose,
 }: {
-  yil:          number
-  ay:           number
-  bsyAdlar:     string[]
+  yil: number; ay: number; bsyAdlar: string[]
   getKisiHedef: (bsyAdi: string, brand: BrandKey) => { hedefCiro: number; hakedilenPrim: number | null }
-  saving:       boolean
-  onSave:       (
+  saving: boolean
+  onSave: (
     hedefRows: { bsyAdi: string; brand: BrandKey; hedefCiro: number; hakedilenPrim: number | null }[],
     extraRows: { bsyAdi: string; markaCarp: number | null; tahsiatCarp: number | null }[]
   ) => Promise<void>
-  onClose:      () => void
+  onClose: () => void
 }) {
-  const [vals, setVals] = useState<Record<string, { elxHedef: string; reluxHedef: string }>>(() => {
-    const init: Record<string, { elxHedef: string; reluxHedef: string }> = {}
+  const [vals, setVals] = useState<Record<string, { elx: string; relux: string }>>(() => {
+    const init: Record<string, { elx: string; relux: string }> = {}
     bsyAdlar.forEach(bsy => {
-      const elx   = getKisiHedef(bsy, 'ELECTROLUX')
-      const relux = getKisiHedef(bsy, 'RELUX')
+      const e = getKisiHedef(bsy, 'ELECTROLUX')
+      const r = getKisiHedef(bsy, 'RELUX')
       init[bsy] = {
-        elxHedef:   elx.hedefCiro   > 0 ? elx.hedefCiro.toLocaleString('tr-TR')   : '',
-        reluxHedef: relux.hedefCiro > 0 ? relux.hedefCiro.toLocaleString('tr-TR') : '',
+        elx:   e.hedefCiro > 0 ? String(e.hedefCiro) : '',
+        relux: r.hedefCiro > 0 ? String(r.hedefCiro) : '',
       }
     })
     return init
   })
 
-  const set = (bsy: string, field: 'elxHedef' | 'reluxHedef', val: string) =>
-    setVals(v => ({ ...v, [bsy]: { ...v[bsy], [field]: val } }))
+  function handleChange(bsy: string, field: 'elx' | 'relux', raw: string) {
+    const digits = raw.replace(/[^\d]/g, '')
+    setVals(v => ({ ...v, [bsy]: { ...v[bsy], [field]: digits } }))
+  }
+  function display(s: string) { const n = parseInt(s)||0; return n>0 ? n.toLocaleString('tr-TR') : '' }
+  function toNum(s: string) { return parseInt(s) || 0 }
+
+  const totalElx   = bsyAdlar.reduce((s, b) => s + toNum(vals[b]?.elx   ?? ''), 0)
+  const totalRelux = bsyAdlar.reduce((s, b) => s + toNum(vals[b]?.relux ?? ''), 0)
+  const totalAll   = totalElx + totalRelux
+
+  function pct(val: number, tot: number) {
+    return (tot > 0 && val > 0) ? (val/tot*100).toFixed(1) : null
+  }
 
   async function handleSave() {
     const hedefRows = bsyAdlar.flatMap(bsy => [
-      { bsyAdi: bsy, brand: 'ELECTROLUX' as BrandKey, hedefCiro: parseCur(vals[bsy].elxHedef),   hakedilenPrim: null },
-      { bsyAdi: bsy, brand: 'RELUX'       as BrandKey, hedefCiro: parseCur(vals[bsy].reluxHedef), hakedilenPrim: null },
+      { bsyAdi: bsy, brand: 'ELECTROLUX' as BrandKey, hedefCiro: toNum(vals[bsy]?.elx   ?? ''), hakedilenPrim: null },
+      { bsyAdi: bsy, brand: 'RELUX'       as BrandKey, hedefCiro: toNum(vals[bsy]?.relux ?? ''), hakedilenPrim: null },
     ])
     await onSave(hedefRows, [])
     onClose()
   }
 
-  const inputCls = 'w-full text-right border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-brand-400 bg-white'
+  const inputCls = 'w-full text-right border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-brand-400 bg-white tabular-nums'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col">
-
-        {/* Header */}
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <div>
             <p className="text-xs text-gray-400 font-medium">{MONTHS_TR[ay - 1]} {yil}</p>
             <h2 className="text-sm font-bold text-gray-800">BSY Hedef Girişi</h2>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold disabled:opacity-60"
-            >
+            <button onClick={handleSave} disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold disabled:opacity-60">
               {saving ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
               {saving ? 'Kaydediliyor…' : 'Kaydet'}
             </button>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
-              <X size={16} />
-            </button>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={16} /></button>
           </div>
         </div>
-
-        {/* Scrollable table */}
         <div className="overflow-auto flex-1 p-3">
           <table className="text-xs border-collapse w-full">
             <thead>
               <tr className="bg-gray-800 text-white">
-                <th className="border border-gray-600 px-3 py-2 text-left min-w-[155px]">BSY Adı</th>
-                <th className="border border-gray-600 px-3 py-1.5 text-center min-w-[140px]">Electrolux Hedef Ciro</th>
-                <th className="border border-gray-600 px-3 py-1.5 text-center min-w-[140px]">Relux Hedef Ciro</th>
+                <th className="border border-gray-600 px-3 py-2 text-left min-w-[160px]">BSY Adı</th>
+                <th className="border border-gray-600 px-2 py-1.5 text-center min-w-[150px]">Electrolux Hedef Ciro</th>
+                <th className="border border-gray-600 px-2 py-1.5 text-center min-w-[65px]">Elx %</th>
+                <th className="border border-gray-600 px-2 py-1.5 text-center min-w-[150px]">Relux Hedef Ciro</th>
+                <th className="border border-gray-600 px-2 py-1.5 text-center min-w-[65px]">Relux %</th>
               </tr>
             </thead>
             <tbody>
-              {bsyAdlar.map((bsy, i) => (
-                <tr key={bsy} className={clsx('border-b border-gray-100', i % 2 === 1 && 'bg-gray-50/50')}>
-                  <td className="border border-gray-100 px-3 py-1.5 font-medium text-gray-800 whitespace-nowrap">
-                    {bsy}
-                  </td>
-                  <td className="border border-gray-100 p-1">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={vals[bsy].elxHedef}
-                      onChange={e => set(bsy, 'elxHedef', e.target.value)}
-                      placeholder="0"
-                      className={inputCls}
-                    />
-                  </td>
-                  <td className="border border-gray-100 p-1">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={vals[bsy].reluxHedef}
-                      onChange={e => set(bsy, 'reluxHedef', e.target.value)}
-                      placeholder="0"
-                      className={inputCls}
-                    />
-                  </td>
-                </tr>
-              ))}
+              {bsyAdlar.map((bsy, i) => {
+                const ev = toNum(vals[bsy]?.elx ?? ''), rv = toNum(vals[bsy]?.relux ?? '')
+                const ep = pct(ev, totalElx), rp = pct(rv, totalRelux)
+                return (
+                  <tr key={bsy} className={clsx('border-b border-gray-100', i%2===1 && 'bg-gray-50/50')}>
+                    <td className="border border-gray-100 px-3 py-1.5 font-medium text-gray-800 whitespace-nowrap">{bsy}</td>
+                    <td className="border border-gray-100 p-1">
+                      <input type="text" inputMode="numeric" value={display(vals[bsy]?.elx??'')}
+                        onChange={e => handleChange(bsy,'elx',e.target.value)} placeholder="0" className={inputCls} />
+                    </td>
+                    <td className="border border-gray-100 px-2 py-1.5 text-center">
+                      {ep ? <span className={clsx('font-semibold', parseFloat(ep)>=15?'text-blue-600':'text-gray-500')}>%{ep}</span>
+                          : <span className="text-gray-200">—</span>}
+                    </td>
+                    <td className="border border-gray-100 p-1">
+                      <input type="text" inputMode="numeric" value={display(vals[bsy]?.relux??'')}
+                        onChange={e => handleChange(bsy,'relux',e.target.value)} placeholder="0" className={inputCls} />
+                    </td>
+                    <td className="border border-gray-100 px-2 py-1.5 text-center">
+                      {rp ? <span className={clsx('font-semibold', parseFloat(rp)>=15?'text-purple-600':'text-gray-500')}>%{rp}</span>
+                          : <span className="text-gray-200">—</span>}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
+            <tfoot>
+              <tr className="bg-gray-900 text-white font-semibold text-[11px]">
+                <td className="border border-gray-700 px-3 py-2">
+                  Toplam
+                  {totalAll > 0 && <span className="ml-2 text-[10px] text-gray-400 font-normal">{totalAll.toLocaleString('tr-TR')} ₺</span>}
+                </td>
+                <td className="border border-gray-700 px-3 py-2 text-right tabular-nums">{totalElx>0?totalElx.toLocaleString('tr-TR'):'—'}</td>
+                <td className="border border-gray-700 px-3 py-2 text-center text-blue-300">{totalElx>0?'%100':'—'}</td>
+                <td className="border border-gray-700 px-3 py-2 text-right tabular-nums">{totalRelux>0?totalRelux.toLocaleString('tr-TR'):'—'}</td>
+                <td className="border border-gray-700 px-3 py-2 text-center text-purple-300">{totalRelux>0?'%100':'—'}</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>

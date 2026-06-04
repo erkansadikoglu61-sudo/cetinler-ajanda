@@ -395,34 +395,58 @@ function KisiHedefModal({
   ) => Promise<void>
   onClose: () => void
 }) {
-  const [vals, setVals] = useState<Record<string, { elxHedef: string; reluxHedef: string }>>(() => {
-    const init: Record<string, { elxHedef: string; reluxHedef: string }> = {}
+  // Sadece rakamlar sakla ("1750000"), gösterimde bin ayraçlı format
+  const [vals, setVals] = useState<Record<string, { elx: string; relux: string }>>(() => {
+    const init: Record<string, { elx: string; relux: string }> = {}
     bsyAdlar.forEach(bsy => {
-      const elx   = getKisiHedef(bsy, 'ELECTROLUX')
-      const relux = getKisiHedef(bsy, 'RELUX')
+      const e = getKisiHedef(bsy, 'ELECTROLUX')
+      const r = getKisiHedef(bsy, 'RELUX')
       init[bsy] = {
-        elxHedef:   elx.hedefCiro   > 0 ? elx.hedefCiro.toLocaleString('tr-TR')   : '',
-        reluxHedef: relux.hedefCiro > 0 ? relux.hedefCiro.toLocaleString('tr-TR') : '',
+        elx:   e.hedefCiro > 0 ? String(e.hedefCiro)   : '',
+        relux: r.hedefCiro > 0 ? String(r.hedefCiro) : '',
       }
     })
     return init
   })
-  const set = (bsy: string, field: 'elxHedef' | 'reluxHedef', val: string) =>
-    setVals(v => ({ ...v, [bsy]: { ...v[bsy], [field]: val } }))
+
+  // Yalnızca rakamları sakla
+  function handleChange(bsy: string, field: 'elx' | 'relux', raw: string) {
+    const digits = raw.replace(/[^\d]/g, '')
+    setVals(v => ({ ...v, [bsy]: { ...v[bsy], [field]: digits } }))
+  }
+
+  // Görüntüleme: bin ayraçlı
+  function display(s: string): string {
+    const n = parseInt(s) || 0
+    return n > 0 ? n.toLocaleString('tr-TR') : ''
+  }
+  // Sayı değeri
+  function toNum(s: string) { return parseInt(s) || 0 }
+
+  // Alt toplamlar
+  const totalElx   = bsyAdlar.reduce((s, bsy) => s + toNum(vals[bsy]?.elx   ?? ''), 0)
+  const totalRelux = bsyAdlar.reduce((s, bsy) => s + toNum(vals[bsy]?.relux ?? ''), 0)
+  const totalAll   = totalElx + totalRelux
+
+  // Oran hesapla
+  function oran(val: number, total: number) {
+    if (!total || !val) return null
+    return (val / total * 100)
+  }
 
   async function handleSave() {
     const hedefRows = bsyAdlar.flatMap(bsy => [
-      { bsyAdi: bsy, brand: 'ELECTROLUX' as BrandKey, hedefCiro: parseCur(vals[bsy].elxHedef),   hakedilenPrim: null },
-      { bsyAdi: bsy, brand: 'RELUX'       as BrandKey, hedefCiro: parseCur(vals[bsy].reluxHedef), hakedilenPrim: null },
+      { bsyAdi: bsy, brand: 'ELECTROLUX' as BrandKey, hedefCiro: toNum(vals[bsy]?.elx ?? ''),   hakedilenPrim: null },
+      { bsyAdi: bsy, brand: 'RELUX'       as BrandKey, hedefCiro: toNum(vals[bsy]?.relux ?? ''), hakedilenPrim: null },
     ])
     await onSave(hedefRows, []); onClose()
   }
 
-  const inputCls = 'w-full text-right border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-brand-400 bg-white'
+  const inputCls = 'w-full text-right border border-gray-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-brand-400 bg-white tabular-nums'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <div>
             <p className="text-xs text-gray-400 font-medium">{MONTHS_TR[ay - 1]} {yil}</p>
@@ -441,26 +465,81 @@ function KisiHedefModal({
           <table className="text-xs border-collapse w-full">
             <thead>
               <tr className="bg-gray-800 text-white">
-                <th className="border border-gray-600 px-3 py-2 text-left min-w-[155px]">BSY Adı</th>
-                <th className="border border-gray-600 px-3 py-1.5 text-center min-w-[140px]">Electrolux Hedef Ciro</th>
-                <th className="border border-gray-600 px-3 py-1.5 text-center min-w-[140px]">Relux Hedef Ciro</th>
+                <th className="border border-gray-600 px-3 py-2 text-left min-w-[160px]">BSY Adı</th>
+                {/* Electrolux grubu */}
+                <th className="border border-gray-600 px-2 py-1.5 text-center min-w-[150px]">Electrolux Hedef Ciro</th>
+                <th className="border border-gray-600 px-2 py-1.5 text-center min-w-[70px]" title="Toplam Elx hedefindeki payı">Elx %</th>
+                {/* Relux grubu */}
+                <th className="border border-gray-600 px-2 py-1.5 text-center min-w-[150px]">Relux Hedef Ciro</th>
+                <th className="border border-gray-600 px-2 py-1.5 text-center min-w-[70px]" title="Toplam Relux hedefindeki payı">Relux %</th>
               </tr>
             </thead>
             <tbody>
-              {bsyAdlar.map((bsy, i) => (
-                <tr key={bsy} className={clsx('border-b border-gray-100', i % 2 === 1 && 'bg-gray-50/50')}>
-                  <td className="border border-gray-100 px-3 py-1.5 font-medium text-gray-800 whitespace-nowrap">{bsy}</td>
-                  <td className="border border-gray-100 p-1">
-                    <input type="text" inputMode="decimal" value={vals[bsy]?.elxHedef ?? ''}
-                      onChange={e => set(bsy, 'elxHedef', e.target.value)} placeholder="0" className={inputCls} />
-                  </td>
-                  <td className="border border-gray-100 p-1">
-                    <input type="text" inputMode="decimal" value={vals[bsy]?.reluxHedef ?? ''}
-                      onChange={e => set(bsy, 'reluxHedef', e.target.value)} placeholder="0" className={inputCls} />
-                  </td>
-                </tr>
-              ))}
+              {bsyAdlar.map((bsy, i) => {
+                const elxVal   = toNum(vals[bsy]?.elx   ?? '')
+                const reluxVal = toNum(vals[bsy]?.relux ?? '')
+                const elxPct   = oran(elxVal,   totalElx)
+                const reluxPct = oran(reluxVal, totalRelux)
+                return (
+                  <tr key={bsy} className={clsx('border-b border-gray-100', i % 2 === 1 && 'bg-gray-50/50')}>
+                    <td className="border border-gray-100 px-3 py-1.5 font-medium text-gray-800 whitespace-nowrap">{bsy}</td>
+                    {/* Electrolux */}
+                    <td className="border border-gray-100 p-1">
+                      <input type="text" inputMode="numeric"
+                        value={display(vals[bsy]?.elx ?? '')}
+                        onChange={e => handleChange(bsy, 'elx', e.target.value)}
+                        placeholder="0" className={inputCls} />
+                    </td>
+                    <td className="border border-gray-100 px-2 py-1.5 text-center tabular-nums">
+                      {elxPct != null
+                        ? <span className={clsx('font-semibold', elxPct >= 15 ? 'text-blue-600' : 'text-gray-500')}>
+                            %{elxPct.toFixed(1)}
+                          </span>
+                        : <span className="text-gray-200">—</span>}
+                    </td>
+                    {/* Relux */}
+                    <td className="border border-gray-100 p-1">
+                      <input type="text" inputMode="numeric"
+                        value={display(vals[bsy]?.relux ?? '')}
+                        onChange={e => handleChange(bsy, 'relux', e.target.value)}
+                        placeholder="0" className={inputCls} />
+                    </td>
+                    <td className="border border-gray-100 px-2 py-1.5 text-center tabular-nums">
+                      {reluxPct != null
+                        ? <span className={clsx('font-semibold', reluxPct >= 15 ? 'text-purple-600' : 'text-gray-500')}>
+                            %{reluxPct.toFixed(1)}
+                          </span>
+                        : <span className="text-gray-200">—</span>}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
+            {/* Alt toplam */}
+            <tfoot>
+              <tr className="bg-gray-900 text-white font-semibold text-[11px]">
+                <td className="border border-gray-700 px-3 py-2">
+                  Toplam
+                  {totalAll > 0 && (
+                    <span className="ml-2 text-[10px] font-normal text-gray-400">
+                      {totalAll.toLocaleString('tr-TR')} ₺
+                    </span>
+                  )}
+                </td>
+                <td className="border border-gray-700 px-3 py-2 text-right tabular-nums">
+                  {totalElx > 0 ? totalElx.toLocaleString('tr-TR') : '—'}
+                </td>
+                <td className="border border-gray-700 px-3 py-2 text-center text-blue-300">
+                  {totalElx > 0 ? '%100' : '—'}
+                </td>
+                <td className="border border-gray-700 px-3 py-2 text-right tabular-nums">
+                  {totalRelux > 0 ? totalRelux.toLocaleString('tr-TR') : '—'}
+                </td>
+                <td className="border border-gray-700 px-3 py-2 text-center text-purple-300">
+                  {totalRelux > 0 ? '%100' : '—'}
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
