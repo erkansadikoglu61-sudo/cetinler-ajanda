@@ -42,6 +42,16 @@ function calcTieredPrimBsy(
   if (excluded) return { elxPrim: 0, reluxPrim: 0, topPrim: 0 }
   const achElx   = hedefElx   > 0 ? (gercElx   / hedefElx)   * 100 : 0
   const achRelux = hedefRelux > 0 ? (gercRelux / hedefRelux) * 100 : 0
+
+  // Baraj kontrolü: her iki markada da minimum eşiği (t1_thr = %80) aşmak zorunlu.
+  // Bir marka başarısız olursa BSY hiç prim alamaz.
+  const elxBaraj   = params[`elx_t1_thr`]   ?? 80
+  const reluxBaraj = params[`relux_t1_thr`] ?? 80
+  if ((hedefElx   > 0 && achElx   < elxBaraj) ||
+      (hedefRelux > 0 && achRelux < reluxBaraj)) {
+    return { elxPrim: 0, reluxPrim: 0, topPrim: 0 }
+  }
+
   function tierRate(achPct: number, prefix: string): number {
     const tiers: [number, number][] = [4,3,2,1].map(i => [
       params[`${prefix}_t${i}_thr`] ?? 0, params[`${prefix}_t${i}_rate`] ?? 0,
