@@ -647,15 +647,35 @@ function BsyKisiTable({
             const topGerc   = elxGerc + reluxGerc
             const { elxPrim, reluxPrim, topPrim } = getPrims(row)
             const excluded  = isExcluded(row.bsyAdi)
+            const tahsilOran = getTahsilatOran(row.bsyAdi)
+
+            // Çarpan göstergeleri — sadece parametrik hesap aktifken (params !== null)
+            const c1thr = params?.['carp1_thr'] ?? 50
+            const achElxPct   = elx.hedefCiro   > 0 ? (elxGerc   / elx.hedefCiro)   * 100 : -1
+            const achReluxPct = relux.hedefCiro > 0 ? (reluxGerc / relux.hedefCiro) * 100 : -1
+            const carp1Active = !excluded && params !== null && (
+              (achElxPct >= 0 && achElxPct < c1thr) || (achReluxPct >= 0 && achReluxPct < c1thr)
+            )
+            const compAchPct = compHedef > 0 ? (compGerc / compHedef) * 100 : 0
+            const carp2Active = !excluded && params !== null && compAchPct < (params['carp2_thr'] ?? 80)
+            const carp3Active = !excluded && params !== null && tahsilOran >= (params['carp3_thr'] ?? 100)
 
             return (
               <tr key={row.bsyAdi} className={clsx(
                 'border-b border-gray-100 hover:bg-blue-50/20',
                 idx % 2 === 1 && 'bg-gray-50/40'
               )}>
-                <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-4 py-2 font-medium text-gray-800 whitespace-nowrap">
-                  <span className={excluded ? 'italic text-gray-500' : ''}>{row.bsyAdi}</span>
-                  {excluded && <span className="ml-1 text-[9px] bg-gray-200 text-gray-500 rounded px-1">prim yok</span>}
+                <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-3 py-2 font-medium text-gray-800">
+                  <div className="flex flex-col gap-0.5">
+                    <span className={excluded ? 'italic text-gray-500' : ''}>{row.bsyAdi}</span>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {excluded && <span className="text-[9px] bg-gray-200 text-gray-500 rounded px-1 py-0.5">prim yok</span>}
+                      {carp1Active && <span className="text-[9px] bg-orange-100 text-orange-700 rounded px-1 py-0.5 font-semibold">①×{params!['carp1_val'] ?? 0.70}</span>}
+                      {carp2Active && <span className="text-[9px] bg-red-100 text-red-700 rounded px-1 py-0.5 font-semibold">②×{params!['carp2_val'] ?? 0.50}</span>}
+                      {carp3Active && <span className="text-[9px] bg-green-100 text-green-700 rounded px-1 py-0.5 font-semibold">③×{params!['carp3_val'] ?? 1.50}</span>}
+                      {params !== null && tahsilOran > 0 && <span className="text-[9px] text-gray-400">Tah:{Math.round(tahsilOran)}%</span>}
+                    </div>
+                  </div>
                 </td>
                 {/* ELECTROLUX */}
                 <td className={cellCls + ' text-gray-700'}>{elx.hedefCiro > 0 ? fmtCur(elx.hedefCiro) : '—'}</td>
