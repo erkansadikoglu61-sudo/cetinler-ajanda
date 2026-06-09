@@ -1674,7 +1674,7 @@ export default function AppPage() {
 
           {/* Alt sekmeler satırı (gruplu sekmelerde gösterilir) */}
           {/* Takvim alt sekmeleri */}
-          {currentProfile?.role === 'admin' && ['month','week','day'].includes(tab) && (
+          {(currentProfile?.role === 'admin' || currentProfile?.full_name === 'Sinem Bektaş') && ['month','week','day'].includes(tab) && (
             <div className="flex overflow-x-auto items-center gap-1 px-3 pb-1.5 scrollbar-none">
               {([
                 { key: 'month' as const, icon: Calendar,     label: 'Ay' },
