@@ -7,7 +7,8 @@ import { useRouter } from 'next/navigation'
 import {
   Menu, ChevronLeft, ChevronRight, BarChart2, Plus, X, Trash2,
   MapPin, MessageSquare, Calendar, CalendarDays, CalendarRange,
-  FileText, LogOut, Check, TrendingUp, Target, Activity, Store, Users
+  FileText, LogOut, Check, TrendingUp, Target, Activity, Store, Users,
+  Download, FileSpreadsheet
 } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, isToday } from 'date-fns'
 import { tr } from 'date-fns/locale'
@@ -1076,6 +1077,45 @@ function CompletedVisitsView({
       return dateB.getTime() - dateA.getTime()
     })
 
+  const exportToExcel = async () => {
+    const XLSX = await import('xlsx')
+    const data = completedVisits.map(t => ({
+      'Cari / Şube': t.customer || '—',
+      'Ziyaret Tarihi': t.checkin_ts ? format(new Date(t.checkin_ts), 'dd.MM.yyyy HH:mm') : '—',
+      'Ziyaret Nedeni': t.type,
+      'Check-in Adresi': t.checkin_address || '—',
+      'Kişi': profileMap.get(t.pid)?.full_name || '—'
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Gerçekleşen Ziyaretler')
+    XLSX.writeFile(wb, `Gerceklesen_Ziyaretler_${format(new Date(), 'yyyyMMdd')}.xlsx`)
+  }
+
+  const exportToPDF = async () => {
+    const { jsPDF } = await import('jspdf')
+    const autoTable = (await import('jspdf-autotable')).default
+    const doc = new jsPDF()
+
+    doc.text('Gerçekleşen Ziyaretler', 14, 15)
+
+    autoTable(doc, {
+      startY: 25,
+      head: [['Cari / Şube', 'Ziyaret Tarihi', 'Ziyaret Nedeni', 'Check-in Adresi', 'Kişi']],
+      body: completedVisits.map(t => [
+        t.customer || '—',
+        t.checkin_ts ? format(new Date(t.checkin_ts), 'dd.MM.yyyy HH:mm') : '—',
+        t.type,
+        t.checkin_address || '—',
+        profileMap.get(t.pid)?.full_name || '—'
+      ]),
+      styles: { font: 'helvetica', fontSize: 8 },
+      headStyles: { fillColor: [59, 130, 246] }
+    })
+
+    doc.save(`Gerceklesen_Ziyaretler_${format(new Date(), 'yyyyMMdd')}.pdf`)
+  }
+
   if (completedVisits.length === 0) {
     return (
       <div className="flex items-center justify-center py-12 text-sm text-gray-400">
@@ -1085,7 +1125,26 @@ function CompletedVisitsView({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="flex flex-col h-full">
+      {/* Export butonları */}
+      <div className="flex justify-end gap-2 px-4 py-3 border-b bg-gray-50">
+        <button
+          onClick={exportToExcel}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors"
+        >
+          <FileSpreadsheet size={14} />
+          Excel
+        </button>
+        <button
+          onClick={exportToPDF}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors"
+        >
+          <Download size={14} />
+          PDF
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-x-auto">
       <table className="w-full text-sm border-collapse">
         <thead className="bg-gray-50 sticky top-0">
           <tr className="border-b">
@@ -1121,6 +1180,7 @@ function CompletedVisitsView({
           })}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }
