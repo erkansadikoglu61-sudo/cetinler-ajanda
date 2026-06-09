@@ -1095,22 +1095,42 @@ function CompletedVisitsView({
   const exportToPDF = async () => {
     const { jsPDF } = await import('jspdf')
     const autoTable = (await import('jspdf-autotable')).default
-    const doc = new jsPDF()
+    const doc = new jsPDF({
+      orientation: 'landscape'
+    })
 
-    doc.text('Gerçekleşen Ziyaretler', 14, 15)
+    // Türkçe karakterler için Times font kullan
+    doc.setFont('times', 'normal')
+    doc.setFontSize(16)
+    doc.text('Gerceklesen Ziyaretler', 14, 15)
 
     autoTable(doc, {
       startY: 25,
-      head: [['Cari / Şube', 'Ziyaret Tarihi', 'Ziyaret Nedeni', 'Check-in Adresi', 'Kişi']],
+      head: [['Cari / Sube', 'Ziyaret Tarihi', 'Ziyaret Nedeni', 'Check-in Adresi', 'Kisi']],
       body: completedVisits.map(t => [
-        t.customer || '—',
-        t.checkin_ts ? format(new Date(t.checkin_ts), 'dd.MM.yyyy HH:mm') : '—',
+        t.customer || '-',
+        t.checkin_ts ? format(new Date(t.checkin_ts), 'dd.MM.yyyy HH:mm') : '-',
         t.type,
-        t.checkin_address || '—',
-        profileMap.get(t.pid)?.full_name || '—'
+        t.checkin_address || '-',
+        profileMap.get(t.pid)?.full_name || '-'
       ]),
-      styles: { font: 'helvetica', fontSize: 8 },
-      headStyles: { fillColor: [59, 130, 246] }
+      styles: {
+        font: 'times',
+        fontSize: 9,
+        cellPadding: 3
+      },
+      headStyles: {
+        fillColor: [59, 130, 246],
+        fontSize: 10,
+        fontStyle: 'bold'
+      },
+      columnStyles: {
+        0: { cellWidth: 50 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: 80 },
+        4: { cellWidth: 35 }
+      }
     })
 
     doc.save(`Gerceklesen_Ziyaretler_${format(new Date(), 'yyyyMMdd')}.pdf`)
