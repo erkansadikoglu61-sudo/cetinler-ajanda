@@ -87,6 +87,7 @@ function TaskSheet({
   const [deleting, setDeleting] = useState(false)
   const [checkingIn, setCheckingIn] = useState(false)
   const [locationStatus, setLocationStatus] = useState<'idle' | 'no_location' | 'no_address' | 'done'>('idle')
+  const [customerOptions, setCustomerOptions] = useState<string[]>([])
 
   const canEdit = isNew || currentProfile.role === 'admin' || task?.pid === currentProfile.id
   const canAddForOthers = currentProfile.role === 'admin' ||
@@ -96,6 +97,33 @@ function TaskSheet({
   const selectablePids = isNew && canAddForOthers
     ? visibleIds
     : [currentProfile.id]
+
+  // Kullanıcının şubelerini çek
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        const selectedProfile = team.find(p => p.id === pid)
+        if (!selectedProfile) return
+
+        const res = await fetch(`/api/field-personnel-sync?profileId=${pid}`)
+        const data = await res.json()
+
+        if (data.rows) {
+          // Benzersiz "CariAdi / ŞubeAdi" kombinasyonları
+          const options = [...new Set(
+            data.rows.map((r: any) => `${r.cari_isim?.trim() || ''} / ${r.sube_adi?.trim() || ''}`)
+          )].filter(Boolean).sort((a, b) => a.localeCompare(b, 'tr'))
+
+          setCustomerOptions(options)
+        }
+      } catch (err) {
+        console.error('Müşteri listesi yüklenemedi:', err)
+        setCustomerOptions([])
+      }
+    }
+
+    fetchCustomers()
+  }, [pid, team])
 
   const handleSave = async () => {
     setSaving(true)
@@ -228,14 +256,17 @@ function TaskSheet({
           {/* Müşteri */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Müşteri / Şube</label>
-            <input
-              type="text"
+            <select
               value={customer}
               onChange={e => setCustomer(e.target.value)}
               disabled={!canEdit}
-              placeholder="Müşteri veya şube adı"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
-            />
+            >
+              <option value="">Seçiniz...</option>
+              {customerOptions.map((opt, i) => (
+                <option key={i} value={opt}>{opt}</option>
+              ))}
+            </select>
           </div>
 
           {/* Açıklama */}
