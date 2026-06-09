@@ -1853,8 +1853,8 @@ export default function AppPage() {
         </>
       )}
 
-      {/* FAB — sadece admin takvim sekmelerinde görünür */}
-      {currentProfile?.role === 'admin' && tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && (
+      {/* FAB — sadece admin veya Sinem takvim sekmelerinde görünür */}
+      {(currentProfile?.role === 'admin' || currentProfile?.full_name === 'Sinem Bektaş') && tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && (
         <button
           onClick={handleAddTask}
           className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
