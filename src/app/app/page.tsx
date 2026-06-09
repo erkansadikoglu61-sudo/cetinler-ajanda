@@ -109,9 +109,9 @@ function TaskSheet({
           // Benzersiz "CariAdi / ŞubeAdi" kombinasyonları
           const options = [...new Set(
             data.rows.map((r: any) => `${r.cari_isim?.trim() || ''} / ${r.sube_adi?.trim() || ''}`)
-          )].filter(Boolean).sort((a, b) => a.localeCompare(b, 'tr'))
+          )].filter(Boolean).sort((a, b) => (a as string).localeCompare(b as string, 'tr'))
 
-          setCustomerOptions(options)
+          setCustomerOptions(options as string[])
         }
       } catch (err) {
         console.error('Müşteri listesi yüklenemedi:', err)
