@@ -1552,8 +1552,8 @@ export default function AppPage() {
 
             {/* Masaüstü: Gruplu Tab sekmeleri */}
             <div className="hidden md:flex items-center gap-1 mr-2">
-              {/* Takvim grubu (admin) */}
-              {currentProfile?.role === 'admin' && (
+              {/* Takvim grubu (admin veya Sinem) */}
+              {(currentProfile?.role === 'admin' || currentProfile?.full_name === 'Sinem Bektaş') && (
                 <button
                   onClick={() => { if (!['month','week','day'].includes(tab)) setTab('month') }}
                   className={clsx(
