@@ -102,9 +102,6 @@ function TaskSheet({
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const selectedProfile = team.find(p => p.id === pid)
-        if (!selectedProfile) return
-
         const res = await fetch(`/api/field-personnel-sync?profileId=${pid}`)
         const data = await res.json()
 
@@ -123,7 +120,7 @@ function TaskSheet({
     }
 
     fetchCustomers()
-  }, [pid, team])
+  }, [pid])
 
   const handleSave = async () => {
     setSaving(true)
