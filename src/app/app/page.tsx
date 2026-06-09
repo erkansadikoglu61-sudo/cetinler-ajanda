@@ -102,17 +102,50 @@ function TaskSheet({
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const res = await fetch(`/api/field-personnel-sync?profileId=${pid}`)
-        const data = await res.json()
-
-        if (data.rows) {
-          // Benzersiz "CariAdi / ŞubeAdi" kombinasyonları
-          const options = [...new Set(
-            data.rows.map((r: any) => `${r.cari_isim?.trim() || ''} / ${r.sube_adi?.trim() || ''}`)
-          )].filter(Boolean).sort((a, b) => (a as string).localeCompare(b as string, 'tr'))
-
-          setCustomerOptions(options as string[])
+        const selectedProfile = team.find(p => p.id === pid)
+        if (!selectedProfile) {
+          setCustomerOptions([])
+          return
         }
+
+        // Supabase'den field_personnel verilerini çek
+        const { supabase } = await import('@/lib/supabase')
+        const { data, error } = await supabase
+          .from('field_personnel')
+          .select('cari_adi, sube_adi, sup_adi, jr_profile_id')
+
+        if (error) {
+          console.error('Field personnel hatası:', error)
+          setCustomerOptions([])
+          return
+        }
+
+        if (!data) {
+          setCustomerOptions([])
+          return
+        }
+
+        // Kullanıcının rolüne göre filtrele
+        let filtered = data
+        if (selectedProfile.role === 'jr') {
+          // Jr. için sadece jr_profile_id eşleşenler
+          filtered = data.filter(r => r.jr_profile_id === selectedProfile.id)
+        } else if (selectedProfile.role === 'sup') {
+          // Sup için sup_adi eşleşenler veya altındaki jr'lar
+          const jrIds = team.filter(p => p.role === 'jr' && p.manager_id === selectedProfile.id).map(p => p.id)
+          filtered = data.filter(r =>
+            r.sup_adi?.trim() === selectedProfile.full_name?.trim() ||
+            (r.jr_profile_id && jrIds.includes(r.jr_profile_id))
+          )
+        }
+        // Admin için tümü
+
+        // Benzersiz "CariAdi / ŞubeAdi" kombinasyonları
+        const options = [...new Set(
+          filtered.map(r => `${r.cari_adi?.trim() || ''} / ${r.sube_adi?.trim() || ''}`)
+        )].filter(Boolean).sort((a, b) => (a as string).localeCompare(b as string, 'tr'))
+
+        setCustomerOptions(options as string[])
       } catch (err) {
         console.error('Müşteri listesi yüklenemedi:', err)
         setCustomerOptions([])
@@ -120,7 +153,7 @@ function TaskSheet({
     }
 
     fetchCustomers()
-  }, [pid])
+  }, [pid, team])
 
   const handleSave = async () => {
     setSaving(true)
