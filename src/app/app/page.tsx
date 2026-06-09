@@ -29,7 +29,7 @@ import { KullanicilarView } from '@/components/KullanicilarView'
 import { SellinSelloutView } from '@/components/SellinSelloutView'
 import { AdetPrimTablosu, BayiMerchHakdis } from '@/components/AdetPrimView'
 import { AnalizView } from '@/components/AnalizView'
-type TabType = 'month' | 'week' | 'day' | 'report' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'analiz'
+type TabType = 'month' | 'week' | 'day' | 'report' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'analiz'
 
 // Renk hex'ine alpha ekle
 function hexWithAlpha(hex: string, alpha: string) {
@@ -854,15 +854,16 @@ function MonthView({
                 {shown.map(t => {
                   const p = profileMap.get(t.pid)
                   if (!p) return null
+                  const hasCheckin = !!t.checkin_ts
                   return (
                     <div
                       key={t.id}
                       onClick={e => { e.stopPropagation(); onTaskClick(t) }}
                       className="text-xs rounded px-1 py-0.5 border-l-2 truncate"
                       style={{
-                        backgroundColor: hexWithAlpha(p.color, '22'),
-                        borderLeftColor: p.color,
-                        color: p.color,
+                        backgroundColor: hasCheckin ? '#dcfce7' : hexWithAlpha(p.color, '22'),
+                        borderLeftColor: hasCheckin ? '#16a34a' : p.color,
+                        color: hasCheckin ? '#15803d' : p.color,
                       }}
                     >
                       {t.checkin_ts && '✓ '}{t.customer ?? t.type}
@@ -960,15 +961,16 @@ function WeekView({
                   {ts.map(t => {
                     const p = profileMap.get(t.pid)
                     if (!p) return null
+                    const hasCheckin = !!t.checkin_ts
                     return (
                       <div
                         key={t.id}
                         onClick={() => onTaskClick(t)}
                         className="text-xs rounded px-1 py-0.5 border-l-2 truncate cursor-pointer mb-0.5"
                         style={{
-                          backgroundColor: hexWithAlpha(p.color, '22'),
-                          borderLeftColor: p.color,
-                          color: p.color,
+                          backgroundColor: hasCheckin ? '#dcfce7' : hexWithAlpha(p.color, '22'),
+                          borderLeftColor: hasCheckin ? '#16a34a' : p.color,
+                          color: hasCheckin ? '#15803d' : p.color,
                         }}
                       >
                         {t.checkin_ts && '✓ '}{t.customer ?? t.type}
@@ -1028,17 +1030,18 @@ function DayView({
               {ts.map(t => {
                 const p = profileMap.get(t.pid)
                 if (!p) return null
+                const hasCheckin = !!t.checkin_ts
                 return (
                   <div
                     key={t.id}
                     onClick={() => onTaskClick(t)}
                     className="w-full rounded-lg px-3 py-2 border-l-4 cursor-pointer"
                     style={{
-                      backgroundColor: hexWithAlpha(p.color, '15'),
-                      borderLeftColor: p.color,
+                      backgroundColor: hasCheckin ? '#dcfce7' : hexWithAlpha(p.color, '15'),
+                      borderLeftColor: hasCheckin ? '#16a34a' : p.color,
                     }}
                   >
-                    <p className="text-sm font-medium" style={{ color: p.color }}>
+                    <p className="text-sm font-medium" style={{ color: hasCheckin ? '#15803d' : p.color }}>
                       {t.checkin_ts && '✓ '}{t.type}
                       {t.customer && ` — ${t.customer}`}
                     </p>
@@ -1050,6 +1053,74 @@ function DayView({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────
+// GERÇEKLEŞEN ZİYARETLER
+// ─────────────────────────────────────────────────────
+function CompletedVisitsView({
+  tasks, team, filterPid
+}: {
+  tasks: Task[]; team: Profile[]; filterPid: string | null;
+}) {
+  const profileMap = new Map(team.map(p => [p.id, p]))
+
+  // Check-in yapılmış görevler
+  const completedVisits = tasks
+    .filter(t => t.checkin_ts && (!filterPid || t.pid === filterPid))
+    .sort((a, b) => {
+      const dateA = new Date(a.checkin_ts!)
+      const dateB = new Date(b.checkin_ts!)
+      return dateB.getTime() - dateA.getTime()
+    })
+
+  if (completedVisits.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-12 text-sm text-gray-400">
+        Henüz gerçekleşen ziyaret bulunmuyor.
+      </div>
+    )
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm border-collapse">
+        <thead className="bg-gray-50 sticky top-0">
+          <tr className="border-b">
+            <th className="text-left px-4 py-3 font-medium text-gray-700">Ziyaret Edilen Cari / Şube</th>
+            <th className="text-left px-4 py-3 font-medium text-gray-700">Ziyaret Tarihi</th>
+            <th className="text-left px-4 py-3 font-medium text-gray-700">Ziyaret Nedeni</th>
+            <th className="text-left px-4 py-3 font-medium text-gray-700">Check-in Adresi</th>
+            <th className="text-left px-4 py-3 font-medium text-gray-700">Kişi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {completedVisits.map(t => {
+            const profile = profileMap.get(t.pid)
+            return (
+              <tr key={t.id} className="border-b hover:bg-gray-50">
+                <td className="px-4 py-3 font-medium text-gray-800">
+                  {t.customer || '—'}
+                </td>
+                <td className="px-4 py-3 text-gray-600">
+                  {t.checkin_ts ? format(new Date(t.checkin_ts), 'dd.MM.yyyy HH:mm', { locale: tr }) : '—'}
+                </td>
+                <td className="px-4 py-3 text-gray-600">
+                  {t.type}
+                </td>
+                <td className="px-4 py-3 text-gray-600 max-w-xs truncate">
+                  {t.checkin_address || '—'}
+                </td>
+                <td className="px-4 py-3 text-gray-600">
+                  {profile?.full_name || '—'}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -1736,12 +1807,13 @@ export default function AppPage() {
 
           {/* Alt sekmeler satırı (gruplu sekmelerde gösterilir) */}
           {/* Takvim alt sekmeleri */}
-          {(currentProfile?.role === 'admin' || currentProfile?.full_name === 'Sinem Bektaş') && ['month','week','day'].includes(tab) && (
+          {(currentProfile?.role === 'admin' || currentProfile?.full_name === 'Sinem Bektaş') && ['month','week','day','visits'].includes(tab) && (
             <div className="flex overflow-x-auto items-center gap-1 px-3 pb-1.5 scrollbar-none">
               {([
                 { key: 'month' as const, icon: Calendar,     label: 'Ay' },
                 { key: 'week'  as const, icon: CalendarRange, label: 'Hafta' },
                 { key: 'day'   as const, icon: CalendarDays,  label: 'Gün' },
+                { key: 'visits' as const, icon: Check,        label: 'Gerçekleşen Ziyaretler' },
               ] as const).map(({ key, icon: Icon, label }) => (
                 <button key={key} onClick={() => setTab(key)}
                   className={clsx(
@@ -1836,6 +1908,11 @@ export default function AppPage() {
               filterPid={filterPid} onTaskClick={handleTaskClick}
             />
           )}
+          {tab === 'visits' && (
+            <CompletedVisitsView
+              tasks={tasks} team={team} filterPid={filterPid}
+            />
+          )}
           {tab === 'report' && (
             <ReportView
               tasks={tasks} team={team} year={year} month={month}
@@ -1916,7 +1993,7 @@ export default function AppPage() {
       )}
 
       {/* FAB — sadece admin veya Sinem takvim sekmelerinde görünür */}
-      {(currentProfile?.role === 'admin' || currentProfile?.full_name === 'Sinem Bektaş') && tab !== 'report' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && (
+      {(currentProfile?.role === 'admin' || currentProfile?.full_name === 'Sinem Bektaş') && tab !== 'report' && tab !== 'visits' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && (
         <button
           onClick={handleAddTask}
           className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
