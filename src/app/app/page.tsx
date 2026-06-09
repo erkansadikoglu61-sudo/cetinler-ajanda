@@ -296,6 +296,7 @@ function TaskSheet({
               {customerOptions.map((opt, i) => (
                 <option key={i} value={opt}>{opt}</option>
               ))}
+              <option value="Diğer">Diğer (Yeni müşteri)</option>
             </select>
           </div>
 
