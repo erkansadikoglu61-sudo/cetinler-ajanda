@@ -70,6 +70,21 @@ const KAMPANYALAR: Kampanya[] = [
     headerBg:    'bg-[#1d4ed8]',
     accentText:  'text-blue-600',
   },
+  {
+    id:          'k4',
+    stokKodlar:  ['RRS9000', 'RRS8700', 'RFX8500', 'RHC6800'],
+    stokAdi:     'RRS9000 · RRS8700 · RFX8500 · RHC6800',
+    marka:       'Relux',
+    yil:         2026,
+    ayBaslangic: 6, ayBitis: 6,
+    donemAdi:    '1–30 Haziran 2026',
+    esik:        160,
+    toplamEsik:  1500,
+    odul:        'Tatilbudur Çeki', odulTutar: '25.000 TL',
+    renk:        'from-[#dc2626] to-[#f87171]',
+    headerBg:    'bg-[#dc2626]',
+    accentText:  'text-red-600',
+  },
 ]
 
 // ─── Tipler ──────────────────────────────────────────────────────
