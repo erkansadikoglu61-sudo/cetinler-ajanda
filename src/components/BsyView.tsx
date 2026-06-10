@@ -238,29 +238,34 @@ function ParametrelerModal({ isAdmin, onClose }: { isAdmin: boolean; onClose: ()
   const imgRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    // Public URL al (bucket public olmalı)
-    const { data } = supabase.storage
-      .from('bsy-excel')
-      .getPublicUrl('parametreler.png')
-
-    if (data?.publicUrl) {
-      // URL geçerliliğini kontrol et
-      fetch(data.publicUrl, { method: 'HEAD' })
-        .then(res => {
-          if (res.ok) {
-            setImgSrc(data.publicUrl)
-          } else {
-            // Dosya yoksa localStorage'den fallback
-            const saved = localStorage.getItem('bsy_param_img')
-            if (saved) setImgSrc(saved)
-          }
-        })
-        .catch(() => {
-          // Hata durumunda localStorage'den fallback
-          const saved = localStorage.getItem('bsy_param_img')
-          if (saved) setImgSrc(saved)
-        })
-    }
+    // API'den görseli al
+    fetch('/api/bsy-param-img')
+      .then(res => res.json())
+      .then(data => {
+        if (data.url) {
+          // URL geçerliliğini kontrol et
+          fetch(data.url, { method: 'HEAD' })
+            .then(res => {
+              if (res.ok) {
+                setImgSrc(data.url)
+              } else {
+                // Dosya yoksa localStorage'den fallback
+                const saved = localStorage.getItem('bsy_param_img')
+                if (saved) setImgSrc(saved)
+              }
+            })
+            .catch(() => {
+              // Hata durumunda localStorage'den fallback
+              const saved = localStorage.getItem('bsy_param_img')
+              if (saved) setImgSrc(saved)
+            })
+        }
+      })
+      .catch(() => {
+        // API hatası durumunda localStorage'den fallback
+        const saved = localStorage.getItem('bsy_param_img')
+        if (saved) setImgSrc(saved)
+      })
   }, [])
 
   async function handleImgUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -269,16 +274,20 @@ function ParametrelerModal({ isAdmin, onClose }: { isAdmin: boolean; onClose: ()
 
     setUploading(true)
     try {
-      // Supabase Storage'a yükle
-      const { error } = await supabase.storage
-        .from('bsy-excel')
-        .upload('parametreler.png', file, { upsert: true })
+      // API üzerinden yükle
+      const formData = new FormData()
+      formData.append('file', file)
 
-      if (error) throw error
+      const res = await fetch('/api/bsy-param-img', {
+        method: 'POST',
+        body: formData
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Yükleme hatası')
 
       // Yeni görseli göster
-      const url = URL.createObjectURL(file)
-      setImgSrc(url)
+      setImgSrc(data.url + '?t=' + Date.now()) // Cache bust
     } catch (err) {
       alert('Görsel yüklenirken hata: ' + (err instanceof Error ? err.message : String(err)))
     } finally {
