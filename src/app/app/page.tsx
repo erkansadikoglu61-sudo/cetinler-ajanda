@@ -1635,7 +1635,7 @@ export default function AppPage() {
   const isSupOrJr = currentProfile?.role === 'sup' || currentProfile?.role === 'jr'
 
   // Takvim erişimi olan kullanıcılar
-  const CALENDAR_USERS = ['Sinem Bektaş', 'Duygu DUMAN', 'Nagihan ERDÖNMEZ', 'Mustafa ÇETİNKAYA']
+  const CALENDAR_USERS = ['Sinem Bektaş', 'Duygu Duman', 'Nagihan Erdönmez', 'Mustafa CETİNKAYA']
   const hasCalendarAccess = currentProfile?.role === 'admin' || CALENDAR_USERS.includes(currentProfile?.full_name ?? '')
 
   // Primler sayfası filtreleri
