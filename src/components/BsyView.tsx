@@ -847,15 +847,9 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
   }
 
   const {
-    bsyRows: allBsyRows, brandTotals, genelToplamGercCiro,
+    bsyRows, brandTotals, genelToplamGercCiro,
     yillar, loading, error, source, reload,
   } = useBsyCiro(yil, ay)
-
-  // BSY kullanıcısı sadece kendini görür
-  const bsyRows = useMemo(
-    () => isBsy && bsyAdi ? allBsyRows.filter(r => r.bsyAdi === bsyAdi) : allBsyRows,
-    [allBsyRows, isBsy, bsyAdi]
-  )
 
   const {
     hedefMap, loading: hedefLoading, saving, reload: reloadHedef, save,
@@ -1069,7 +1063,7 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
           <BsyKisiTable
             yil={yil}
             ay={ay}
-            bsyRows={bsyRows}
+            bsyRows={isBsy && bsyAdi ? bsyRows.filter(r => r.bsyAdi === bsyAdi) : bsyRows}
             allBsyNames={isBsy && bsyAdi ? [bsyAdi] : allBsyNames}
             getKisiHedef={getKisiHedef}
             getKisiExtra={getKisiExtra}
