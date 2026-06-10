@@ -1070,7 +1070,7 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
             yil={yil}
             ay={ay}
             bsyRows={bsyRows}
-            allBsyNames={allBsyNames}
+            allBsyNames={isBsy && bsyAdi ? [bsyAdi] : allBsyNames}
             getKisiHedef={getKisiHedef}
             getKisiExtra={getKisiExtra}
             params={activeParams}
@@ -1123,7 +1123,7 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
         <KisiHedefModal
           yil={yil}
           ay={ay}
-          bsyAdlar={allBsyNames.length > 0 ? allBsyNames : bsyRows.map(r => r.bsyAdi)}
+          bsyAdlar={isBsy && bsyAdi ? [bsyAdi] : (allBsyNames.length > 0 ? allBsyNames : bsyRows.map(r => r.bsyAdi))}
           getKisiHedef={getKisiHedef}
           saving={kisiSaving}
           onSave={saveKisi}
