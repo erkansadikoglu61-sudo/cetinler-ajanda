@@ -1614,7 +1614,7 @@ export default function AppPage() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
-  const [tab, setTab] = useState<TabType>('month')
+  const [tab, setTab] = useState<TabType | null>(null)
   const [filterPid, setFilterPid] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date>(now)
 
@@ -1658,12 +1658,15 @@ export default function AppPage() {
     }
   }, [authLoading, currentProfile, router])
 
-  // sup/jr için varsayılan sekme: sellout, bsy için: bsy, admin için: month
+  // Varsayılan sekme: takvim erişimi varsa month, sup/jr için sellout, bsy için bsy
   useEffect(() => {
-    if (isSupOrJr) setTab('sellout')
+    if (!currentProfile || tab !== null) return
+
+    if (hasCalendarAccess) setTab('month')
+    else if (isSupOrJr) setTab('sellout')
     else if (isBsy) setTab('bsy')
-    else if (currentProfile?.role === 'admin') setTab('month')
-  }, [isSupOrJr, isBsy, currentProfile?.role])
+    else setTab('month') // Fallback
+  }, [currentProfile, hasCalendarAccess, isSupOrJr, isBsy, tab])
 
   const prevMonth = () => {
     if (month === 0) { setMonth(11); setYear(y => y - 1) }
@@ -1719,7 +1722,7 @@ export default function AppPage() {
     )
   }
 
-  if (!currentProfile) return null
+  if (!currentProfile || tab === null) return null
 
   return (
     <div className="flex h-screen bg-white safe-top">
