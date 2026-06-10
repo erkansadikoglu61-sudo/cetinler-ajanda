@@ -1063,8 +1063,8 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
           <BsyKisiTable
             yil={yil}
             ay={ay}
-            bsyRows={isBsy && bsyAdi ? bsyRows.filter(r => r.bsyAdi === bsyAdi) : bsyRows}
-            allBsyNames={isBsy && bsyAdi ? [bsyAdi] : allBsyNames}
+            bsyRows={bsyRows}
+            allBsyNames={allBsyNames}
             getKisiHedef={getKisiHedef}
             getKisiExtra={getKisiExtra}
             params={activeParams}
