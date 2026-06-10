@@ -1634,6 +1634,10 @@ export default function AppPage() {
   // Süpervizör ve Jr. Süpervizör → sadece Sellout + Noktalarımız
   const isSupOrJr = currentProfile?.role === 'sup' || currentProfile?.role === 'jr'
 
+  // Takvim erişimi olan kullanıcılar
+  const CALENDAR_USERS = ['Sinem Bektaş', 'Duygu DUMAN', 'Nagihan ERDÖNMEZ', 'Mustafa ÇETİNKAYA']
+  const hasCalendarAccess = currentProfile?.role === 'admin' || CALENDAR_USERS.includes(currentProfile?.full_name ?? '')
+
   // Primler sayfası filtreleri
   const { primSupervisorFilter, primBsyKod } = useMemo(() => {
     if (!currentProfile) return { primSupervisorFilter: [] as string[], primBsyKod: null as string | null }
@@ -1766,7 +1770,7 @@ export default function AppPage() {
             {/* Masaüstü: Gruplu Tab sekmeleri */}
             <div className="hidden md:flex items-center gap-1 mr-2">
               {/* Takvim grubu (admin veya Sinem) */}
-              {(currentProfile?.role === 'admin' || currentProfile?.full_name === 'Sinem Bektaş') && (
+              {hasCalendarAccess && (
                 <button
                   onClick={() => { if (!['month','week','day'].includes(tab)) setTab('month') }}
                   className={clsx(
@@ -1887,7 +1891,7 @@ export default function AppPage() {
 
           {/* Alt sekmeler satırı (gruplu sekmelerde gösterilir) */}
           {/* Takvim alt sekmeleri */}
-          {(currentProfile?.role === 'admin' || currentProfile?.full_name === 'Sinem Bektaş') && ['month','week','day','visits'].includes(tab) && (
+          {hasCalendarAccess && ['month','week','day','visits'].includes(tab) && (
             <div className="flex overflow-x-auto items-center gap-1 px-3 pb-1.5 scrollbar-none">
               {([
                 { key: 'month' as const, icon: Calendar,     label: 'Ay' },
@@ -2072,8 +2076,8 @@ export default function AppPage() {
         </>
       )}
 
-      {/* FAB — sadece admin veya Sinem takvim sekmelerinde görünür */}
-      {(currentProfile?.role === 'admin' || currentProfile?.full_name === 'Sinem Bektaş') && tab !== 'report' && tab !== 'visits' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && (
+      {/* FAB — sadece takvim erişimi olan kullanıcılar takvim sekmelerinde görünür */}
+      {hasCalendarAccess && tab !== 'report' && tab !== 'visits' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && (
         <button
           onClick={handleAddTask}
           className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
