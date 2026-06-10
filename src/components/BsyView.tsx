@@ -234,23 +234,43 @@ function parseCur(s: string): number {
 // ─── Parametreler Modalı ──────────────────────────────────────
 function ParametrelerModal({ isAdmin, onClose }: { isAdmin: boolean; onClose: () => void }) {
   const [imgSrc, setImgSrc] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
   const imgRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    const saved = localStorage.getItem('bsy_param_img')
-    if (saved) setImgSrc(saved)
+    // Supabase Storage'dan görseli çek
+    supabase.storage
+      .from('bsy-excel')
+      .download('parametreler.png')
+      .then(({ data, error }) => {
+        if (data) {
+          const url = URL.createObjectURL(data)
+          setImgSrc(url)
+        }
+      })
   }, [])
 
-  function handleImgUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImgUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => {
-      const b64 = ev.target?.result as string
-      setImgSrc(b64)
-      localStorage.setItem('bsy_param_img', b64)
+
+    setUploading(true)
+    try {
+      // Supabase Storage'a yükle
+      const { error } = await supabase.storage
+        .from('bsy-excel')
+        .upload('parametreler.png', file, { upsert: true })
+
+      if (error) throw error
+
+      // Yeni görseli göster
+      const url = URL.createObjectURL(file)
+      setImgSrc(url)
+    } catch (err) {
+      alert('Görsel yüklenirken hata: ' + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setUploading(false)
     }
-    reader.readAsDataURL(file)
   }
 
   return (
@@ -268,10 +288,11 @@ function ParametrelerModal({ isAdmin, onClose }: { isAdmin: boolean; onClose: ()
               <>
                 <button
                   onClick={() => imgRef.current?.click()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-600 font-medium"
+                  disabled={uploading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ImagePlus size={12} />
-                  {imgSrc ? 'Görseli Değiştir' : 'PNG Ekle'}
+                  {uploading ? 'Yükleniyor...' : imgSrc ? 'Görseli Değiştir' : 'PNG Ekle'}
                 </button>
                 <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={handleImgUpload} />
               </>
