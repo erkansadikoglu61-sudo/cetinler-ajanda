@@ -238,16 +238,29 @@ function ParametrelerModal({ isAdmin, onClose }: { isAdmin: boolean; onClose: ()
   const imgRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    // Supabase Storage'dan görseli çek
-    supabase.storage
+    // Public URL al (bucket public olmalı)
+    const { data } = supabase.storage
       .from('bsy-excel')
-      .download('parametreler.png')
-      .then(({ data, error }) => {
-        if (data) {
-          const url = URL.createObjectURL(data)
-          setImgSrc(url)
-        }
-      })
+      .getPublicUrl('parametreler.png')
+
+    if (data?.publicUrl) {
+      // URL geçerliliğini kontrol et
+      fetch(data.publicUrl, { method: 'HEAD' })
+        .then(res => {
+          if (res.ok) {
+            setImgSrc(data.publicUrl)
+          } else {
+            // Dosya yoksa localStorage'den fallback
+            const saved = localStorage.getItem('bsy_param_img')
+            if (saved) setImgSrc(saved)
+          }
+        })
+        .catch(() => {
+          // Hata durumunda localStorage'den fallback
+          const saved = localStorage.getItem('bsy_param_img')
+          if (saved) setImgSrc(saved)
+        })
+    }
   }, [])
 
   async function handleImgUpload(e: React.ChangeEvent<HTMLInputElement>) {
