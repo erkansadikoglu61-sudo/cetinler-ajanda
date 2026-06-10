@@ -810,12 +810,11 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
       .then(r => r.json())
       .then(d => {
         const allRows: TahsilatRow[] = d.rows ?? []
-        // BSY kullanıcısı sadece kendini görür
-        setTahsilatRows(isBsy && bsyAdi ? allRows.filter(r => r.bsyAdi === bsyAdi) : allRows)
+        setTahsilatRows(allRows)
         setTahsilatDetay(d.detay ?? [])
       })
       .finally(() => setTahsilatLoading(false))
-  }, [yil, ay, isBsy, bsyAdi])
+  }, [yil, ay])
 
   async function handleExcelUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
