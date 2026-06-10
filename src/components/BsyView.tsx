@@ -243,22 +243,11 @@ function ParametrelerModal({ isAdmin, onClose }: { isAdmin: boolean; onClose: ()
       .then(res => res.json())
       .then(data => {
         if (data.url) {
-          // URL geçerliliğini kontrol et
-          fetch(data.url, { method: 'HEAD' })
-            .then(res => {
-              if (res.ok) {
-                setImgSrc(data.url)
-              } else {
-                // Dosya yoksa localStorage'den fallback
-                const saved = localStorage.getItem('bsy_param_img')
-                if (saved) setImgSrc(saved)
-              }
-            })
-            .catch(() => {
-              // Hata durumunda localStorage'den fallback
-              const saved = localStorage.getItem('bsy_param_img')
-              if (saved) setImgSrc(saved)
-            })
+          setImgSrc(data.url)
+        } else {
+          // Dosya yoksa localStorage'den fallback
+          const saved = localStorage.getItem('bsy_param_img')
+          if (saved) setImgSrc(saved)
         }
       })
       .catch(() => {

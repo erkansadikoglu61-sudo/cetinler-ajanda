@@ -9,11 +9,16 @@ const supabase = createClient(
 // GET - Görseli al
 export async function GET() {
   try {
-    const { data } = supabase.storage
+    // Signed URL kullan (1 saat geçerli)
+    const { data, error } = await supabase.storage
       .from('bsy-excel')
-      .getPublicUrl('parametreler.png')
+      .createSignedUrl('parametreler.png', 3600)
 
-    return NextResponse.json({ url: data.publicUrl })
+    if (error) {
+      return NextResponse.json({ url: null }, { status: 200 })
+    }
+
+    return NextResponse.json({ url: data.signedUrl })
   } catch (error) {
     return NextResponse.json({ error: 'Görsel alınamadı' }, { status: 500 })
   }
@@ -40,11 +45,14 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error
 
-    const { data } = supabase.storage
+    // Signed URL döndür
+    const { data: signedData, error: signError } = await supabase.storage
       .from('bsy-excel')
-      .getPublicUrl('parametreler.png')
+      .createSignedUrl('parametreler.png', 3600)
 
-    return NextResponse.json({ url: data.publicUrl })
+    if (signError) throw signError
+
+    return NextResponse.json({ url: signedData.signedUrl })
   } catch (error) {
     console.error('Upload error:', error)
     return NextResponse.json({
