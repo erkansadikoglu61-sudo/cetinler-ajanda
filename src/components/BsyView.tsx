@@ -847,9 +847,15 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
   }
 
   const {
-    bsyRows, brandTotals, genelToplamGercCiro,
+    bsyRows: allBsyRows, brandTotals, genelToplamGercCiro,
     yillar, loading, error, source, reload,
   } = useBsyCiro(yil, ay)
+
+  // BSY kullanıcısı sadece kendini görür
+  const bsyRows = useMemo(
+    () => isBsy && bsyAdi ? allBsyRows.filter(r => r.bsyAdi === bsyAdi) : allBsyRows,
+    [allBsyRows, isBsy, bsyAdi]
+  )
 
   const {
     hedefMap, loading: hedefLoading, saving, reload: reloadHedef, save,
