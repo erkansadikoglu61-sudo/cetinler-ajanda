@@ -28,6 +28,7 @@ export interface Profile {
   color: string
   manager_id: string | null
   email: string | null
+  push_token: string | null
 }
 
 export interface Task {
