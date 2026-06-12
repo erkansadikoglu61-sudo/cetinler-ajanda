@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { data, error } = await resend.emails.send({
-      from: 'Cetinler Ajanda <bildirim@cetinler-ajanda.com>',
+      from: 'Cetinler Ajanda <onboarding@resend.dev>',
       to: [to],
       subject: `${authorName} görevinize not ekledi`,
       html: `
