@@ -17,7 +17,6 @@ import clsx from 'clsx'
 import { useAuth } from '@/hooks/useAuth'
 import { useTeam } from '@/hooks/useTeam'
 import { useTasks, useNotes } from '@/hooks/useTasks'
-import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications'
 import { Profile, Task } from '@/lib/supabase'
 import { TASK_TYPES, VISIT_TYPES, MONTHS_TR, DAYS_SHORT, ROLE_LABELS } from '@/lib/constants'
 import { generateVisitReport } from '@/lib/pdf'
@@ -211,7 +210,10 @@ function TaskSheet({
           <div className="w-8 h-1 bg-gray-200 rounded-full mx-auto mb-2 md:hidden" />
           <div className="flex items-center justify-between px-4">
             <h2 className="font-semibold text-base text-gray-800">
-              {isNew ? 'Yeni Görev' : 'Görev Detayı'}
+              {isNew ? 'Yeni Görev' : (() => {
+                const owner = team.find(p => p.id === (task?.pid || pid))
+                return owner ? `Görev Detayı - ${owner.full_name}` : 'Görev Detayı'
+              })()}
             </h2>
             <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
               <X size={18} />
@@ -1611,9 +1613,6 @@ export default function AppPage() {
   const router = useRouter()
   const { profile: currentProfile, loading: authLoading, signOut } = useAuth()
   const { team, bsyLinks, loading: teamLoading, visibleIds, profileById } = useTeam(currentProfile)
-
-  // Realtime notifications - Service Worker yok, sadece browser API!
-  useRealtimeNotifications(currentProfile?.id || null)
 
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
