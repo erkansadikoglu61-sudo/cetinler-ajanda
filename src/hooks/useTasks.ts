@@ -160,49 +160,7 @@ export function useNotes(taskId: string | null) {
     })
     if (!error) {
       await load()
-
-      // Görevi oluşturan kullanıcıya push notification gönder
-      try {
-        // Görev bilgisini al
-        const { data: task } = await supabase
-          .from('tasks')
-          .select('pid, type, customer')
-          .eq('id', taskId)
-          .single()
-
-        if (task && task.pid !== authorId) {
-          // Görev sahibinin push token'ını al
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('push_token, full_name')
-            .eq('id', task.pid)
-            .single()
-
-          if (profile?.push_token) {
-            // Not ekleyen kullanıcının adını al
-            const { data: author } = await supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('id', authorId)
-              .single()
-
-            // Push notification gönder
-            await fetch('/api/send-push-notification', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                pushTokens: [profile.push_token],
-                title: 'Göreve Yeni Not Eklendi',
-                body: `${author?.full_name || 'Bir kullanıcı'} "${task.type}${task.customer ? ' - ' + task.customer : ''}" görevine not ekledi: ${text.trim().substring(0, 100)}${text.trim().length > 100 ? '...' : ''}`,
-                data: { taskId, type: 'task_note_added' },
-              }),
-            })
-          }
-        }
-      } catch (error) {
-        console.error('Push notification gönderilirken hata:', error)
-        // Hata olsa bile not ekleme işlemi başarılı sayılır
-      }
+      // Realtime subscription otomatik bildirim gönderecek
     }
     return !error
   }

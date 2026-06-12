@@ -17,7 +17,7 @@ import clsx from 'clsx'
 import { useAuth } from '@/hooks/useAuth'
 import { useTeam } from '@/hooks/useTeam'
 import { useTasks, useNotes } from '@/hooks/useTasks'
-import { usePushNotifications } from '@/hooks/usePushNotifications'
+import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications'
 import { Profile, Task } from '@/lib/supabase'
 import { TASK_TYPES, VISIT_TYPES, MONTHS_TR, DAYS_SHORT, ROLE_LABELS } from '@/lib/constants'
 import { generateVisitReport } from '@/lib/pdf'
@@ -1612,19 +1612,8 @@ export default function AppPage() {
   const { profile: currentProfile, loading: authLoading, signOut } = useAuth()
   const { team, bsyLinks, loading: teamLoading, visibleIds, profileById } = useTeam(currentProfile)
 
-  // Push notifications
-  const { permission, registerPushToken, isSupported } = usePushNotifications(currentProfile?.id || null)
-
-  // Kullanıcı giriş yaptığında ve izin henüz alınmamışsa push token al
-  useEffect(() => {
-    if (currentProfile && isSupported && permission === 'default') {
-      // 2 saniye sonra izin iste (kullanıcı deneyimi için)
-      const timer = setTimeout(() => {
-        registerPushToken()
-      }, 2000)
-      return () => clearTimeout(timer)
-    }
-  }, [currentProfile, isSupported, permission, registerPushToken])
+  // Realtime notifications - Service Worker yok, sadece browser API!
+  useRealtimeNotifications(currentProfile?.id || null)
 
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
