@@ -79,7 +79,7 @@ function TaskSheet({
 
   const [pid, setPid] = useState(task?.pid ?? currentProfile.id)
   const [date, setDate] = useState(task?.date ?? format(selectedDate, 'yyyy-MM-dd'))
-  const [time, setTime] = useState(task?.time ?? '09:00')
+  const [time, setTime] = useState(task?.time?.substring(0, 5) ?? '09:00')
   const [type, setType] = useState(task?.type ?? TASK_TYPES[0])
   const [customer, setCustomer] = useState(task?.customer ?? '')
   const [description, setDescription] = useState(task?.description ?? '')
