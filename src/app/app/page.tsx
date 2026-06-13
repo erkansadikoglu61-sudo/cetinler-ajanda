@@ -99,6 +99,18 @@ function TaskSheet({
     ? visibleIds
     : [currentProfile.id]
 
+  // Task değiştiğinde form state'lerini güncelle
+  useEffect(() => {
+    if (task) {
+      setPid(task.pid)
+      setDate(task.date)
+      setTime(task.time?.substring(0, 5) ?? '09:00')
+      setType(task.type)
+      setCustomer(task.customer ?? '')
+      setDescription(task.description ?? '')
+    }
+  }, [task?.id])
+
   // Kullanıcının şubelerini çek
   useEffect(() => {
     const fetchCustomers = async () => {
