@@ -52,7 +52,7 @@ export function useTasks(
     [tasks]
   )
 
-  const addTask = async (task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): Promise<Task | null> => {
+  const addTask = async (task: Omit<Task, 'id' | 'created_at' | 'updated_at' | 'created_by'>): Promise<Task | null> => {
     const { data, error } = await supabase
       .from('tasks')
       .insert(task)

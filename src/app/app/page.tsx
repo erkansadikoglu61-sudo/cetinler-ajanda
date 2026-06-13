@@ -159,7 +159,7 @@ function TaskSheet({
   const handleSave = async () => {
     setSaving(true)
     if (isNew) {
-      await onSave({ pid, date, time: time || null, type, customer: customer || null, description: description || null, checkin_ts: null, checkin_lat: null, checkin_lng: null, checkin_by: null, checkin_address: null })
+      await onSave({ pid, date, time: time || null, type, customer: customer || null, description: description || null, checkin_ts: null, checkin_lat: null, checkin_lng: null, checkin_by: null, checkin_address: null, created_by: currentProfile.id })
     } else if (task) {
       await onUpdate(task.id, { pid, date, time: time || null, type, customer: customer || null, description: description || null })
     }
@@ -211,8 +211,8 @@ function TaskSheet({
           <div className="flex items-center justify-between px-4">
             <h2 className="font-semibold text-base text-gray-800">
               {isNew ? 'Yeni Görev' : (() => {
-                const owner = team.find(p => p.id === (task?.pid || pid))
-                return owner ? `Görev Detayı - ${owner.full_name}` : 'Görev Detayı'
+                const creator = team.find(p => p.id === task?.created_by)
+                return creator ? `Görev Detayı - ${creator.full_name}` : 'Görev Detayı'
               })()}
             </h2>
             <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
@@ -1700,8 +1700,8 @@ export default function AppPage() {
     setTaskSheet({ task: null, isNew: true })
   }
 
-  const handleSaveTask = async (data: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
-    await addTask(data)
+  const handleSaveTask = async (data: Omit<Task, 'id' | 'created_at' | 'updated_at' | 'created_by'>) => {
+    await addTask({ ...data, created_by: currentProfile!.id })
   }
 
   const handleUpdateTask = async (id: string, data: Partial<Task>) => {
