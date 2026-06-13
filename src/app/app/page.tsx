@@ -102,9 +102,14 @@ function TaskSheet({
   // Task değiştiğinde form state'lerini güncelle
   useEffect(() => {
     if (task) {
+      console.log('🔵 Task yüklendi:', task)
+      console.log('🔵 Task time:', task.time)
+      console.log('🔵 Substring sonrası:', task.time?.substring(0, 5))
       setPid(task.pid)
       setDate(task.date)
-      setTime(task.time?.substring(0, 5) ?? '09:00')
+      const newTime = task.time?.substring(0, 5) ?? '09:00'
+      console.log('🔵 SetTime çağrılıyor:', newTime)
+      setTime(newTime)
       setType(task.type)
       setCustomer(task.customer ?? '')
       setDescription(task.description ?? '')
