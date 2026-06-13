@@ -2175,6 +2175,7 @@ export default function AppPage() {
 
       {taskSheet && currentProfile && (
         <TaskSheet
+          key={taskSheet.task?.id ?? 'new'}
           task={taskSheet.task}
           isNew={taskSheet.isNew}
           selectedDate={selectedDate}
