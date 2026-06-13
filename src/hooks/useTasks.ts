@@ -28,7 +28,7 @@ export function useTasks(
 
     const { data, error } = await supabase
       .from('tasks')
-      .select('*')
+      .select('*, creator:profiles!created_by(full_name)')
       .in('pid', ids)
       .gte('date', startDate)
       .lte('date', endDateStr)

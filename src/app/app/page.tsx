@@ -210,12 +210,7 @@ function TaskSheet({
           <div className="w-8 h-1 bg-gray-200 rounded-full mx-auto mb-2 md:hidden" />
           <div className="flex items-center justify-between px-4">
             <h2 className="font-semibold text-base text-gray-800">
-              {isNew ? 'Yeni Görev' : (() => {
-                console.log('Task created_by:', task?.created_by, 'Team:', team.map(p => ({ id: p.id, name: p.full_name })))
-                const creator = team.find(p => p.id === task?.created_by)
-                console.log('Creator found:', creator)
-                return creator ? `Görev Detayı - ${creator.full_name}` : 'Görev Detayı'
-              })()}
+              {isNew ? 'Yeni Görev' : (task?.creator?.full_name ? `Görev Detayı - ${task.creator.full_name}` : 'Görev Detayı')}
             </h2>
             <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
               <X size={18} />

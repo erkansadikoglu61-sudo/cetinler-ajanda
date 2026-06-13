@@ -47,6 +47,7 @@ export interface Task {
   created_by: string | null
   created_at: string
   updated_at: string
+  creator?: { full_name: string }
 }
 
 export interface TaskNote {
