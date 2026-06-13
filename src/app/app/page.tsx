@@ -211,7 +211,9 @@ function TaskSheet({
           <div className="flex items-center justify-between px-4">
             <h2 className="font-semibold text-base text-gray-800">
               {isNew ? 'Yeni Görev' : (() => {
+                console.log('Task created_by:', task?.created_by, 'Team:', team.map(p => ({ id: p.id, name: p.full_name })))
                 const creator = team.find(p => p.id === task?.created_by)
+                console.log('Creator found:', creator)
                 return creator ? `Görev Detayı - ${creator.full_name}` : 'Görev Detayı'
               })()}
             </h2>
