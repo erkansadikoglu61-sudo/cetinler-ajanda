@@ -15,10 +15,11 @@ interface SellinRow {
 }
 
 interface TableRow {
-  stokKodu: string
-  sellin:   number
-  sellout:  number
-  oran:     number | null
+  stokKodu:  string
+  sellin:    number
+  sellout:   number
+  oran:      number | null
+  cariCount: number
 }
 
 interface Props {
@@ -307,9 +308,22 @@ export function SellinSelloutView({ currentProfile, active }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sellinRows, filteredSellout, isBsy, bsyKod, filterBsy, filterCari, filterMarka, filterKategori, filterStok, filterAy, filterYil])
 
+  // X = filtreye göre sellin olan unique cari sayısı (kolon başlığında kullanılır)
+  const totalCariCount = useMemo(
+    () => new Set(filteredSellin.map(r => r.cariIsim)).size,
+    [filteredSellin]
+  )
+
+  // Genel toplam satırı için: sellout'ta en az 1 satır olan unique cari sayısı
+  const totalSelloutCariCount = useMemo(
+    () => new Set(filteredSellout.map(r => r.cari_isim)).size,
+    [filteredSellout]
+  )
+
   // ── Tablo: Stok Kodu bazlı topla ─────────────────────────────
   const tableRows = useMemo<TableRow[]>(() => {
-    const map = new Map<string, { sellin: number; sellout: number }>()
+    const map      = new Map<string, { sellin: number; sellout: number }>()
+    const cariByStok = new Map<string, Set<string>>()
 
     // Stok kodlarını büyük harfe normalize et — kaynak farklılıklarından bağımsız
     filteredSellin.forEach(r => {
@@ -325,14 +339,17 @@ export function SellinSelloutView({ currentProfile, active }: Props) {
       const cur = map.get(key) ?? { sellin: 0, sellout: 0 }
       cur.sellout += r.satilan_adet
       map.set(key, cur)
+      if (!cariByStok.has(key)) cariByStok.set(key, new Set())
+      cariByStok.get(key)!.add(r.cari_isim)
     })
 
     return [...map.entries()]
       .map(([stokKodu, v]) => ({
         stokKodu,
-        sellin:  v.sellin,
-        sellout: v.sellout,
-        oran:    v.sellin > 0 ? (v.sellout / v.sellin) * 100 : null,
+        sellin:    v.sellin,
+        sellout:   v.sellout,
+        oran:      v.sellin > 0 ? (v.sellout / v.sellin) * 100 : null,
+        cariCount: cariByStok.get(stokKodu)?.size ?? 0,
       }))
       // Büyükten küçüğe oran sıralaması; oran=null en sona
       .sort((a, b) => {
@@ -341,7 +358,7 @@ export function SellinSelloutView({ currentProfile, active }: Props) {
         if (b.oran === null) return -1
         return b.oran - a.oran
       })
-  }, [filteredSellin, filteredSellout])
+  }, [filteredSellin, filteredSellout, merchxKodlar])
 
   // Toplam satırı
   const totals = useMemo(() => ({
@@ -469,14 +486,15 @@ export function SellinSelloutView({ currentProfile, active }: Props) {
                 <th className="text-left px-4 py-2.5 font-semibold">Stok Kodu</th>
                 <th className="text-right px-4 py-2.5 font-semibold min-w-[90px]">Sell In</th>
                 <th className="text-right px-4 py-2.5 font-semibold min-w-[90px]">Sell Out</th>
-                <th className="text-right px-4 py-2.5 font-semibold min-w-[80px]">Oran</th>
+                <th className="text-right px-4 py-2.5 font-semibold min-w-[120px]">Sell Out Oran Gerçekleşme Oranı</th>
+                <th className="text-right px-4 py-2.5 font-semibold min-w-[140px]">{totalCariCount} Caride Satış Oranı</th>
               </tr>
             </thead>
 
             <tbody>
               {tableRows.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="text-center py-16 text-gray-400">
+                  <td colSpan={5} className="text-center py-16 text-gray-400">
                     {activeFilterCount ? 'Eşleşen kayıt yok' : 'Veri yükleniyor veya seçim yapın'}
                   </td>
                 </tr>
@@ -486,6 +504,14 @@ export function SellinSelloutView({ currentProfile, active }: Props) {
                   row.oran === null ? 'text-gray-400'
                   : row.oran >= 80  ? 'text-green-600 font-semibold'
                   : row.oran >= 50  ? 'text-amber-600'
+                  : 'text-red-500'
+                const cariPct = totalCariCount > 0
+                  ? (row.cariCount / totalCariCount) * 100
+                  : null
+                const cariColor =
+                  cariPct === null  ? 'text-gray-400'
+                  : cariPct >= 80   ? 'text-green-600 font-semibold'
+                  : cariPct >= 50   ? 'text-amber-600'
                   : 'text-red-500'
                 return (
                   <tr
@@ -501,6 +527,12 @@ export function SellinSelloutView({ currentProfile, active }: Props) {
                     <td className={clsx('px-4 py-2 text-right', oranColor)}>
                       {row.oran !== null ? fmtPct(row.oran) : '—'}
                     </td>
+                    <td className={clsx('px-4 py-2 text-right whitespace-nowrap', cariColor)}>
+                      {row.cariCount} / {totalCariCount}
+                      {cariPct !== null && (
+                        <span className="ml-1 text-[10px] opacity-70">({fmtPct(cariPct)})</span>
+                      )}
+                    </td>
                   </tr>
                 )
               })}
@@ -514,6 +546,14 @@ export function SellinSelloutView({ currentProfile, active }: Props) {
                   <td className="px-4 py-2 text-right">{fmtNum(totals.sellout)}</td>
                   <td className="px-4 py-2 text-right">
                     {totals.sellin > 0 ? fmtPct((totals.sellout / totals.sellin) * 100) : '—'}
+                  </td>
+                  <td className="px-4 py-2 text-right whitespace-nowrap">
+                    {totalSelloutCariCount} / {totalCariCount}
+                    {totalCariCount > 0 && (
+                      <span className="ml-1 text-[10px] opacity-70">
+                        ({fmtPct((totalSelloutCariCount / totalCariCount) * 100)})
+                      </span>
+                    )}
                   </td>
                 </tr>
               </tfoot>
