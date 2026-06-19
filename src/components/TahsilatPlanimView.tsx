@@ -276,28 +276,28 @@ export function TahsilatPlanimView({
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm bg-white">
-            <table className="text-xs border-collapse w-full">
+            <table className="text-[10px] border-collapse w-full table-fixed">
               <thead className="sticky top-0 z-20">
                 <tr className="bg-purple-600 text-white">
-                  <th className="sticky left-0 z-30 bg-purple-600 border-r border-purple-500 px-3 py-2 text-left min-w-[50px]">
+                  <th className="sticky left-0 z-30 bg-purple-600 border-r border-purple-500 px-1 py-1.5 text-left w-[70px]">
                     Cari Kod
                   </th>
-                  <th className="sticky left-[50px] z-30 bg-purple-600 border-r border-purple-500 px-3 py-2 text-left min-w-[200px]">
+                  <th className="bg-purple-600 border-r border-purple-500 px-1 py-1.5 text-left w-[160px]">
                     Cari İsim
                   </th>
                   {ayKolonlari.map((kolon, i) => (
-                    <th key={i} className="border-r border-purple-500 px-3 py-2 text-center min-w-[100px]">
+                    <th key={i} className="border-r border-purple-500 px-1 py-1.5 text-right w-[70px]">
                       {kolon.baslik}
                     </th>
                   ))}
-                  <th className="border-r border-purple-500 px-3 py-2 text-center min-w-[100px]">
+                  <th className="border-r border-purple-500 px-1 py-1.5 text-right w-[80px]">
                     Toplam
                   </th>
-                  <th className="border-r border-purple-500 px-3 py-2 text-center min-w-[150px]">
-                    Tahsilat Planım
+                  <th className="border-r border-purple-500 px-1 py-1.5 text-center w-[120px]">
+                    Tahsilat Planı
                   </th>
-                  <th className="border-r border-purple-500 px-3 py-2 text-center min-w-[130px]">
-                    Tahsilat Türü
+                  <th className="border-r border-purple-500 px-1 py-1.5 text-center w-[90px]">
+                    Tür
                   </th>
                 </tr>
               </thead>
@@ -313,76 +313,63 @@ export function TahsilatPlanimView({
                       'border-b border-gray-100 hover:bg-purple-50/30',
                       idx % 2 === 1 && 'bg-gray-50/40'
                     )}>
-                      <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-3 py-2 text-gray-600 font-mono text-[10px]">
+                      <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-1 py-1 text-gray-600 font-mono">
                         {row.cariKod}
                       </td>
-                      <td className="sticky left-[50px] z-10 bg-white border-r border-gray-200 px-3 py-2 font-semibold text-gray-800">
+                      <td className="bg-white border-r border-gray-200 px-1 py-1 font-medium text-gray-800 truncate" title={row.cariIsim}>
                         {row.cariIsim}
-                        {isBolgeMuduru && rowBsy !== bsyAdi && (
-                          <span className="ml-2 text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
-                            {rowBsy}
-                          </span>
-                        )}
                       </td>
 
                       {/* Ay kolonları */}
                       {ayKolonlari.map((kolon, i) => {
                         const deger = row[kolon.field]
                         return (
-                          <td key={i} className="border-r border-gray-100 px-3 py-2 text-right text-gray-600 tabular-nums">
-                            {deger > 0 ? fmtCur(deger) : '—'}
+                          <td key={i} className="border-r border-gray-100 px-1 py-1 text-right text-gray-600 tabular-nums">
+                            {deger > 0 ? (deger / 1000).toFixed(0) + 'K' : '—'}
                           </td>
                         )
                       })}
 
-                      <td className="border-r border-gray-100 px-3 py-2 text-right font-semibold text-gray-800 tabular-nums">
-                        {row.toplam > 0 ? fmtCur(row.toplam) : '—'}
+                      <td className="border-r border-gray-100 px-1 py-1 text-right font-semibold text-gray-800 tabular-nums">
+                        {row.toplam > 0 ? (row.toplam / 1000).toFixed(0) + 'K' : '—'}
                       </td>
 
                       {/* Tahsilat Planı Dropdown */}
-                      <td className="border-r border-gray-100 px-2 py-1.5">
+                      <td className="border-r border-gray-100 px-1 py-0.5">
                         <select
                           value={secim?.hafta || ''}
                           onChange={e => saveSecim(row.cariKod, row.cariIsim, 'hafta', e.target.value, rowBsy)}
                           disabled={saving}
                           className={clsx(
-                            'w-full text-xs border rounded px-2 py-1.5 focus:outline-none focus:border-purple-400',
+                            'w-full text-[9px] border rounded px-1 py-1 focus:outline-none focus:border-purple-400',
                             henuzSecilmedi || !secim?.hafta
                               ? 'bg-amber-50 border-amber-300 text-amber-700'
                               : 'bg-white border-gray-200 text-gray-800'
                           )}
                         >
-                          <option value="">
-                            {henuzSecilmedi || !secim?.hafta ? 'Henüz Plan Girmediniz' : 'Seçiniz'}
-                          </option>
+                          <option value="">{henuzSecilmedi || !secim?.hafta ? 'Plan Gir' : 'Seç'}</option>
                           {haftaSecenekleri.map(hafta => (
-                            <option key={hafta} value={hafta}>
-                              {hafta}
-                            </option>
+                            <option key={hafta} value={hafta}>{hafta}</option>
                           ))}
                         </select>
                       </td>
 
                       {/* Tahsilat Türü Dropdown */}
-                      <td className="border-r border-gray-100 px-2 py-1.5">
+                      <td className="border-r border-gray-100 px-1 py-0.5">
                         <select
                           value={secim?.tur || ''}
                           onChange={e => saveSecim(row.cariKod, row.cariIsim, 'tur', e.target.value, rowBsy)}
                           disabled={saving}
                           className={clsx(
-                            'w-full text-xs border rounded px-2 py-1.5 focus:outline-none focus:border-purple-400',
+                            'w-full text-[9px] border rounded px-1 py-1 focus:outline-none focus:border-purple-400',
                             henuzSecilmedi || !secim?.tur
                               ? 'bg-amber-50 border-amber-300 text-amber-700'
                               : 'bg-white border-gray-200 text-gray-800'
                           )}
                         >
-                          <option value="">
-                            {henuzSecilmedi || !secim?.tur ? 'Henüz Plan Girmediniz' : 'Seçiniz'}
-                          </option>
+                          <option value="">{henuzSecilmedi || !secim?.tur ? 'Plan Gir' : 'Seç'}</option>
                           {TAHSILAT_TURLERI.map(tur => (
-                            <option key={tur} value={tur}>
-                              {tur}
-                            </option>
+                            <option key={tur} value={tur}>{tur}</option>
                           ))}
                         </select>
                       </td>
