@@ -279,10 +279,10 @@ export function TahsilatPlanimView({
             <table className="text-xs border-collapse w-full">
               <thead className="sticky top-0 z-20">
                 <tr className="bg-purple-600 text-white">
-                  <th rowSpan={2} className="sticky left-0 z-30 bg-purple-600 border-r border-purple-500 px-3 py-2 text-left min-w-[50px]">
+                  <th className="sticky left-0 z-30 bg-purple-600 border-r border-purple-500 px-3 py-2 text-left min-w-[50px]">
                     Cari Kod
                   </th>
-                  <th rowSpan={2} className="sticky left-[50px] z-30 bg-purple-600 border-r border-purple-500 px-3 py-2 text-left min-w-[200px]">
+                  <th className="sticky left-[50px] z-30 bg-purple-600 border-r border-purple-500 px-3 py-2 text-left min-w-[200px]">
                     Cari İsim
                   </th>
                   {ayKolonlari.map((kolon, i) => (
@@ -290,13 +290,13 @@ export function TahsilatPlanimView({
                       {kolon.baslik}
                     </th>
                   ))}
-                  <th rowSpan={2} className="border-r border-purple-500 px-3 py-2 text-center min-w-[100px]">
+                  <th className="border-r border-purple-500 px-3 py-2 text-center min-w-[100px]">
                     Toplam
                   </th>
-                  <th rowSpan={2} className="border-r border-purple-500 px-3 py-2 text-center min-w-[150px]">
+                  <th className="border-r border-purple-500 px-3 py-2 text-center min-w-[150px]">
                     Tahsilat Planım
                   </th>
-                  <th rowSpan={2} className="border-r border-purple-500 px-3 py-2 text-center min-w-[130px]">
+                  <th className="border-r border-purple-500 px-3 py-2 text-center min-w-[130px]">
                     Tahsilat Türü
                   </th>
                 </tr>
