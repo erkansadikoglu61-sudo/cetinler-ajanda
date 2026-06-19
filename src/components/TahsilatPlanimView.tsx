@@ -298,7 +298,7 @@ export function TahsilatPlanimView({
                   <th className="sticky left-0 z-30 bg-purple-600 border-r border-purple-500 px-1 py-1.5 text-left w-[70px]">
                     Cari Kod
                   </th>
-                  <th className="bg-purple-600 border-r border-purple-500 px-1 py-1.5 text-left w-[160px]">
+                  <th className="bg-purple-600 border-r border-purple-500 px-1 py-1.5 text-left w-[110px]">
                     Cari İsim
                   </th>
                   {ayKolonlari.map((kolon, i) => (
