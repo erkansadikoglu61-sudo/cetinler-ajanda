@@ -85,11 +85,17 @@ export async function GET(req: Request) {
     }
   }
 
-  // BSY kodunu bul
+  // BSY kodunu bul (Burak Kılıç için hem IB1 hem IB2)
   const bsyNameToKod = Object.fromEntries(
     Object.entries(BSY_KOD_TO_NAME).map(([k, v]) => [v.toLocaleLowerCase('tr'), k])
   )
   const bsyKod = bsyNameToKod[bsyAdi.toLocaleLowerCase('tr')] ?? ''
+
+  // Burak Kılıç (IB1) için IB2'yi de ekle
+  const allowedBsyKods: string[] = bsyKod ? [bsyKod] : []
+  if (bsyKod === 'IB1') {
+    allowedBsyKods.push('IB2')
+  }
 
   // Supabase'den kullanıcı seçimlerini al
   const sb = createClient(
@@ -116,7 +122,7 @@ export async function GET(req: Request) {
   let bsyKodCol = -1
   for (let c = 0; c < header.length; c++) {
     const h = String(header[c] ?? '').trim().toLowerCase()
-    if (h === 'bsy kod' || h === 'bsy' || h === 'bsy kodu') {
+    if (h === 'bsy kod' || h === 'bsy' || h === 'bsy kodu' || h === 'bsy_kod') {
       bsyKodCol = c
       break
     }
@@ -134,9 +140,9 @@ export async function GET(req: Request) {
     if (!cariKod || !cariIsim) continue
 
     // BSY filtrelemesi
-    if (bsyAdi && bsyKod && bsyKodCol >= 0) {
+    if (bsyAdi && allowedBsyKods.length > 0 && bsyKodCol >= 0) {
       const rowBsyKod = String(r[bsyKodCol] ?? '').trim().toUpperCase()
-      if (rowBsyKod !== bsyKod) continue
+      if (!allowedBsyKods.includes(rowBsyKod)) continue
     }
 
     const onceki  = toNum(r[cols['Önceki']])
