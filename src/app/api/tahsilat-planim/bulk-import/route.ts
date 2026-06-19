@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     const inserts = rows.map((r: any) => ({
       bsy_adi: BSY_KOD_TO_NAME[r.bsyKod] || '',
       cari_kod: r.cariKod,
-      cari_isim: r.cariIsim,
+      cari_isim: r.cariIsim || '',
       yil,
       ay,
       tahsilat_haftasi: r.tahsilatHaftasi || null,
