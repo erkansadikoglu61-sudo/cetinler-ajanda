@@ -20,6 +20,7 @@ import { TASK_TYPES, VISIT_TYPES, MONTHS_TR, DAYS_SHORT, ROLE_LABELS } from '@/l
 import { generateVisitReport } from '@/lib/pdf'
 import { SelloutView } from '@/components/SelloutView'
 import { BsyView } from '@/components/BsyView'
+import { TahsilatPlanimView } from '@/components/TahsilatPlanimView'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
 import { GenelRaporlarView } from '@/components/GenelRaporlarView'
 import { KpiView } from '@/components/KpiView'
@@ -28,7 +29,7 @@ import { KullanicilarView } from '@/components/KullanicilarView'
 import { SellinSelloutView } from '@/components/SellinSelloutView'
 import { AdetPrimTablosu, BayiMerchHakdis } from '@/components/AdetPrimView'
 import { AnalizView } from '@/components/AnalizView'
-type TabType = 'month' | 'week' | 'day' | 'report' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'analiz'
+type TabType = 'month' | 'week' | 'day' | 'report' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'analiz' | 'tahsilat-planim'
 
 // Renk hex'ine alpha ekle
 function hexWithAlpha(hex: string, alpha: string) {
@@ -1814,10 +1815,10 @@ export default function AppPage() {
               {/* BSY grubu */}
               {isBsyOrAdmin && (
                 <button
-                  onClick={() => { if (!['bsy','kpi','genel-raporlar'].includes(tab)) setTab('bsy') }}
+                  onClick={() => { if (!['bsy','kpi','genel-raporlar','tahsilat-planim'].includes(tab)) setTab('bsy') }}
                   className={clsx(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                    ['bsy','kpi','genel-raporlar'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                    ['bsy','kpi','genel-raporlar','tahsilat-planim'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
                   )}
                 >
                   <Target size={15} /> BSY
@@ -1929,12 +1930,13 @@ export default function AppPage() {
             </div>
           )}
           {/* BSY alt sekmeleri */}
-          {isBsyOrAdmin && ['bsy','kpi','genel-raporlar'].includes(tab) && (
+          {isBsyOrAdmin && ['bsy','kpi','genel-raporlar','tahsilat-planim'].includes(tab) && (
             <div className="flex overflow-x-auto items-center gap-1 px-3 pb-1.5 scrollbar-none">
               {([
                 { key: 'bsy'            as const, icon: Target,   label: 'Ciro ve Tahsilat Takip' },
                 { key: 'kpi'            as const, icon: Activity,  label: 'Özel Hedefler' },
                 { key: 'genel-raporlar' as const, icon: BarChart2, label: 'Genel Raporlar' },
+                { key: 'tahsilat-planim' as const, icon: CalendarRange, label: 'Tahsilat Planım' },
               ] as const).map(({ key, icon: Icon, label }) => (
                 <button key={key} onClick={() => setTab(key)}
                   className={clsx(
@@ -2055,6 +2057,15 @@ export default function AppPage() {
               <GenelRaporlarView />
             </div>
           )}
+          {tab === 'tahsilat-planim' && isBsyOrAdmin && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <TahsilatPlanimView
+                bsyAdi={isBsy ? (currentProfile?.full_name ?? '') : ''}
+                isAdmin={currentProfile?.role === 'admin'}
+                isBolgeMuduru={currentProfile?.full_name === 'Burak Kılıç'}
+              />
+            </div>
+          )}
           {tab === 'noktalar' && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
               <NoktalarimizView
@@ -2095,7 +2106,7 @@ export default function AppPage() {
       )}
 
       {/* FAB — sadece takvim erişimi olan kullanıcılar takvim sekmelerinde görünür */}
-      {hasCalendarAccess && tab !== 'report' && tab !== 'visits' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && (
+      {hasCalendarAccess && tab !== 'report' && tab !== 'visits' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && tab !== 'tahsilat-planim' && (
         <button
           onClick={handleAddTask}
           className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
