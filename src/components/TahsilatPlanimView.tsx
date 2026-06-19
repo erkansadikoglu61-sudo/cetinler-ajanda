@@ -11,6 +11,22 @@ function fmtCur(n: number) {
   return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// Cari ismini akıllı şekilde kısalt
+function kisaltCariIsim(isim: string): string {
+  const kelimeler = isim.trim().split(/\s+/)
+  if (kelimeler.length === 0) return isim
+
+  const ilkKelime = kelimeler[0]
+
+  // İlk kelime 5 harften az ise ilk 2 kelimeyi göster
+  if (ilkKelime.length < 5 && kelimeler.length > 1) {
+    return kelimeler.slice(0, 2).join(' ')
+  }
+
+  // İlk kelimeyi döndür
+  return ilkKelime
+}
+
 interface TahsilatPlanimRow {
   cariKod:   string
   cariIsim:  string
@@ -316,8 +332,8 @@ export function TahsilatPlanimView({
                       <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-1 py-1 text-gray-600 font-mono">
                         {row.cariKod}
                       </td>
-                      <td className="bg-white border-r border-gray-200 px-1 py-1 font-medium text-gray-800 truncate" title={row.cariIsim}>
-                        {row.cariIsim}
+                      <td className="bg-white border-r border-gray-200 px-1 py-1 font-medium text-gray-800" title={row.cariIsim}>
+                        {kisaltCariIsim(row.cariIsim)}
                       </td>
 
                       {/* Ay kolonları */}
@@ -325,13 +341,13 @@ export function TahsilatPlanimView({
                         const deger = row[kolon.field]
                         return (
                           <td key={i} className="border-r border-gray-100 px-1 py-1 text-right text-gray-600 tabular-nums">
-                            {deger > 0 ? (deger / 1000).toFixed(0) + 'K' : '—'}
+                            {deger > 0 ? Math.round(deger).toLocaleString('tr-TR') : '—'}
                           </td>
                         )
                       })}
 
                       <td className="border-r border-gray-100 px-1 py-1 text-right font-semibold text-gray-800 tabular-nums">
-                        {row.toplam > 0 ? (row.toplam / 1000).toFixed(0) + 'K' : '—'}
+                        {row.toplam > 0 ? Math.round(row.toplam).toLocaleString('tr-TR') : '—'}
                       </td>
 
                       {/* Tahsilat Planı Dropdown */}
