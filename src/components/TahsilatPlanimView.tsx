@@ -44,60 +44,45 @@ interface TahsilatPlanimRow {
   tahsilatTuru?: string
 }
 
-// Hafta seçeneklerini dinamik oluştur
+// Hafta seçeneklerini dinamik oluştur (Pazartesi-Pazar, bugünden itibaren 8 hafta)
 function getHaftaSecenekleri(ay: number): string[] {
-  const now = new Date()
-  const bugun = now.getDate()
-  const buAy = now.getMonth() + 1
+  const bugun = new Date()
 
-  // Temmuz ayı için sabit haftalar (Pazartesi-Cumartesi)
-  const temmuzHaftalar = [
-    '30 Haziran-5 Temmuz',
-    '7-12 Temmuz',
-    '14-19 Temmuz',
-    '21-26 Temmuz',
-    '28 Temmuz-2 Ağustos'
-  ]
+  // Bu haftanın pazartesini bul
+  const gunIndex = bugun.getDay() // 0=Pazar, 1=Pazartesi, ..., 6=Cumartesi
+  const pazartesiFarki = gunIndex === 0 ? -6 : 1 - gunIndex // Pazar ise -6, yoksa 1-günIndex
 
-  // Haziran ayı için sabit haftalar (Pazartesi-Cumartesi)
-  const haziranHaftalar = [
-    '2-7 Haziran',
-    '9-14 Haziran',
-    '16-21 Haziran',
-    '23-28 Haziran',
-    '30 Haziran-5 Temmuz'
-  ]
+  const buHaftaPazartesi = new Date(bugun)
+  buHaftaPazartesi.setDate(bugun.getDate() + pazartesiFarki)
 
-  if (ay === 6) { // Haziran
-    if (buAy === 6) {
-      // Bugünün tarihine göre filtrele
-      const filtered = haziranHaftalar.filter(hafta => {
-        const parcalar = hafta.split('-')
-        const baslangic = parseInt(parcalar[0].replace(/\D/g, ''))
-        return bugun <= baslangic + 6 // Haftanın son günü
-      })
-      // En sona "Tahsilat Yapıldı" ekle
-      return [...filtered, 'Tahsilat Yapıldı']
+  const haftalar: string[] = []
+
+  // 8 hafta oluştur
+  for (let i = 0; i < 8; i++) {
+    const haftaBaslangic = new Date(buHaftaPazartesi)
+    haftaBaslangic.setDate(buHaftaPazartesi.getDate() + (i * 7))
+
+    const haftaBitis = new Date(haftaBaslangic)
+    haftaBitis.setDate(haftaBaslangic.getDate() + 6) // Pazar
+
+    const baslangicGun = haftaBaslangic.getDate()
+    const baslangicAy = MONTHS_TR[haftaBaslangic.getMonth()]
+    const bitisGun = haftaBitis.getDate()
+    const bitisAy = MONTHS_TR[haftaBitis.getMonth()]
+
+    if (haftaBaslangic.getMonth() === haftaBitis.getMonth()) {
+      // Aynı ay içinde
+      haftalar.push(`${baslangicGun}-${bitisGun} ${baslangicAy}`)
+    } else {
+      // Ay geçişi var
+      haftalar.push(`${baslangicGun} ${baslangicAy}-${bitisGun} ${bitisAy}`)
     }
-    return [...haziranHaftalar, 'Tahsilat Yapıldı']
   }
 
-  if (ay === 7) { // Temmuz
-    return [...temmuzHaftalar, 'Tahsilat Yapıldı']
-  }
+  // En sona "Tahsilat Yapıldı" ekle
+  haftalar.push('Tahsilat Yapıldı')
 
-  // Diğer aylar için dinamik oluştur
-  const ayAdi = MONTHS_TR[ay - 1]
-  const sonrakiAy = MONTHS_TR[ay % 12]
-
-  return [
-    `1-6 ${ayAdi}`,
-    `7-13 ${ayAdi}`,
-    `14-20 ${ayAdi}`,
-    `21-27 ${ayAdi}`,
-    `28 ${ayAdi}-4 ${sonrakiAy}`,
-    'Tahsilat Yapıldı'
-  ]
+  return haftalar
 }
 
 const TAHSILAT_TURLERI = ['Çek', 'Nakit', 'Kredi Kartı']
