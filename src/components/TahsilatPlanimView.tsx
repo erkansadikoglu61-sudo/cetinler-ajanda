@@ -71,17 +71,19 @@ function getHaftaSecenekleri(ay: number): string[] {
   if (ay === 6) { // Haziran
     if (buAy === 6) {
       // Bugünün tarihine göre filtrele
-      return haziranHaftalar.filter(hafta => {
+      const filtered = haziranHaftalar.filter(hafta => {
         const parcalar = hafta.split('-')
         const baslangic = parseInt(parcalar[0].replace(/\D/g, ''))
         return bugun <= baslangic + 6 // Haftanın son günü
       })
+      // En sona "Tahsilat Yapıldı" ekle
+      return [...filtered, 'Tahsilat Yapıldı']
     }
-    return haziranHaftalar
+    return [...haziranHaftalar, 'Tahsilat Yapıldı']
   }
 
   if (ay === 7) { // Temmuz
-    return temmuzHaftalar
+    return [...temmuzHaftalar, 'Tahsilat Yapıldı']
   }
 
   // Diğer aylar için dinamik oluştur
@@ -93,7 +95,8 @@ function getHaftaSecenekleri(ay: number): string[] {
     `7-13 ${ayAdi}`,
     `14-20 ${ayAdi}`,
     `21-27 ${ayAdi}`,
-    `28 ${ayAdi}-4 ${sonrakiAy}`
+    `28 ${ayAdi}-4 ${sonrakiAy}`,
+    'Tahsilat Yapıldı'
   ]
 }
 
