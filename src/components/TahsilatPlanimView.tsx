@@ -57,8 +57,8 @@ function getHaftaSecenekleri(ay: number): string[] {
 
   const haftalar: string[] = []
 
-  // 8 hafta oluştur
-  for (let i = 0; i < 8; i++) {
+  // 7 hafta oluştur
+  for (let i = 0; i < 7; i++) {
     const haftaBaslangic = new Date(buHaftaPazartesi)
     haftaBaslangic.setDate(buHaftaPazartesi.getDate() + (i * 7))
 
