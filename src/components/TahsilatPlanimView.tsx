@@ -50,22 +50,22 @@ function getHaftaSecenekleri(ay: number): string[] {
   const bugun = now.getDate()
   const buAy = now.getMonth() + 1
 
-  // Temmuz ayı için sabit haftalar
+  // Temmuz ayı için sabit haftalar (Pazartesi-Cumartesi)
   const temmuzHaftalar = [
-    '29 Haziran-4 Temmuz',
-    '5-11 Temmuz',
-    '12-18 Temmuz',
-    '19-25 Temmuz',
-    '26 Temmuz-1 Ağustos'
+    '30 Haziran-5 Temmuz',
+    '7-12 Temmuz',
+    '14-19 Temmuz',
+    '21-26 Temmuz',
+    '28 Temmuz-2 Ağustos'
   ]
 
-  // Haziran ayı için sabit haftalar
+  // Haziran ayı için sabit haftalar (Pazartesi-Cumartesi)
   const haziranHaftalar = [
-    '1-6 Haziran',
-    '7-13 Haziran',
-    '14-20 Haziran',
-    '21-27 Haziran',
-    '28 Haziran-4 Temmuz'
+    '2-7 Haziran',
+    '9-14 Haziran',
+    '16-21 Haziran',
+    '23-28 Haziran',
+    '30 Haziran-5 Temmuz'
   ]
 
   if (ay === 6) { // Haziran
@@ -360,7 +360,7 @@ export function TahsilatPlanimView({
                           onChange={e => saveSecim(row.cariKod, row.cariIsim, 'hafta', e.target.value, rowBsy)}
                           disabled={saving}
                           className={clsx(
-                            'w-full text-[9px] border rounded px-1 py-1 focus:outline-none focus:border-purple-400',
+                            'w-full text-[8px] border rounded px-1 py-1 focus:outline-none focus:border-purple-400',
                             henuzSecilmedi || !secim?.hafta
                               ? 'bg-amber-50 border-amber-300 text-amber-700'
                               : 'bg-white border-gray-200 text-gray-800'
@@ -380,7 +380,7 @@ export function TahsilatPlanimView({
                           onChange={e => saveSecim(row.cariKod, row.cariIsim, 'tur', e.target.value, rowBsy)}
                           disabled={saving}
                           className={clsx(
-                            'w-full text-[9px] border rounded px-1 py-1 focus:outline-none focus:border-purple-400',
+                            'w-full text-[8px] border rounded px-1 py-1 focus:outline-none focus:border-purple-400',
                             henuzSecilmedi || !secim?.tur
                               ? 'bg-amber-50 border-amber-300 text-amber-700'
                               : 'bg-white border-gray-200 text-gray-800'
