@@ -405,7 +405,7 @@ export function TahsilatPlanimView({
                           onChange={e => saveSecim(row.cariKod, row.cariIsim, 'hafta', e.target.value, rowBsy)}
                           disabled={saving}
                           className={clsx(
-                            'w-full text-[8px] border rounded px-1 py-1 focus:outline-none focus:border-purple-400',
+                            'w-full text-[7px] border rounded px-0.5 py-0.5 focus:outline-none focus:border-purple-400',
                             !secim?.hafta
                               ? 'bg-amber-50 border-amber-300 text-amber-700'
                               : 'bg-white border-purple-300 text-purple-700 font-semibold'
@@ -425,7 +425,7 @@ export function TahsilatPlanimView({
                           onChange={e => saveSecim(row.cariKod, row.cariIsim, 'tur', e.target.value, rowBsy)}
                           disabled={saving}
                           className={clsx(
-                            'w-full text-[8px] border rounded px-1 py-1 focus:outline-none focus:border-purple-400',
+                            'w-full text-[7px] border rounded px-0.5 py-0.5 focus:outline-none focus:border-purple-400',
                             !secim?.tur
                               ? 'bg-amber-50 border-amber-300 text-amber-700'
                               : 'bg-white border-purple-300 text-purple-700 font-semibold'
