@@ -431,13 +431,18 @@ export function TahsilatPlanimView({
                       <td className="border-r border-gray-100 px-1 py-0.5">
                         <input
                           type="number"
-                          value={secim?.tutar ?? ''}
-                          onChange={e => {
+                          defaultValue={secim?.tutar ?? ''}
+                          onBlur={e => {
                             const val = e.target.value === '' ? null : parseFloat(e.target.value)
                             if (val !== null && !isNaN(val)) {
                               saveSecim(row.cariKod, row.cariIsim, 'tutar', val, rowBsy)
                             } else if (val === null) {
-                              saveSecim(row.cariKod, row.cariIsim, 'tutar', val, rowBsy)
+                              saveSecim(row.cariKod, row.cariIsim, 'tutar', null, rowBsy)
+                            }
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.currentTarget.blur()
                             }
                           }}
                           disabled={saving}
