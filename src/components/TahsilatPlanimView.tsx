@@ -118,30 +118,44 @@ export function TahsilatPlanimView({
     try {
       let allRows: TahsilatPlanimRow[] = []
 
-      // Admin için seçilen BSY'nin verilerini çek, yoksa ilk BSY'yi seç
-      const targetBsy = isAdmin ? selectedBsy : bsyAdi
+      if (isAdmin) {
+        // Admin için: BSY seçiliyse onun verilerini, seçili değilse tüm BSY'lerin verilerini çek
+        if (selectedBsy) {
+          // Belirli bir BSY seçili
+          const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(selectedBsy)}`)
+          const data = await res.json()
+          allRows = (data.rows || []).map((r: TahsilatPlanimRow) => ({
+            ...r,
+            _bsyAdi: selectedBsy
+          }))
+        } else {
+          // Hiç BSY seçili değil - tüm BSY'lerin verilerini çek
+          for (const bsy of BSY_LISTESI) {
+            const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(bsy)}`)
+            const data = await res.json()
+            const rowsWithBsy = (data.rows || []).map((r: TahsilatPlanimRow) => ({
+              ...r,
+              _bsyAdi: bsy,
+              bsyAdi: bsy
+            }))
+            allRows.push(...rowsWithBsy)
+          }
+        }
+      } else {
+        // BSY kullanıcısı için
+        const bsyAdlari = isBolgeMuduru
+          ? [bsyAdi, 'Okan Oğuz']
+          : [bsyAdi]
 
-      if (!targetBsy) {
-        setRows([])
-        setLoading(false)
-        return
-      }
-
-      // Bölge müdürü için hem kendi hem de IB2'nin verilerini çek
-      const bsyAdlari = isBolgeMuduru && !isAdmin
-        ? [bsyAdi, 'Okan Oğuz']
-        : [targetBsy]
-
-      for (const bsy of bsyAdlari) {
-        const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(bsy)}`)
-        const data = await res.json()
-
-        // Her satıra BSY bilgisini ekle
-        const rowsWithBsy = (data.rows || []).map((r: TahsilatPlanimRow) => ({
-          ...r,
-          _bsyAdi: bsy
-        }))
-        allRows.push(...rowsWithBsy)
+        for (const bsy of bsyAdlari) {
+          const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(bsy)}`)
+          const data = await res.json()
+          const rowsWithBsy = (data.rows || []).map((r: TahsilatPlanimRow) => ({
+            ...r,
+            _bsyAdi: bsy
+          }))
+          allRows.push(...rowsWithBsy)
+        }
       }
 
       setRows(allRows)
@@ -324,6 +338,11 @@ export function TahsilatPlanimView({
                   <th className="bg-purple-600 border-r border-purple-500 px-1 py-1.5 text-left w-[110px]">
                     Cari İsim
                   </th>
+                  {isAdmin && !selectedBsy && (
+                    <th className="bg-purple-600 border-r border-purple-500 px-1 py-1.5 text-left w-[90px]">
+                      BSY
+                    </th>
+                  )}
                   {ayKolonlari.map((kolon, i) => (
                     <th key={i} className="border-r border-purple-500 px-1 py-1.5 text-right w-[70px]">
                       {kolon.baslik}
@@ -358,6 +377,11 @@ export function TahsilatPlanimView({
                       <td className="bg-white border-r border-gray-200 px-1 py-1 font-medium text-gray-800" title={row.cariIsim}>
                         {kisaltCariIsim(row.cariIsim)}
                       </td>
+                      {isAdmin && !selectedBsy && (
+                        <td className="bg-white border-r border-gray-200 px-1 py-1 text-xs text-gray-700 font-medium">
+                          {row.bsyAdi || rowBsy || '-'}
+                        </td>
+                      )}
 
                       {/* Ay kolonları */}
                       {ayKolonlari.map((kolon, i) => {
