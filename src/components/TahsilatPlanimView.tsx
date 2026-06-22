@@ -146,7 +146,9 @@ export function TahsilatPlanimView({
         allRows.forEach(r => {
           // Eğer veritabanından gelen veri varsa, state'i güncelle
           if (r.tahsilatHaftasi || r.tahsilatTuru) {
-            newSecimler.set(r.cariKod, {
+            // Admin için: cariKod + bsyAdi kombinasyonu key olarak kullan
+            const key = isAdmin && r.bsyAdi ? `${r.cariKod}|${r.bsyAdi}` : r.cariKod
+            newSecimler.set(key, {
               hafta: r.tahsilatHaftasi || '',
               tur: r.tahsilatTuru || ''
             })
@@ -167,7 +169,9 @@ export function TahsilatPlanimView({
   async function saveSecim(cariKod: string, cariIsim: string, field: 'hafta' | 'tur', value: string, rowBsy: string) {
     setSaving(true)
     try {
-      const current = secimler.get(cariKod) || { hafta: '', tur: '' }
+      // Admin için: cariKod + bsyAdi kombinasyonu key olarak kullan
+      const key = isAdmin && rowBsy ? `${cariKod}|${rowBsy}` : cariKod
+      const current = secimler.get(key) || { hafta: '', tur: '' }
       const updated = { ...current, [field]: value }
 
       await fetch('/api/tahsilat-planim', {
@@ -184,7 +188,7 @@ export function TahsilatPlanimView({
         })
       })
 
-      setSecimler(new Map(secimler.set(cariKod, updated)))
+      setSecimler(new Map(secimler.set(key, updated)))
     } finally {
       setSaving(false)
     }
@@ -239,7 +243,8 @@ export function TahsilatPlanimView({
   const filteredRows = useMemo(() => {
     if (!isAdmin || !sadecePlanGirilmis) return rows
     return rows.filter(row => {
-      const secim = secimler.get(row.cariKod)
+      const key = isAdmin && row.bsyAdi ? `${row.cariKod}|${row.bsyAdi}` : row.cariKod
+      const secim = secimler.get(key)
       return secim?.hafta || secim?.tur
     })
   }, [rows, sadecePlanGirilmis, secimler, isAdmin])
@@ -348,9 +353,10 @@ export function TahsilatPlanimView({
 
               <tbody>
                 {filteredRows.map((row, idx) => {
-                  const secim = secimler.get(row.cariKod)
-                  const henuzSecilmedi = !secim?.hafta || !secim?.tur
                   const rowBsy = row.bsyAdi || (row as any)._bsyAdi || bsyAdi
+                  const key = isAdmin && rowBsy ? `${row.cariKod}|${rowBsy}` : row.cariKod
+                  const secim = secimler.get(key)
+                  const henuzSecilmedi = !secim?.hafta || !secim?.tur
 
                   return (
                     <tr key={`${row.cariKod}-${idx}`} className={clsx(
