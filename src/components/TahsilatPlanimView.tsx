@@ -45,6 +45,7 @@ interface TahsilatPlanimRow {
   haziran:   number
   toplam:    number
   tahsilatHaftasi?: string
+  tutar?: number
   tahsilatTuru?: string
 }
 
@@ -110,7 +111,7 @@ export function TahsilatPlanimView({
   const [selectedBsy, setSelectedBsy] = useState<string>('') // Admin için BSY filtresi
 
   // Kullanıcı seçimleri (local state)
-  const [secimler, setSecimler] = useState<Map<string, { hafta: string; tur: string }>>(new Map())
+  const [secimler, setSecimler] = useState<Map<string, { hafta: string; tutar: number | null; tur: string }>>(new Map())
 
   // Verileri yükle
   async function loadData() {
@@ -166,9 +167,10 @@ export function TahsilatPlanimView({
         const newSecimler = new Map(prevSecimler)
         allRows.forEach(r => {
           // Eğer veritabanından gelen veri varsa, state'i güncelle
-          if (r.tahsilatHaftasi || r.tahsilatTuru) {
+          if (r.tahsilatHaftasi || r.tutar || r.tahsilatTuru) {
             newSecimler.set(r.cariKod, {
               hafta: r.tahsilatHaftasi || '',
+              tutar: r.tutar ?? null,
               tur: r.tahsilatTuru || ''
             })
           }
@@ -185,10 +187,10 @@ export function TahsilatPlanimView({
   }, [selectedBsy, bsyAdi, isBolgeMuduru, isAdmin])
 
   // Seçimi kaydet
-  async function saveSecim(cariKod: string, cariIsim: string, field: 'hafta' | 'tur', value: string, rowBsy: string) {
+  async function saveSecim(cariKod: string, cariIsim: string, field: 'hafta' | 'tutar' | 'tur', value: string | number, rowBsy: string) {
     setSaving(true)
     try {
-      const current = secimler.get(cariKod) || { hafta: '', tur: '' }
+      const current = secimler.get(cariKod) || { hafta: '', tutar: null, tur: '' }
       const updated = { ...current, [field]: value }
 
       await fetch('/api/tahsilat-planim', {
@@ -201,6 +203,7 @@ export function TahsilatPlanimView({
           cariKod,
           cariIsim,
           tahsilatHaftasi: updated.hafta,
+          tutar: updated.tutar,
           tahsilatTuru: updated.tur
         })
       })
@@ -355,6 +358,9 @@ export function TahsilatPlanimView({
                   <th className="border-r border-purple-500 px-1 py-1.5 text-center w-[150px]">
                     Tahsilat Planı
                   </th>
+                  <th className="border-r border-purple-500 px-1 py-1.5 text-center w-[90px]">
+                    Tutar
+                  </th>
                   <th className="border-r border-purple-500 px-1 py-1.5 text-center w-[100px]">
                     Tür
                   </th>
@@ -416,6 +422,30 @@ export function TahsilatPlanimView({
                             <option key={hafta} value={hafta}>{hafta}</option>
                           ))}
                         </select>
+                      </td>
+
+                      {/* Tutar Input */}
+                      <td className="border-r border-gray-100 px-1 py-0.5">
+                        <input
+                          type="number"
+                          value={secim?.tutar ?? ''}
+                          onChange={e => {
+                            const val = e.target.value === '' ? null : parseFloat(e.target.value)
+                            if (val !== null && !isNaN(val)) {
+                              saveSecim(row.cariKod, row.cariIsim, 'tutar', val, rowBsy)
+                            } else if (val === null) {
+                              saveSecim(row.cariKod, row.cariIsim, 'tutar', val, rowBsy)
+                            }
+                          }}
+                          disabled={saving}
+                          placeholder="₺"
+                          className={clsx(
+                            'w-full text-[7px] border rounded px-0.5 py-0.5 focus:outline-none focus:border-purple-400 text-right',
+                            !secim?.tutar
+                              ? 'bg-amber-50 border-amber-300 text-amber-700'
+                              : 'bg-white border-purple-300 text-purple-700 font-semibold'
+                          )}
+                        />
                       </td>
 
                       {/* Tahsilat Türü Dropdown */}

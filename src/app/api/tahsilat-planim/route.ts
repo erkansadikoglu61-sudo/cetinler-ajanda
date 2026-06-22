@@ -46,6 +46,7 @@ export interface TahsilatPlanimRow {
   haziran:   number
   toplam:    number
   tahsilatHaftasi?: string  // Kullanıcı seçimi
+  tutar?: number            // Kullanıcı girişi
   tahsilatTuru?: string     // Kullanıcı seçimi
 }
 
@@ -129,10 +130,11 @@ export async function GET(req: Request) {
     sampleData: secimler?.slice(0, 2)
   })
 
-  const secimMap = new Map<string, { tahsilatHaftasi: string; tahsilatTuru: string }>()
+  const secimMap = new Map<string, { tahsilatHaftasi: string; tutar: number | null; tahsilatTuru: string }>()
   secimler?.forEach(s => {
     secimMap.set(s.cari_kod, {
       tahsilatHaftasi: s.tahsilat_haftasi ?? '',
+      tutar: s.tutar ?? null,
       tahsilatTuru: s.tahsilat_turu ?? ''
     })
   })
@@ -194,6 +196,7 @@ export async function GET(req: Request) {
       haziran,
       toplam,
       tahsilatHaftasi: secim?.tahsilatHaftasi,
+      tutar: secim?.tutar ?? undefined,
       tahsilatTuru: secim?.tahsilatTuru
     })
   }
@@ -205,9 +208,9 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { bsyAdi, yil, ay, cariKod, tahsilatHaftasi, tahsilatTuru } = body
+    const { bsyAdi, yil, ay, cariKod, tahsilatHaftasi, tutar, tahsilatTuru } = body
 
-    console.log('💾 Tahsilat Planı Kaydet:', { bsyAdi, cariKod, yil, ay, tahsilatHaftasi, tahsilatTuru })
+    console.log('💾 Tahsilat Planı Kaydet:', { bsyAdi, cariKod, yil, ay, tahsilatHaftasi, tutar, tahsilatTuru })
 
     if (!bsyAdi || !cariKod) {
       console.error('❌ Validation Error: BSY adı veya Cari kod eksik')
@@ -228,6 +231,7 @@ export async function POST(req: Request) {
         yil,
         ay,
         tahsilat_haftasi: tahsilatHaftasi,
+        tutar: tutar ?? null,
         tahsilat_turu: tahsilatTuru,
         updated_at: new Date().toISOString()
       }, {
