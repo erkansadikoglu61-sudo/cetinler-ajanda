@@ -131,17 +131,20 @@ export function TahsilatPlanimView({
 
       setRows(allRows)
 
-      // Seçimleri yükle
-      const newSecimler = new Map<string, { hafta: string; tur: string }>()
-      allRows.forEach(r => {
-        if (r.tahsilatHaftasi || r.tahsilatTuru) {
-          newSecimler.set(r.cariKod, {
-            hafta: r.tahsilatHaftasi || '',
-            tur: r.tahsilatTuru || ''
-          })
-        }
+      // Seçimleri yükle - mevcut seçimleri koru, sadece yeni verileri ekle
+      setSecimler(prevSecimler => {
+        const newSecimler = new Map(prevSecimler)
+        allRows.forEach(r => {
+          // Eğer veritabanından gelen veri varsa, state'i güncelle
+          if (r.tahsilatHaftasi || r.tahsilatTuru) {
+            newSecimler.set(r.cariKod, {
+              hafta: r.tahsilatHaftasi || '',
+              tur: r.tahsilatTuru || ''
+            })
+          }
+        })
+        return newSecimler
       })
-      setSecimler(newSecimler)
     } finally {
       setLoading(false)
     }

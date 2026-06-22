@@ -29,17 +29,45 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'No valid data to import', count: 0 })
     }
 
+    // Önce mevcut kayıtları kontrol et - sadece YENİ kayıtları ekle, mevcut olanları GÜNCELLEME
+    const cariKodlar = inserts.map((i: any) => i.cari_kod)
+    const { data: mevcutKayitlar } = await sb
+      .from('tahsilat_planim')
+      .select('cari_kod, bsy_adi')
+      .eq('yil', yil)
+      .eq('ay', ay)
+      .in('cari_kod', cariKodlar)
+
+    const mevcutSet = new Set(
+      mevcutKayitlar?.map(k => `${k.bsy_adi}|${k.cari_kod}`) || []
+    )
+
+    // Sadece mevcut olmayan kayıtları ekle
+    const yeniKayitlar = inserts.filter((i: any) =>
+      !mevcutSet.has(`${i.bsy_adi}|${i.cari_kod}`)
+    )
+
+    if (yeniKayitlar.length === 0) {
+      return NextResponse.json({
+        message: 'Tüm kayıtlar zaten mevcut, güncelleme yapılmadı',
+        count: 0,
+        skipped: inserts.length
+      })
+    }
+
     const { error } = await sb
       .from('tahsilat_planim')
-      .upsert(inserts, {
-        onConflict: 'bsy_adi,cari_kod,yil,ay'
-      })
+      .insert(yeniKayitlar)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, count: inserts.length })
+    return NextResponse.json({
+      success: true,
+      count: yeniKayitlar.length,
+      skipped: inserts.length - yeniKayitlar.length
+    })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
