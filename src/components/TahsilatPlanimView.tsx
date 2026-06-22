@@ -346,12 +346,12 @@ export function TahsilatPlanimView({
                           disabled={saving}
                           className={clsx(
                             'w-full text-[8px] border rounded px-1 py-1 focus:outline-none focus:border-purple-400',
-                            henuzSecilmedi || !secim?.hafta
+                            !secim?.hafta
                               ? 'bg-amber-50 border-amber-300 text-amber-700'
                               : 'bg-white border-purple-300 text-purple-700 font-semibold'
                           )}
                         >
-                          <option value="">{henuzSecilmedi || !secim?.hafta ? 'Plan Gir' : 'Seç'}</option>
+                          <option value="">{!secim?.hafta ? 'Plan Gir' : 'Seç'}</option>
                           {haftaSecenekleri.map(hafta => (
                             <option key={hafta} value={hafta}>{hafta}</option>
                           ))}
@@ -366,12 +366,12 @@ export function TahsilatPlanimView({
                           disabled={saving}
                           className={clsx(
                             'w-full text-[8px] border rounded px-1 py-1 focus:outline-none focus:border-purple-400',
-                            henuzSecilmedi || !secim?.tur
+                            !secim?.tur
                               ? 'bg-amber-50 border-amber-300 text-amber-700'
                               : 'bg-white border-purple-300 text-purple-700 font-semibold'
                           )}
                         >
-                          <option value="">{henuzSecilmedi || !secim?.tur ? 'Plan Gir' : 'Seç'}</option>
+                          <option value="">{!secim?.tur ? 'Plan Gir' : 'Seç'}</option>
                           {TAHSILAT_TURLERI.map(tur => (
                             <option key={tur} value={tur}>{tur}</option>
                           ))}
