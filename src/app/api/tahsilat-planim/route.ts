@@ -118,6 +118,9 @@ export async function GET(req: Request) {
 
   const { data: secimler } = await secimlerQuery
 
+  // Debug log
+  console.log('📊 Tahsilat Planı Query:', { showAll, bsyAdi, yil, ay, secimCount: secimler?.length })
+
   const secimMap = new Map<string, { tahsilatHaftasi: string; tahsilatTuru: string }>()
   secimler?.forEach(s => {
     secimMap.set(s.cari_kod, {
