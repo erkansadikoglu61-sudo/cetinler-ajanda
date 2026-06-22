@@ -187,11 +187,14 @@ export function TahsilatPlanimView({
   }, [selectedBsy, bsyAdi, isBolgeMuduru, isAdmin])
 
   // Seçimi kaydet
-  async function saveSecim(cariKod: string, cariIsim: string, field: 'hafta' | 'tutar' | 'tur', value: string | number, rowBsy: string) {
+  async function saveSecim(cariKod: string, cariIsim: string, field: 'hafta' | 'tutar' | 'tur', value: string | number | null, rowBsy: string) {
     setSaving(true)
     try {
       const current = secimler.get(cariKod) || { hafta: '', tutar: null, tur: '' }
-      const updated = { ...current, [field]: value }
+      const updated: { hafta: string; tutar: number | null; tur: string } = {
+        ...current,
+        [field]: field === 'tutar' ? (value as number | null) : (value as string)
+      }
 
       await fetch('/api/tahsilat-planim', {
         method: 'POST',
