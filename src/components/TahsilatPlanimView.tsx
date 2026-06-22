@@ -352,10 +352,10 @@ export function TahsilatPlanimView({
                   <th className="border-r border-purple-500 px-1 py-1.5 text-right w-[80px]">
                     Toplam
                   </th>
-                  <th className="border-r border-purple-500 px-1 py-1.5 text-center w-[120px]">
+                  <th className="border-r border-purple-500 px-1 py-1.5 text-center w-[150px]">
                     Tahsilat Planı
                   </th>
-                  <th className="border-r border-purple-500 px-1 py-1.5 text-center w-[90px]">
+                  <th className="border-r border-purple-500 px-1 py-1.5 text-center w-[100px]">
                     Tür
                   </th>
                 </tr>
