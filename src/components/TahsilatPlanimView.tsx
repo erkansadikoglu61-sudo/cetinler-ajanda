@@ -119,20 +119,29 @@ export function TahsilatPlanimView({
       let allRows: TahsilatPlanimRow[] = []
 
       if (isAdmin) {
-        // Admin için: BSY seçilmemişse boş göster (hızlı yükleme için)
-        if (!selectedBsy) {
-          setRows([])
-          setLoading(false)
-          return
-        }
+        if (selectedBsy) {
+          // Belirli bir BSY seçili - sadece onun verilerini çek
+          const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(selectedBsy)}`)
+          const data = await res.json()
+          allRows = (data.rows || []).map((r: TahsilatPlanimRow) => ({
+            ...r,
+            _bsyAdi: selectedBsy
+          }))
+        } else {
+          // BSY seçili değil - TÜM BSY'lerin verilerini PARALEL çek (hızlı!)
+          const promises = BSY_LISTESI.map(async (bsy) => {
+            const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(bsy)}`)
+            const data = await res.json()
+            return (data.rows || []).map((r: TahsilatPlanimRow) => ({
+              ...r,
+              _bsyAdi: bsy,
+              bsyAdi: bsy
+            }))
+          })
 
-        // Belirli bir BSY seçili
-        const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(selectedBsy)}`)
-        const data = await res.json()
-        allRows = (data.rows || []).map((r: TahsilatPlanimRow) => ({
-          ...r,
-          _bsyAdi: selectedBsy
-        }))
+          const results = await Promise.all(promises)
+          allRows = results.flat()
+        }
       } else {
         // BSY kullanıcısı için
         const bsyAdlari = isBolgeMuduru
