@@ -34,6 +34,7 @@ function toNum(v: unknown): number {
 export interface TahsilatPlanimRow {
   cariKod:   string
   cariIsim:  string
+  bsyAdi?:   string         // Admin için BSY bilgisi
   onceki:    number
   kasim:     number
   aralik:    number
@@ -57,6 +58,7 @@ export async function GET(req: Request) {
   const yil    = sp.get('yil') ? parseInt(sp.get('yil')!) : new Date().getFullYear()
   const ay     = sp.get('ay')  ? parseInt(sp.get('ay')!)  : new Date().getMonth() + 1
   const bsyAdi = sp.get('bsyAdi') ?? ''
+  const showAll = sp.get('showAll') === 'true' // Admin için tümünü göster
 
   const buf = await getExcelBuffer()
   if (!buf) return NextResponse.json<TahsilatPlanimResponse>({ rows: [] })
@@ -103,18 +105,27 @@ export async function GET(req: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  const { data: secimler } = await sb
+  // Admin için tüm seçimleri çek, normal kullanıcı için sadece kendi BSY'sini
+  let secimlerQuery = sb
     .from('tahsilat_planim')
     .select('*')
-    .eq('bsy_adi', bsyAdi)
     .eq('yil', yil)
     .eq('ay', ay)
 
-  const secimMap = new Map<string, { tahsilatHaftasi: string; tahsilatTuru: string }>()
+  if (!showAll && bsyAdi) {
+    secimlerQuery = secimlerQuery.eq('bsy_adi', bsyAdi)
+  }
+
+  const { data: secimler } = await secimlerQuery
+
+  const secimMap = new Map<string, { tahsilatHaftasi: string; tahsilatTuru: string; bsyAdi: string }>()
   secimler?.forEach(s => {
-    secimMap.set(s.cari_kod, {
+    // Admin için: cari_kod + bsy_adi kombinasyonu ile kaydet
+    const key = showAll ? `${s.cari_kod}|${s.bsy_adi}` : s.cari_kod
+    secimMap.set(key, {
       tahsilatHaftasi: s.tahsilat_haftasi ?? '',
-      tahsilatTuru: s.tahsilat_turu ?? ''
+      tahsilatTuru: s.tahsilat_turu ?? '',
+      bsyAdi: s.bsy_adi
     })
   })
 
@@ -139,9 +150,12 @@ export async function GET(req: Request) {
 
     if (!cariKod || !cariIsim) continue
 
-    // BSY filtrelemesi
-    if (bsyAdi && allowedBsyKods.length > 0 && bsyKodCol >= 0) {
-      const rowBsyKod = String(r[bsyKodCol] ?? '').trim().toUpperCase()
+    // BSY kodunu al
+    const rowBsyKod = bsyKodCol >= 0 ? String(r[bsyKodCol] ?? '').trim().toUpperCase() : ''
+    const rowBsyAdi = rowBsyKod ? BSY_KOD_TO_NAME[rowBsyKod] : ''
+
+    // BSY filtrelemesi - showAll true ise filtre yapma
+    if (!showAll && bsyAdi && allowedBsyKods.length > 0 && bsyKodCol >= 0) {
       if (!allowedBsyKods.includes(rowBsyKod)) continue
     }
 
@@ -156,10 +170,13 @@ export async function GET(req: Request) {
     const haziran = toNum(r[cols['Haziran']])
     const toplam  = toNum(r[cols['Toplam']])
 
-    const secim = secimMap.get(cariKod)
+    // Admin için BSY bazında seçim al
+    const secimKey = showAll && rowBsyAdi ? `${cariKod}|${rowBsyAdi}` : cariKod
+    const secim = secimMap.get(secimKey)
     rows.push({
       cariKod,
       cariIsim,
+      ...(showAll && rowBsyAdi ? { bsyAdi: rowBsyAdi } : {}),
       onceki,
       kasim,
       aralik,

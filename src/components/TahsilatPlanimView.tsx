@@ -30,6 +30,7 @@ function kisaltCariIsim(isim: string): string {
 interface TahsilatPlanimRow {
   cariKod:   string
   cariIsim:  string
+  bsyAdi?:   string  // Admin için BSY bilgisi
   onceki:    number
   kasim:     number
   aralik:    number
@@ -102,6 +103,7 @@ export function TahsilatPlanimView({
   const [rows, setRows] = useState<TahsilatPlanimRow[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [sadecePlanGirilmis, setSadecePlanGirilmis] = useState(false) // Admin için filtre
 
   // Kullanıcı seçimleri (local state)
   const [secimler, setSecimler] = useState<Map<string, { hafta: string; tur: string }>>(new Map())
@@ -110,23 +112,30 @@ export function TahsilatPlanimView({
   async function loadData() {
     setLoading(true)
     try {
-      // Eğer bölge müdürüyse (Burak Kılıç), hem kendi hem de IB2'nin verilerini çek
-      const bsyAdlari = isBolgeMuduru
-        ? [bsyAdi, 'Okan Oğuz']
-        : [bsyAdi]
+      let allRows: TahsilatPlanimRow[] = []
 
-      const allRows: TahsilatPlanimRow[] = []
-
-      for (const bsy of bsyAdlari) {
-        const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(bsy)}`)
+      if (isAdmin) {
+        // Admin: Tüm BSY'lerin verilerini çek
+        const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&showAll=true`)
         const data = await res.json()
+        allRows = data.rows || []
+      } else {
+        // Eğer bölge müdürüyse (Burak Kılıç), hem kendi hem de IB2'nin verilerini çek
+        const bsyAdlari = isBolgeMuduru
+          ? [bsyAdi, 'Okan Oğuz']
+          : [bsyAdi]
 
-        // Her satıra BSY bilgisini ekle
-        const rowsWithBsy = (data.rows || []).map((r: TahsilatPlanimRow) => ({
-          ...r,
-          _bsyAdi: bsy
-        }))
-        allRows.push(...rowsWithBsy)
+        for (const bsy of bsyAdlari) {
+          const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(bsy)}`)
+          const data = await res.json()
+
+          // Her satıra BSY bilgisini ekle
+          const rowsWithBsy = (data.rows || []).map((r: TahsilatPlanimRow) => ({
+            ...r,
+            _bsyAdi: bsy
+          }))
+          allRows.push(...rowsWithBsy)
+        }
       }
 
       setRows(allRows)
@@ -152,7 +161,7 @@ export function TahsilatPlanimView({
 
   useEffect(() => {
     loadData()
-  }, [yil, ay, bsyAdi, isBolgeMuduru])
+  }, [yil, ay, bsyAdi, isBolgeMuduru, isAdmin])
 
   // Seçimi kaydet
   async function saveSecim(cariKod: string, cariIsim: string, field: 'hafta' | 'tur', value: string, rowBsy: string) {
@@ -226,6 +235,15 @@ export function TahsilatPlanimView({
 
   const haftaSecenekleri = useMemo(() => getHaftaSecenekleri(ay), [ay])
 
+  // Admin için filtrelenmiş satırlar
+  const filteredRows = useMemo(() => {
+    if (!isAdmin || !sadecePlanGirilmis) return rows
+    return rows.filter(row => {
+      const secim = secimler.get(row.cariKod)
+      return secim?.hafta || secim?.tur
+    })
+  }, [rows, sadecePlanGirilmis, secimler, isAdmin])
+
   return (
     <div className="flex flex-col h-full bg-gray-50">
       {/* Üst Bar */}
@@ -262,11 +280,25 @@ export function TahsilatPlanimView({
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
 
+        {isAdmin && (
+          <button
+            onClick={() => setSadecePlanGirilmis(!sadecePlanGirilmis)}
+            className={clsx(
+              'px-2 py-1 text-[10px] rounded-lg border transition-colors',
+              sadecePlanGirilmis
+                ? 'bg-purple-100 border-purple-300 text-purple-700 font-semibold'
+                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+            )}
+          >
+            {sadecePlanGirilmis ? '✓ Sadece Plan Girilmiş' : 'Tümü'}
+          </button>
+        )}
+
         <div className="flex-1" />
 
         {!loading && rows.length > 0 && (
           <span className="text-[10px] text-gray-400">
-            {rows.length} Cari · {MONTHS_TR[ay - 1]} {yil}
+            {filteredRows.length} Cari {filteredRows.length !== rows.length && `(${rows.length} toplam)`} · {MONTHS_TR[ay - 1]} {yil}
           </span>
         )}
       </div>
@@ -292,6 +324,11 @@ export function TahsilatPlanimView({
                   <th className="bg-purple-600 border-r border-purple-500 px-1 py-1.5 text-left w-[110px]">
                     Cari İsim
                   </th>
+                  {isAdmin && (
+                    <th className="bg-purple-600 border-r border-purple-500 px-1 py-1.5 text-left w-[90px]">
+                      BSY
+                    </th>
+                  )}
                   {ayKolonlari.map((kolon, i) => (
                     <th key={i} className="border-r border-purple-500 px-1 py-1.5 text-right w-[70px]">
                       {kolon.baslik}
@@ -310,10 +347,10 @@ export function TahsilatPlanimView({
               </thead>
 
               <tbody>
-                {rows.map((row, idx) => {
+                {filteredRows.map((row, idx) => {
                   const secim = secimler.get(row.cariKod)
                   const henuzSecilmedi = !secim?.hafta || !secim?.tur
-                  const rowBsy = (row as any)._bsyAdi || bsyAdi
+                  const rowBsy = row.bsyAdi || (row as any)._bsyAdi || bsyAdi
 
                   return (
                     <tr key={`${row.cariKod}-${idx}`} className={clsx(
@@ -326,6 +363,11 @@ export function TahsilatPlanimView({
                       <td className="bg-white border-r border-gray-200 px-1 py-1 font-medium text-gray-800" title={row.cariIsim}>
                         {kisaltCariIsim(row.cariIsim)}
                       </td>
+                      {isAdmin && (
+                        <td className="bg-white border-r border-gray-200 px-1 py-1 text-xs text-gray-700 font-medium">
+                          {row.bsyAdi || '-'}
+                        </td>
+                      )}
 
                       {/* Ay kolonları */}
                       {ayKolonlari.map((kolon, i) => {
