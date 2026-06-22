@@ -118,14 +118,11 @@ export async function GET(req: Request) {
 
   const { data: secimler } = await secimlerQuery
 
-  const secimMap = new Map<string, { tahsilatHaftasi: string; tahsilatTuru: string; bsyAdi: string }>()
+  const secimMap = new Map<string, { tahsilatHaftasi: string; tahsilatTuru: string }>()
   secimler?.forEach(s => {
-    // Admin için: cari_kod + bsy_adi kombinasyonu ile kaydet
-    const key = showAll ? `${s.cari_kod}|${s.bsy_adi}` : s.cari_kod
-    secimMap.set(key, {
+    secimMap.set(s.cari_kod, {
       tahsilatHaftasi: s.tahsilat_haftasi ?? '',
-      tahsilatTuru: s.tahsilat_turu ?? '',
-      bsyAdi: s.bsy_adi
+      tahsilatTuru: s.tahsilat_turu ?? ''
     })
   })
 
@@ -170,9 +167,7 @@ export async function GET(req: Request) {
     const haziran = toNum(r[cols['Haziran']])
     const toplam  = toNum(r[cols['Toplam']])
 
-    // Admin için BSY bazında seçim al
-    const secimKey = showAll && rowBsyAdi ? `${cariKod}|${rowBsyAdi}` : cariKod
-    const secim = secimMap.get(secimKey)
+    const secim = secimMap.get(cariKod)
     rows.push({
       cariKod,
       cariIsim,
