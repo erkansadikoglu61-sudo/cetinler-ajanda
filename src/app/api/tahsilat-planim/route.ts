@@ -199,7 +199,10 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { bsyAdi, yil, ay, cariKod, tahsilatHaftasi, tahsilatTuru } = body
 
+    console.log('💾 Tahsilat Planı Kaydet:', { bsyAdi, cariKod, yil, ay, tahsilatHaftasi, tahsilatTuru })
+
     if (!bsyAdi || !cariKod) {
+      console.error('❌ Validation Error: BSY adı veya Cari kod eksik')
       return NextResponse.json({ error: 'BSY adı ve Cari kod gerekli' }, { status: 400 })
     }
 
@@ -224,9 +227,11 @@ export async function POST(req: Request) {
       })
 
     if (error) {
+      console.error('❌ Supabase Error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    console.log('✅ Kayıt başarılı')
     return NextResponse.json({ success: true })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
