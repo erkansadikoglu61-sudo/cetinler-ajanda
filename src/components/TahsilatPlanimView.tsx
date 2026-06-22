@@ -430,14 +430,24 @@ export function TahsilatPlanimView({
                       {/* Tutar Input */}
                       <td className="border-r border-gray-100 px-1 py-0.5">
                         <input
-                          type="number"
-                          defaultValue={secim?.tutar ?? ''}
+                          type="text"
+                          defaultValue={secim?.tutar ? secim.tutar.toLocaleString('tr-TR') : ''}
+                          onFocus={e => {
+                            // Focus'ta bin ayracını kaldır (düzenleme için)
+                            const numVal = secim?.tutar
+                            if (numVal) {
+                              e.target.value = String(numVal)
+                            }
+                          }}
                           onBlur={e => {
-                            const val = e.target.value === '' ? null : parseFloat(e.target.value)
+                            const cleaned = e.target.value.replace(/\./g, '').trim()
+                            const val = cleaned === '' ? null : parseFloat(cleaned)
                             if (val !== null && !isNaN(val)) {
                               saveSecim(row.cariKod, row.cariIsim, 'tutar', val, rowBsy)
+                              e.target.value = val.toLocaleString('tr-TR')
                             } else if (val === null) {
                               saveSecim(row.cariKod, row.cariIsim, 'tutar', null, rowBsy)
+                              e.target.value = ''
                             }
                           }}
                           onKeyDown={e => {
