@@ -148,7 +148,7 @@ export function TahsilatPlanimView({
   }
 
   useEffect(() => {
-    if (bsyAdi) loadData()
+    loadData()
   }, [yil, ay, bsyAdi, isBolgeMuduru])
 
   // Seçimi kaydet
