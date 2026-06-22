@@ -3,9 +3,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { RefreshCw, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
+import { BSY_KOD_TO_NAME } from '@/lib/bsy'
 
 const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
                    'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
+
+const BSY_LISTESI = Object.values(BSY_KOD_TO_NAME).sort()
 
 function fmtCur(n: number) {
   return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -98,12 +101,13 @@ export function TahsilatPlanimView({
   isBolgeMuduru?: boolean
 }) {
   const now = new Date()
-  const [yil, setYil] = useState(now.getFullYear())
-  const [ay, setAy] = useState(now.getMonth() + 1)
+  const yil = now.getFullYear()
+  const ay = now.getMonth() + 1
   const [rows, setRows] = useState<TahsilatPlanimRow[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [sadecePlanGirilmis, setSadecePlanGirilmis] = useState(false) // Admin için filtre
+  const [selectedBsy, setSelectedBsy] = useState<string>('') // Admin için BSY filtresi
 
   // Kullanıcı seçimleri (local state)
   const [secimler, setSecimler] = useState<Map<string, { hafta: string; tur: string }>>(new Map())
@@ -114,28 +118,30 @@ export function TahsilatPlanimView({
     try {
       let allRows: TahsilatPlanimRow[] = []
 
-      if (isAdmin) {
-        // Admin: Tüm BSY'lerin verilerini çek
-        const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&showAll=true`)
+      // Admin için seçilen BSY'nin verilerini çek, yoksa ilk BSY'yi seç
+      const targetBsy = isAdmin ? selectedBsy : bsyAdi
+
+      if (!targetBsy) {
+        setRows([])
+        setLoading(false)
+        return
+      }
+
+      // Bölge müdürü için hem kendi hem de IB2'nin verilerini çek
+      const bsyAdlari = isBolgeMuduru && !isAdmin
+        ? [bsyAdi, 'Okan Oğuz']
+        : [targetBsy]
+
+      for (const bsy of bsyAdlari) {
+        const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(bsy)}`)
         const data = await res.json()
-        allRows = data.rows || []
-      } else {
-        // Eğer bölge müdürüyse (Burak Kılıç), hem kendi hem de IB2'nin verilerini çek
-        const bsyAdlari = isBolgeMuduru
-          ? [bsyAdi, 'Okan Oğuz']
-          : [bsyAdi]
 
-        for (const bsy of bsyAdlari) {
-          const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(bsy)}`)
-          const data = await res.json()
-
-          // Her satıra BSY bilgisini ekle
-          const rowsWithBsy = (data.rows || []).map((r: TahsilatPlanimRow) => ({
-            ...r,
-            _bsyAdi: bsy
-          }))
-          allRows.push(...rowsWithBsy)
-        }
+        // Her satıra BSY bilgisini ekle
+        const rowsWithBsy = (data.rows || []).map((r: TahsilatPlanimRow) => ({
+          ...r,
+          _bsyAdi: bsy
+        }))
+        allRows.push(...rowsWithBsy)
       }
 
       setRows(allRows)
@@ -161,7 +167,7 @@ export function TahsilatPlanimView({
 
   useEffect(() => {
     loadData()
-  }, [yil, ay, bsyAdi, isBolgeMuduru, isAdmin])
+  }, [selectedBsy, bsyAdi, isBolgeMuduru, isAdmin])
 
   // Seçimi kaydet
   async function saveSecim(cariKod: string, cariIsim: string, field: 'hafta' | 'tur', value: string, rowBsy: string) {
@@ -250,27 +256,21 @@ export function TahsilatPlanimView({
       <div className="flex-shrink-0 flex flex-wrap items-center gap-2 px-4 py-2 bg-white border-b border-gray-100">
         <span className="text-xs text-gray-500 font-semibold">Tahsilat Planım</span>
 
-        <div className="relative">
-          <select
-            value={yil}
-            onChange={e => setYil(Number(e.target.value))}
-            className="appearance-none pl-2 pr-6 py-1 text-xs border border-gray-200 rounded-lg bg-white font-medium text-brand-700 focus:outline-none focus:border-brand-400"
-          >
-            {[yil - 1, yil, yil + 1].map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <ChevronDown size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-        </div>
-
-        <div className="relative">
-          <select
-            value={ay}
-            onChange={e => setAy(Number(e.target.value))}
-            className="appearance-none pl-2 pr-6 py-1 text-xs border border-gray-200 rounded-lg bg-white font-medium text-brand-700 focus:outline-none focus:border-brand-400"
-          >
-            {MONTHS_TR.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
-          </select>
-          <ChevronDown size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-        </div>
+        {isAdmin && (
+          <div className="relative">
+            <select
+              value={selectedBsy}
+              onChange={e => setSelectedBsy(e.target.value)}
+              className="appearance-none pl-2 pr-6 py-1 text-xs border border-gray-200 rounded-lg bg-white font-medium text-brand-700 focus:outline-none focus:border-brand-400"
+            >
+              <option value="">BSY Seçin...</option>
+              {BSY_LISTESI.map(bsy => (
+                <option key={bsy} value={bsy}>{bsy}</option>
+              ))}
+            </select>
+            <ChevronDown size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+        )}
 
         <button
           onClick={loadData}
@@ -298,7 +298,7 @@ export function TahsilatPlanimView({
 
         {!loading && rows.length > 0 && (
           <span className="text-[10px] text-gray-400">
-            {filteredRows.length} Cari {filteredRows.length !== rows.length && `(${rows.length} toplam)`} · {MONTHS_TR[ay - 1]} {yil}
+            {filteredRows.length} Cari {filteredRows.length !== rows.length && `(${rows.length} toplam)`}
           </span>
         )}
       </div>
@@ -324,11 +324,6 @@ export function TahsilatPlanimView({
                   <th className="bg-purple-600 border-r border-purple-500 px-1 py-1.5 text-left w-[110px]">
                     Cari İsim
                   </th>
-                  {isAdmin && (
-                    <th className="bg-purple-600 border-r border-purple-500 px-1 py-1.5 text-left w-[90px]">
-                      BSY
-                    </th>
-                  )}
                   {ayKolonlari.map((kolon, i) => (
                     <th key={i} className="border-r border-purple-500 px-1 py-1.5 text-right w-[70px]">
                       {kolon.baslik}
@@ -363,11 +358,6 @@ export function TahsilatPlanimView({
                       <td className="bg-white border-r border-gray-200 px-1 py-1 font-medium text-gray-800" title={row.cariIsim}>
                         {kisaltCariIsim(row.cariIsim)}
                       </td>
-                      {isAdmin && (
-                        <td className="bg-white border-r border-gray-200 px-1 py-1 text-xs text-gray-700 font-medium">
-                          {row.bsyAdi || '-'}
-                        </td>
-                      )}
 
                       {/* Ay kolonları */}
                       {ayKolonlari.map((kolon, i) => {

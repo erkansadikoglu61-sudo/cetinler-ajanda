@@ -116,10 +116,18 @@ export async function GET(req: Request) {
     secimlerQuery = secimlerQuery.eq('bsy_adi', bsyAdi)
   }
 
-  const { data: secimler } = await secimlerQuery
+  const { data: secimler, error: secimlerError } = await secimlerQuery
 
   // Debug log
-  console.log('📊 Tahsilat Planı Query:', { showAll, bsyAdi, yil, ay, secimCount: secimler?.length })
+  console.log('📊 Tahsilat Planı Query:', {
+    showAll,
+    bsyAdi,
+    yil,
+    ay,
+    secimCount: secimler?.length,
+    error: secimlerError,
+    sampleData: secimler?.slice(0, 2)
+  })
 
   const secimMap = new Map<string, { tahsilatHaftasi: string; tahsilatTuru: string }>()
   secimler?.forEach(s => {
