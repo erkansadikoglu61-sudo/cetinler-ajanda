@@ -29,7 +29,8 @@ import { KullanicilarView } from '@/components/KullanicilarView'
 import { SellinSelloutView } from '@/components/SellinSelloutView'
 import { AdetPrimTablosu, BayiMerchHakdis } from '@/components/AdetPrimView'
 import { AnalizView } from '@/components/AnalizView'
-type TabType = 'month' | 'week' | 'day' | 'report' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'analiz' | 'tahsilat-planim'
+import { AdminDashboardView } from '@/components/AdminDashboardView'
+type TabType = 'month' | 'week' | 'day' | 'report' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'analiz' | 'tahsilat-planim' | 'dashboard'
 
 // Renk hex'ine alpha ekle
 function hexWithAlpha(hex: string, alpha: string) {
@@ -1812,6 +1813,18 @@ export default function AppPage() {
                   <FileText size={15} /> Rapor
                 </button>
               )}
+              {/* Dashboard (admin) */}
+              {currentProfile?.role === 'admin' && (
+                <button
+                  onClick={() => setTab('dashboard')}
+                  className={clsx(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                    tab === 'dashboard' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                  )}
+                >
+                  <BarChart2 size={15} /> Dashboard
+                </button>
+              )}
               {/* BSY grubu */}
               {isBsyOrAdmin && (
                 <button
@@ -2064,6 +2077,11 @@ export default function AppPage() {
                 isAdmin={currentProfile?.role === 'admin'}
                 isBolgeMuduru={currentProfile?.full_name === 'Burak Kılıç'}
               />
+            </div>
+          )}
+          {tab === 'dashboard' && currentProfile?.role === 'admin' && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <AdminDashboardView />
             </div>
           )}
           {tab === 'noktalar' && (
