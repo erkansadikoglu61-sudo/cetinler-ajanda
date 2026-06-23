@@ -212,6 +212,14 @@ export async function GET(req: Request) {
     toplam: aylikCariToplamSet.size,
   }
 
+  console.log('📊 Cari Sayıları:', {
+    yillik: yillikCariSayisi,
+    aylik: aylikCariSayisi,
+    yillikReluxSample: Array.from(yillikCariReluxSet).slice(0, 3),
+    yillikElectroluxSample: Array.from(yillikCariElectroluxSet).slice(0, 3),
+    yillikToplamSample: Array.from(yillikCariToplamSet).slice(0, 3),
+  })
+
   // === BSY SIRALAMA ===
   function calculateBsySiralama(data: typeof yillikData) {
     const bsyMap = new Map<string, { relux: number; ekea: number; toplam: number }>()
