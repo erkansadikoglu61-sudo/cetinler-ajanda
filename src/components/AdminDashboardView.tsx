@@ -87,28 +87,30 @@ export function AdminDashboardView() {
               <h2 className="text-lg font-bold text-gray-800">SATIŞ</h2>
             </div>
 
-            {/* Metrikler - Yeni Tasarım */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-              {/* CİRO - 2026 & Haziran */}
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-200">
-                <div className="flex items-center gap-1 mb-2">
-                  <DollarSign className="text-blue-600" size={16} />
-                  <h3 className="text-xs font-bold text-gray-800">CİRO</h3>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-[9px] text-gray-500 mb-1">2026</p>
-                    <p className="text-lg font-bold text-blue-700">{fmtTL(sales.yillikCiro)}</p>
+            {/* Layout: Sol (Ciro+Müşteri) | Orta (BSY) | Sağ (Top 10x3) */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-4">
+              {/* SOL: CİRO + MÜŞTERİ (Alt alta) */}
+              <div className="space-y-3">
+                {/* CİRO */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-200">
+                  <div className="flex items-center gap-1 mb-2">
+                    <DollarSign className="text-blue-600" size={16} />
+                    <h3 className="text-xs font-bold text-gray-800">CİRO</h3>
                   </div>
-                  <div>
-                    <p className="text-[9px] text-gray-500 mb-1">{MONTHS_TR[ay - 1]}</p>
-                    <p className="text-lg font-bold text-blue-700">{fmtTL(sales.aylikCiro)}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-[9px] text-gray-500 mb-1">2026</p>
+                      <p className="text-lg font-bold text-blue-700">{fmtTL(sales.yillikCiro)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-gray-500 mb-1">{MONTHS_TR[ay - 1]}</p>
+                      <p className="text-lg font-bold text-blue-700">{fmtTL(sales.aylikCiro)}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* MÜŞTERİ SAYISI - 2026 & Haziran */}
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
+                {/* MÜŞTERİ SAYISI */}
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
                 <div className="flex items-center gap-1 mb-2">
                   <Users className="text-green-600" size={16} />
                   <h3 className="text-xs font-bold text-gray-800">MÜŞTERİ SAYISI</h3>
@@ -151,17 +153,18 @@ export function AdminDashboardView() {
                     </div>
                   </div>
                 </div>
+                </div>
               </div>
 
-              {/* BSY CİRO SIRALAMASI - TABLO FORMAT */}
+              {/* ORTA: BSY CİROLARI - TABLO */}
               <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-3 border border-purple-200">
                 <div className="flex items-center gap-1 mb-2">
                   <Target className="text-purple-600" size={16} />
-                  <h3 className="text-xs font-bold text-gray-800">BSY CİRO SIRALAMASI</h3>
+                  <h3 className="text-xs font-bold text-gray-800">BSY CİROLARI</h3>
                 </div>
-                <div className="overflow-x-auto max-h-[140px] overflow-y-auto">
+                <div className="overflow-x-auto max-h-[280px] overflow-y-auto">
                   <table className="w-full text-[9px]">
-                    <thead className="sticky top-0 bg-purple-100">
+                    <thead className="sticky top-0 bg-purple-100 z-10">
                       <tr className="border-b border-purple-200">
                         <th className="text-left px-1 py-1 font-semibold text-gray-700">#</th>
                         <th className="text-left px-1 py-1 font-semibold text-gray-700">BSY</th>
@@ -182,39 +185,60 @@ export function AdminDashboardView() {
                         )
                       })}
                     </tbody>
+                    <tfoot className="sticky bottom-0 bg-purple-100 border-t-2 border-purple-300">
+                      <tr>
+                        <td colSpan={2} className="px-1 py-1 font-bold text-gray-800">TOPLAM</td>
+                        <td className="px-1 py-1 text-right font-bold text-purple-800">{fmtTL(sales.yillikCiro)}</td>
+                        <td className="px-1 py-1 text-right font-bold text-indigo-800">{fmtTL(sales.aylikCiro)}</td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               </div>
-            </div>
 
-            {/* Cari Top 10'lar - Kompakt Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {/* Cari Top 10 RELUX */}
-              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-lg p-3 border border-emerald-200">
-                <h3 className="text-xs font-semibold text-gray-700 mb-2">Top 10 Cari (RELUX - 2026)</h3>
-                <div className="space-y-1 text-[10px]">
-                  {sales.yillikCariReluxTop10.slice(0, 5).map((cari, i) => (
-                    <div key={i} className="flex justify-between items-center bg-white/60 rounded px-2 py-1">
-                      <span className="font-medium truncate flex-1 mr-2">{i + 1}. {cari.cariAdi}</span>
-                      <span className="text-emerald-700 font-semibold whitespace-nowrap">{fmtTL(cari.tutar)}</span>
-                    </div>
-                  ))}
+              {/* SAĞ: TOP 10 CARİ LİSTELERİ (3 kolon) */}
+              <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Top 10 RELUX */}
+                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-lg p-3 border border-emerald-200">
+                  <h3 className="text-xs font-semibold text-gray-700 mb-2">Top 10 Cari (RELUX)</h3>
+                  <div className="space-y-1 text-[9px]">
+                    {sales.yillikCariReluxTop10.slice(0, 10).map((cari, i) => (
+                      <div key={i} className="flex justify-between items-center bg-white/60 rounded px-2 py-0.5">
+                        <span className="font-medium truncate flex-1 mr-1">{i + 1}. {cari.cariAdi}</span>
+                        <span className="text-emerald-700 font-semibold whitespace-nowrap text-[8px]">{fmtTL(cari.tutar)} ({fmtPct(cari.oran)})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Top 10 EKEA */}
+                <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg p-3 border border-orange-200">
+                  <h3 className="text-xs font-semibold text-gray-700 mb-2">Top 10 Cari (EKEA)</h3>
+                  <div className="space-y-1 text-[9px]">
+                    {sales.yillikCariEkeaTop10.slice(0, 10).map((cari, i) => (
+                      <div key={i} className="flex justify-between items-center bg-white/60 rounded px-2 py-0.5">
+                        <span className="font-medium truncate flex-1 mr-1">{i + 1}. {cari.cariAdi}</span>
+                        <span className="text-orange-700 font-semibold whitespace-nowrap text-[8px]">{fmtTL(cari.tutar)} ({fmtPct(cari.oran)})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Top 10 TOPLAM */}
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg p-3 border border-indigo-200">
+                  <h3 className="text-xs font-semibold text-gray-700 mb-2">Top 10 Cari (TOPLAM)</h3>
+                  <div className="space-y-1 text-[9px]">
+                    {sales.yillikCariToplamTop10.slice(0, 10).map((cari, i) => (
+                      <div key={i} className="flex justify-between items-center bg-white/60 rounded px-2 py-0.5">
+                        <span className="font-medium truncate flex-1 mr-1">{i + 1}. {cari.cariAdi}</span>
+                        <span className="text-indigo-700 font-semibold whitespace-nowrap text-[8px]">{fmtTL(cari.tutar)} ({fmtPct(cari.oran)})</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-
-              {/* Cari Top 10 EKEA */}
-              <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg p-3 border border-orange-200">
-                <h3 className="text-xs font-semibold text-gray-700 mb-2">Top 10 Cari (EKEA - 2026)</h3>
-                <div className="space-y-1 text-[10px]">
-                  {sales.yillikCariEkeaTop10.slice(0, 5).map((cari, i) => (
-                    <div key={i} className="flex justify-between items-center bg-white/60 rounded px-2 py-1">
-                      <span className="font-medium truncate flex-1 mr-2">{i + 1}. {cari.cariAdi}</span>
-                      <span className="text-orange-700 font-semibold whitespace-nowrap">{fmtTL(cari.tutar)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
+
           </div>
 
           {/* ========== SELLOUT BÖLGESİ ========== */}
