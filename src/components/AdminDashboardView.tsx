@@ -101,15 +101,15 @@ export function AdminDashboardView() {
                 <div className="space-y-0.5">
                   <div className="flex justify-between items-center">
                     <span className="text-[10px] text-gray-500">RELUX</span>
-                    <span className="text-sm font-bold text-gray-900">{fmtN(sales.yillikCariSayisi.relux)}</span>
+                    <span className="text-sm font-bold" style={{ color: '#111827' }}>{fmtN(sales.yillikCariSayisi.relux)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-[10px] text-gray-500">ELECTROLUX</span>
-                    <span className="text-sm font-bold text-blue-600">{fmtN(sales.yillikCariSayisi.electrolux)}</span>
+                    <span className="text-sm font-bold" style={{ color: '#2563eb' }}>{fmtN(sales.yillikCariSayisi.electrolux)}</span>
                   </div>
                   <div className="flex justify-between items-center border-t border-green-200 pt-0.5">
                     <span className="text-[10px] font-semibold text-gray-600">TOPLAM</span>
-                    <span className="text-lg font-bold text-green-700">{fmtN(sales.yillikCariSayisi.toplam)}</span>
+                    <span className="text-lg font-bold" style={{ color: '#15803d' }}>{fmtN(sales.yillikCariSayisi.toplam)}</span>
                   </div>
                 </div>
               </div>
@@ -123,15 +123,15 @@ export function AdminDashboardView() {
                 <div className="space-y-0.5">
                   <div className="flex justify-between items-center">
                     <span className="text-[10px] text-gray-500">RELUX</span>
-                    <span className="text-sm font-bold text-gray-900">{fmtN(sales.aylikCariSayisi.relux)}</span>
+                    <span className="text-sm font-bold" style={{ color: '#111827' }}>{fmtN(sales.aylikCariSayisi.relux)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-[10px] text-gray-500">ELECTROLUX</span>
-                    <span className="text-sm font-bold text-blue-600">{fmtN(sales.aylikCariSayisi.electrolux)}</span>
+                    <span className="text-sm font-bold" style={{ color: '#2563eb' }}>{fmtN(sales.aylikCariSayisi.electrolux)}</span>
                   </div>
                   <div className="flex justify-between items-center border-t border-green-200 pt-0.5">
                     <span className="text-[10px] font-semibold text-gray-600">TOPLAM</span>
-                    <span className="text-lg font-bold text-green-700">{fmtN(sales.aylikCariSayisi.toplam)}</span>
+                    <span className="text-lg font-bold" style={{ color: '#15803d' }}>{fmtN(sales.aylikCariSayisi.toplam)}</span>
                   </div>
                 </div>
               </div>
