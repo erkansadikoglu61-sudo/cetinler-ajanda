@@ -105,6 +105,8 @@ export async function GET(req: Request) {
   }
 
   const raw: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null })
+  console.log(`📊 Excel toplam satır sayısı: ${raw.length}`)
+
   if (raw.length < 2) {
     return NextResponse.json({ error: 'Data boş' }, { status: 404 })
   }
@@ -228,6 +230,8 @@ export async function GET(req: Request) {
   console.log('📊 Cari Sayıları:', {
     yillik: yillikCariSayisi,
     aylik: aylikCariSayisi,
+    yillikDataCount: yillikData.length,
+    aylikDataCount: aylikData.length,
     yillikReluxSample: Array.from(yillikCariReluxSet).slice(0, 3),
     yillikElectroluxSample: Array.from(yillikCariElectroluxSet).slice(0, 3),
     yillikToplamSample: Array.from(yillikCariToplamSet).slice(0, 3),
