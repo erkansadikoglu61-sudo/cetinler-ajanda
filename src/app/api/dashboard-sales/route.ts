@@ -104,10 +104,10 @@ export async function GET(req: Request) {
   const cols: Record<string, number> = {}
   for (let c = 0; c < header.length; c++) {
     const h = String(header[c] ?? '').trim().toLowerCase()
-    if (h.includes('cari') && h.includes('kod')) cols['cariKod'] = c
+    if (h.includes('cari') && h.includes('kod') && !h.includes('kod 1')) cols['cariKod'] = c
     if (h.includes('cari') && h.includes('isim')) cols['cariIsim'] = c
-    if (h.includes('bsy') && (h.includes('adi') || h.includes('adı'))) cols['bsyAdi'] = c
-    if (h.includes('grup')) cols['grup'] = c
+    if (h.includes('plasiyer') && h.includes('ad')) cols['bsyAdi'] = c // Plasiyer Adı = BSY
+    if (h === 'grup') cols['grup'] = c
     if (h === 'yıl' || h === 'yil') cols['yil'] = c
     if (h === 'ay') cols['ay'] = c
     if (h.includes('net') && h.includes('tutar')) cols['netTutar'] = c

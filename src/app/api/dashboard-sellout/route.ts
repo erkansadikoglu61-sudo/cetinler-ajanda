@@ -44,30 +44,52 @@ function calculateTop10(
 
   data.forEach(row => {
     let key = ''
-    const adet = parseInt(row.adet || row.toplam_adet || '0') || 0
+    // Adet için farklı alan isimleri dene
+    const adet = parseInt(
+      row.adet || row.toplam_adet || row.Adet || row.ADET || row.miktar || '0'
+    ) || 0
 
     switch (groupBy) {
       case 'cari':
-        key = String(row.cari_adi || row.cari || '').trim()
+        key = String(
+          row.cari_adi || row.cari || row.CariAdi || row.Cari || row.musteri || row.Müşteri || ''
+        ).trim()
         break
       case 'sube':
-        key = String(row.sube_adi || row.sube || '').trim()
+        key = String(
+          row.sube_adi || row.sube || row.SubeAdi || row.Sube || row.SUBE || ''
+        ).trim()
         break
       case 'supervizor':
-        key = String(row.supervizor || row.supervisor || '').trim()
+        key = String(
+          row.supervizor || row.supervisor || row.Supervizor || row.Supervisor ||
+          row.supervizor_adi || row.SupervizorAdi || ''
+        ).trim()
         break
       case 'cetinler_merch':
         // Çetinler çalışanı olan merch'leri filtrele
-        const isCetinler = row.merch_tipi === 'cetinler' || row.is_cetinler === '1'
+        const isCetinler =
+          row.merch_tipi === 'cetinler' || row.merch_tipi === 'Çetinler' ||
+          row.is_cetinler === '1' || row.is_cetinler === 1 ||
+          row.IsCetinler === '1' || row.IsCetinler === 1
         if (isCetinler) {
-          key = String(row.merch_adi || row.merch || '').trim()
+          key = String(
+            row.merch_adi || row.merch || row.MerchAdi || row.Merch ||
+            row.merchandiser || row.Merchandiser || ''
+          ).trim()
         }
         break
       case 'bayi_merch':
         // Bayi merch'lerini filtrele
-        const isBayi = row.merch_tipi === 'bayi' || row.is_bayi === '1'
+        const isBayi =
+          row.merch_tipi === 'bayi' || row.merch_tipi === 'Bayi' ||
+          row.is_bayi === '1' || row.is_bayi === 1 ||
+          row.IsBayi === '1' || row.IsBayi === 1
         if (isBayi) {
-          key = String(row.merch_adi || row.merch || '').trim()
+          key = String(
+            row.merch_adi || row.merch || row.MerchAdi || row.Merch ||
+            row.merchandiser || row.Merchandiser || ''
+          ).trim()
         }
         break
     }
