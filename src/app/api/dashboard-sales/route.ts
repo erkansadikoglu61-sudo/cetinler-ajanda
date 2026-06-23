@@ -134,6 +134,10 @@ export async function GET(req: Request) {
   }
 
   console.log('📊 Dashboard Sales - Kolonlar:', cols)
+  console.log('📊 Grup kolonu index:', cols['grup'], '(16 olmalı)')
+  if (cols['grup'] < 0 || cols['grup'] === undefined) {
+    console.error('❌ GRUP KOLONU BULUNAMADI!')
+  }
 
   // Verileri topla
   const yillikData: Array<{ cariKod: string; cariIsim: string; bsyAdi: string; grup: string; netTutar: number }> = []
