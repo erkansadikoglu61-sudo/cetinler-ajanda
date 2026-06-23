@@ -153,19 +153,36 @@ export function AdminDashboardView() {
                 </div>
               </div>
 
-              {/* BSY CİRO SIRALAMASI - TÜM BSY'LER */}
+              {/* BSY CİRO SIRALAMASI - TABLO FORMAT */}
               <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-3 border border-purple-200">
                 <div className="flex items-center gap-1 mb-2">
                   <Target className="text-purple-600" size={16} />
-                  <h3 className="text-xs font-bold text-gray-800">BSY CİRO SIRALAMASI (2026)</h3>
+                  <h3 className="text-xs font-bold text-gray-800">BSY CİRO SIRALAMASI</h3>
                 </div>
-                <div className="space-y-0.5 text-[9px] max-h-[140px] overflow-y-auto">
-                  {sales.yillikBsySiralama.map((bsy, i) => (
-                    <div key={i} className="flex justify-between items-center bg-white/60 rounded px-2 py-0.5">
-                      <span className="font-medium truncate flex-1">{i + 1}. {bsy.bsyAdi}</span>
-                      <span className="text-purple-700 font-semibold whitespace-nowrap ml-2">{fmtTL(bsy.toplam)} ({fmtPct(bsy.oran)})</span>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto max-h-[140px] overflow-y-auto">
+                  <table className="w-full text-[9px]">
+                    <thead className="sticky top-0 bg-purple-100">
+                      <tr className="border-b border-purple-200">
+                        <th className="text-left px-1 py-1 font-semibold text-gray-700">#</th>
+                        <th className="text-left px-1 py-1 font-semibold text-gray-700">BSY</th>
+                        <th className="text-right px-1 py-1 font-semibold text-gray-700">2026</th>
+                        <th className="text-right px-1 py-1 font-semibold text-gray-700">{MONTHS_TR[ay - 1]}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sales.yillikBsySiralama.map((bsy, i) => {
+                        const aylikBsy = sales.aylikBsySiralama.find(a => a.bsyAdi === bsy.bsyAdi)
+                        return (
+                          <tr key={i} className="border-b border-purple-100 hover:bg-white/40">
+                            <td className="px-1 py-0.5 text-gray-600">{i + 1}</td>
+                            <td className="px-1 py-0.5 font-medium text-gray-800 truncate max-w-[80px]">{bsy.bsyAdi}</td>
+                            <td className="px-1 py-0.5 text-right font-semibold text-purple-700 whitespace-nowrap">{fmtTL(bsy.toplam)}</td>
+                            <td className="px-1 py-0.5 text-right font-semibold text-indigo-600 whitespace-nowrap">{aylikBsy ? fmtTL(aylikBsy.toplam) : '-'}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
