@@ -113,6 +113,8 @@ export async function GET(req: Request) {
     if (h.includes('net') && h.includes('tutar')) cols['netTutar'] = c
   }
 
+  console.log('📊 Dashboard Sales - Kolonlar:', cols)
+
   // Verileri topla
   const yillikData: Array<{ cariKod: string; cariIsim: string; bsyAdi: string; grup: string; netTutar: number }> = []
   const aylikData: Array<{ cariKod: string; cariIsim: string; bsyAdi: string; grup: string; netTutar: number }> = []
@@ -121,6 +123,7 @@ export async function GET(req: Request) {
   const yillikCariSet = new Set<string>()
   const aylikCariSet = new Set<string>()
 
+  let debugCount = 0
   for (let i = 1; i < raw.length; i++) {
     const r = raw[i]
     if (!r) continue
@@ -132,6 +135,12 @@ export async function GET(req: Request) {
     const bsyAdi = cols['bsyAdi'] >= 0 ? String(r[cols['bsyAdi']] ?? '').trim() : ''
     const grup = cols['grup'] >= 0 ? String(r[cols['grup']] ?? '').trim().toUpperCase() : ''
     const netTutar = cols['netTutar'] >= 0 ? toNum(r[cols['netTutar']]) : 0
+
+    // İlk 3 satırı logla
+    if (debugCount < 3 && rowYil === yil && netTutar !== 0) {
+      console.log(`  Satır ${i}:`, { cariKod, cariIsim: cariIsim.substring(0, 20), bsyAdi, grup, netTutar })
+      debugCount++
+    }
 
     if (!cariKod) continue
 
