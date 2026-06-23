@@ -88,87 +88,90 @@ export function AdminDashboardView() {
             </div>
 
             {/* Metrikler - Yeni Tasarım */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
               {/* CİRO - 2026 & Haziran */}
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
-                <div className="flex items-center gap-2 mb-3">
-                  <DollarSign className="text-blue-600" size={20} />
-                  <h3 className="text-sm font-bold text-gray-800">CİRO</h3>
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-200">
+                <div className="flex items-center gap-1 mb-2">
+                  <DollarSign className="text-blue-600" size={16} />
+                  <h3 className="text-xs font-bold text-gray-800">CİRO</h3>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <p className="text-[10px] text-gray-500 mb-1">2026</p>
-                    <p className="text-2xl font-bold text-blue-700">{fmtTL(sales.yillikCiro)}</p>
+                    <p className="text-[9px] text-gray-500 mb-1">2026</p>
+                    <p className="text-lg font-bold text-blue-700">{fmtTL(sales.yillikCiro)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-500 mb-1">{MONTHS_TR[ay - 1]} 2026</p>
-                    <p className="text-2xl font-bold text-blue-700">{fmtTL(sales.aylikCiro)}</p>
+                    <p className="text-[9px] text-gray-500 mb-1">{MONTHS_TR[ay - 1]}</p>
+                    <p className="text-lg font-bold text-blue-700">{fmtTL(sales.aylikCiro)}</p>
                   </div>
                 </div>
               </div>
 
               {/* MÜŞTERİ SAYISI - 2026 & Haziran */}
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
-                <div className="flex items-center gap-2 mb-3">
-                  <Users className="text-green-600" size={20} />
-                  <h3 className="text-sm font-bold text-gray-800">MÜŞTERİ SAYISI</h3>
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
+                <div className="flex items-center gap-1 mb-2">
+                  <Users className="text-green-600" size={16} />
+                  <h3 className="text-xs font-bold text-gray-800">MÜŞTERİ SAYISI</h3>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   {/* 2026 */}
                   <div>
-                    <p className="text-[10px] text-gray-500 mb-1">2026</p>
-                    <div className="space-y-1">
+                    <p className="text-[9px] text-gray-500 mb-1">2026</p>
+                    <div className="space-y-0.5">
                       <div className="flex justify-between items-center">
-                        <span className="text-[9px] text-gray-500">RELUX</span>
-                        <span className="text-sm font-bold" style={{ color: '#111827' }}>{fmtN(sales.yillikCariSayisi.relux)}</span>
+                        <span className="text-[8px] text-gray-500">RELUX</span>
+                        <span className="text-xs font-bold" style={{ color: '#111827' }}>{fmtN(sales.yillikCariSayisi.relux)}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-[9px] text-gray-500">ELECTROLUX</span>
-                        <span className="text-sm font-bold" style={{ color: '#2563eb' }}>{fmtN(sales.yillikCariSayisi.electrolux)}</span>
+                        <span className="text-[8px] text-gray-500">ELECTROLUX</span>
+                        <span className="text-xs font-bold" style={{ color: '#2563eb' }}>{fmtN(sales.yillikCariSayisi.electrolux)}</span>
                       </div>
-                      <div className="flex justify-between items-center border-t border-green-200 pt-1">
-                        <span className="text-[9px] font-semibold text-gray-600">TOPLAM</span>
-                        <span className="text-xl font-bold" style={{ color: '#15803d' }}>{fmtN(sales.yillikCariSayisi.toplam)}</span>
+                      <div className="flex justify-between items-center border-t border-green-200 pt-0.5">
+                        <span className="text-[8px] font-semibold text-gray-600">TOPLAM</span>
+                        <span className="text-lg font-bold" style={{ color: '#15803d' }}>{fmtN(sales.yillikCariSayisi.toplam)}</span>
                       </div>
                     </div>
                   </div>
                   {/* Haziran */}
                   <div>
-                    <p className="text-[10px] text-gray-500 mb-1">{MONTHS_TR[ay - 1]} 2026</p>
-                    <div className="space-y-1">
+                    <p className="text-[9px] text-gray-500 mb-1">{MONTHS_TR[ay - 1]}</p>
+                    <div className="space-y-0.5">
                       <div className="flex justify-between items-center">
-                        <span className="text-[9px] text-gray-500">RELUX</span>
-                        <span className="text-sm font-bold" style={{ color: '#111827' }}>{fmtN(sales.aylikCariSayisi.relux)}</span>
+                        <span className="text-[8px] text-gray-500">RELUX</span>
+                        <span className="text-xs font-bold" style={{ color: '#111827' }}>{fmtN(sales.aylikCariSayisi.relux)}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-[9px] text-gray-500">ELECTROLUX</span>
-                        <span className="text-sm font-bold" style={{ color: '#2563eb' }}>{fmtN(sales.aylikCariSayisi.electrolux)}</span>
+                        <span className="text-[8px] text-gray-500">ELECTROLUX</span>
+                        <span className="text-xs font-bold" style={{ color: '#2563eb' }}>{fmtN(sales.aylikCariSayisi.electrolux)}</span>
                       </div>
-                      <div className="flex justify-between items-center border-t border-green-200 pt-1">
-                        <span className="text-[9px] font-semibold text-gray-600">TOPLAM</span>
-                        <span className="text-xl font-bold" style={{ color: '#15803d' }}>{fmtN(sales.aylikCariSayisi.toplam)}</span>
+                      <div className="flex justify-between items-center border-t border-green-200 pt-0.5">
+                        <span className="text-[8px] font-semibold text-gray-600">TOPLAM</span>
+                        <span className="text-lg font-bold" style={{ color: '#15803d' }}>{fmtN(sales.aylikCariSayisi.toplam)}</span>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* BSY + Cari Top 10'lar - Kompakt Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-              {/* BSY Sıralama */}
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-200">
-                <h3 className="text-xs font-semibold text-gray-700 mb-2">BSY Ciro Sıralaması (2026)</h3>
-                <div className="space-y-1 text-[10px]">
-                  {sales.yillikBsySiralama.slice(0, 5).map((bsy, i) => (
-                    <div key={i} className="flex justify-between items-center bg-white/60 rounded px-2 py-1">
-                      <span className="font-medium truncate">{i + 1}. {bsy.bsyAdi}</span>
-                      <span className="text-blue-700 font-semibold">{fmtTL(bsy.toplam)} ({fmtPct(bsy.oran)})</span>
+              {/* BSY CİRO SIRALAMASI - TÜM BSY'LER */}
+              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-3 border border-purple-200">
+                <div className="flex items-center gap-1 mb-2">
+                  <Target className="text-purple-600" size={16} />
+                  <h3 className="text-xs font-bold text-gray-800">BSY CİRO SIRALAMASI (2026)</h3>
+                </div>
+                <div className="space-y-0.5 text-[9px] max-h-[140px] overflow-y-auto">
+                  {sales.yillikBsySiralama.map((bsy, i) => (
+                    <div key={i} className="flex justify-between items-center bg-white/60 rounded px-2 py-0.5">
+                      <span className="font-medium truncate flex-1">{i + 1}. {bsy.bsyAdi}</span>
+                      <span className="text-purple-700 font-semibold whitespace-nowrap ml-2">{fmtTL(bsy.toplam)} ({fmtPct(bsy.oran)})</span>
                     </div>
                   ))}
                 </div>
               </div>
+            </div>
 
+            {/* Cari Top 10'lar - Kompakt Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {/* Cari Top 10 RELUX */}
               <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-lg p-3 border border-emerald-200">
                 <h3 className="text-xs font-semibold text-gray-700 mb-2">Top 10 Cari (RELUX - 2026)</h3>
