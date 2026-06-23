@@ -117,6 +117,10 @@ export async function GET(req: Request) {
   const yillikData: Array<{ cariKod: string; cariIsim: string; bsyAdi: string; grup: string; netTutar: number }> = []
   const aylikData: Array<{ cariKod: string; cariIsim: string; bsyAdi: string; grup: string; netTutar: number }> = []
 
+  // Farklı cari sayıları için Set'ler (satış yapılan cariler - fatura kesilmiş)
+  const yillikCariSet = new Set<string>()
+  const aylikCariSet = new Set<string>()
+
   for (let i = 1; i < raw.length; i++) {
     const r = raw[i]
     if (!r) continue
@@ -129,25 +133,32 @@ export async function GET(req: Request) {
     const grup = cols['grup'] >= 0 ? String(r[cols['grup']] ?? '').trim().toUpperCase() : ''
     const netTutar = cols['netTutar'] >= 0 ? toNum(r[cols['netTutar']]) : 0
 
-    if (!cariKod || netTutar === 0) continue
+    if (!cariKod) continue
 
-    // Yıllık (2026)
+    // Yıllık (2026) - satış yapılan cariler (fatura kesilen)
     if (rowYil === yil) {
-      yillikData.push({ cariKod, cariIsim, bsyAdi, grup, netTutar })
+      yillikCariSet.add(cariKod)
+
+      // Ciro hesabı için sadece netTutar > 0 olanlar
+      if (netTutar !== 0) {
+        yillikData.push({ cariKod, cariIsim, bsyAdi, grup, netTutar })
+      }
     }
 
-    // Aylık
+    // Aylık - satış yapılan cariler (fatura kesilen)
     if (rowYil === yil && rowAy === ay) {
-      aylikData.push({ cariKod, cariIsim, bsyAdi, grup, netTutar })
+      aylikCariSet.add(cariKod)
+
+      // Ciro hesabı için sadece netTutar > 0 olanlar
+      if (netTutar !== 0) {
+        aylikData.push({ cariKod, cariIsim, bsyAdi, grup, netTutar })
+      }
     }
   }
 
   // === METRIKLER ===
   const yillikCiro = yillikData.reduce((sum, d) => sum + d.netTutar, 0)
   const aylikCiro = aylikData.reduce((sum, d) => sum + d.netTutar, 0)
-
-  const yillikCariSet = new Set(yillikData.map(d => d.cariKod))
-  const aylikCariSet = new Set(aylikData.map(d => d.cariKod))
 
   // === BSY SIRALAMA ===
   function calculateBsySiralama(data: typeof yillikData) {
