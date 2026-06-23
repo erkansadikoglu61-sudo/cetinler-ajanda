@@ -103,12 +103,22 @@ export async function GET(req: Request) {
   const header = raw[0] as unknown[]
   const cols: Record<string, number> = {}
   for (let c = 0; c < header.length; c++) {
-    const h = String(header[c] ?? '').trim().toLowerCase()
+    const h = String(header[c] ?? '')
+      .trim()
+      .toLowerCase()
+      .replace(/i̇/g, 'i') // Türkçe İ → i
+      .replace(/ı/g, 'i')  // Türkçe ı → i
+      .replace(/ğ/g, 'g')
+      .replace(/ü/g, 'u')
+      .replace(/ş/g, 's')
+      .replace(/ö/g, 'o')
+      .replace(/ç/g, 'c')
+
     if (h.includes('cari') && h.includes('kod') && !h.includes('kod 1')) cols['cariKod'] = c
     if (h.includes('cari') && h.includes('isim')) cols['cariIsim'] = c
     if (h.includes('plasiyer') && h.includes('ad')) cols['bsyAdi'] = c // Plasiyer Adı = BSY
     if (h === 'grup') cols['grup'] = c
-    if (h === 'yıl' || h === 'yil') cols['yil'] = c
+    if (h === 'yil' || h === 'yıl') cols['yil'] = c
     if (h === 'ay') cols['ay'] = c
     if (h.includes('net') && h.includes('tutar')) cols['netTutar'] = c
   }

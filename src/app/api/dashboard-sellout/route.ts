@@ -18,7 +18,12 @@ export interface DashboardSelloutMetrics {
 
 async function fetchPhpSellout(yil: number, ay?: number): Promise<any[]> {
   try {
-    const phpUrl = process.env.PHP_API_URL || 'https://cetinler.net/api/sellout.php'
+    const phpUrl = process.env.PHP_API_URL
+    if (!phpUrl) {
+      console.warn('⚠️ PHP_API_URL not configured, returning empty sellout data')
+      return []
+    }
+
     const params = new URLSearchParams({ yil: String(yil) })
     if (ay) params.append('ay', String(ay))
 
@@ -27,11 +32,21 @@ async function fetchPhpSellout(yil: number, ay?: number): Promise<any[]> {
       next: { revalidate: 300 }, // 5 dakika cache
     })
 
-    if (!response.ok) return []
+    if (!response.ok) {
+      console.warn(`⚠️ PHP Sellout API returned ${response.status}`)
+      return []
+    }
+
+    const contentType = response.headers.get('content-type')
+    if (!contentType?.includes('application/json')) {
+      console.warn('⚠️ PHP Sellout API did not return JSON')
+      return []
+    }
+
     const data = await response.json()
     return Array.isArray(data) ? data : []
   } catch (error) {
-    console.error('PHP Sellout fetch error:', error)
+    console.error('❌ PHP Sellout fetch error:', error)
     return []
   }
 }

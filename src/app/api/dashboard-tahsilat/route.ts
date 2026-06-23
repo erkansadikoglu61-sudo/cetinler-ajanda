@@ -32,6 +32,19 @@ function toNum(v: unknown): number {
   return 0
 }
 
+function normalizeText(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/i̇/g, 'i')
+    .replace(/ı/g, 'i')
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ş/g, 's')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c')
+}
+
 export interface DashboardTahsilatMetrics {
   acikHesap: number // Tahsilat Planım sayfasından Toplam kolonu
   tahsilatHedef: number // Tahsilat Hedef datasından
@@ -65,7 +78,7 @@ export async function GET(req: Request) {
       const header = rows[0] as unknown[]
       let toplamCol = -1
       for (let c = 0; c < header.length; c++) {
-        const h = String(header[c] ?? '').trim().toLowerCase()
+        const h = normalizeText(String(header[c] ?? ''))
         if (h === 'toplam') {
           toplamCol = c
           break
@@ -95,7 +108,7 @@ export async function GET(req: Request) {
       let hedefCol = -1
 
       for (let c = 0; c < header.length; c++) {
-        const h = String(header[c] ?? '').trim().toLowerCase()
+        const h = normalizeText(String(header[c] ?? ''))
         if (h === 'yıl' || h === 'yil') yilCol = c
         if (h === 'ay') ayCol = c
         if (h.includes('hedef') || h.includes('tutar')) hedefCol = c
@@ -130,7 +143,7 @@ export async function GET(req: Request) {
       let turCol = -1
 
       for (let c = 0; c < header.length; c++) {
-        const h = String(header[c] ?? '').trim().toLowerCase()
+        const h = normalizeText(String(header[c] ?? ''))
         if (h === 'yıl' || h === 'yil') yilCol = c
         if (h === 'ay') ayCol = c
         if (h.includes('tutar') || h.includes('tahsilat')) tutarCol = c
