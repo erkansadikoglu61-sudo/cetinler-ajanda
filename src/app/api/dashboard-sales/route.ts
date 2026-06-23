@@ -126,7 +126,7 @@ export async function GET(req: Request) {
       .replace(/ö/g, 'o')
       .replace(/ç/g, 'c')
 
-    if (h.includes('cari') && h.includes('kod') && !h.includes('kod 1')) cols['cariKod'] = c
+    if (h === 'cari kod') cols['cariKod'] = c // Tam eşitlik - "Cari Kod 1" vb ile karışmasın
     if (h.includes('cari') && h.includes('isim')) cols['cariIsim'] = c
     if (h.includes('plasiyer') && h.includes('ad')) cols['bsyAdi'] = c // Plasiyer Adı = BSY
     if (h.includes('grup') && h.includes('kod')) cols['grup'] = c // Grup Kodu kolonu (EKEA, RELUX)
