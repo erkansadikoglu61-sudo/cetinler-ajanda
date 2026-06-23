@@ -36,8 +36,18 @@ export interface DashboardSalesMetrics {
   // Toplam metrikler
   yillikCiro: number
   aylikCiro: number
-  yillikCariSayisi: number
-  aylikCariSayisi: number
+
+  // Cari sayıları - Grup bazında
+  yillikCariSayisi: {
+    relux: number
+    electrolux: number
+    toplam: number
+  }
+  aylikCariSayisi: {
+    relux: number
+    electrolux: number
+    toplam: number
+  }
 
   // BSY sıralamaları
   yillikBsySiralama: Array<{
@@ -75,8 +85,8 @@ export async function GET(req: Request) {
     return NextResponse.json<DashboardSalesMetrics>({
       yillikCiro: 0,
       aylikCiro: 0,
-      yillikCariSayisi: 0,
-      aylikCariSayisi: 0,
+      yillikCariSayisi: { relux: 0, electrolux: 0, toplam: 0 },
+      aylikCariSayisi: { relux: 0, electrolux: 0, toplam: 0 },
       yillikBsySiralama: [],
       aylikBsySiralama: [],
       yillikCariReluxTop10: [],
@@ -129,9 +139,14 @@ export async function GET(req: Request) {
   const yillikData: Array<{ cariKod: string; cariIsim: string; bsyAdi: string; grup: string; netTutar: number }> = []
   const aylikData: Array<{ cariKod: string; cariIsim: string; bsyAdi: string; grup: string; netTutar: number }> = []
 
-  // Farklı cari sayıları için Set'ler (satış yapılan cariler - fatura kesilmiş)
-  const yillikCariSet = new Set<string>()
-  const aylikCariSet = new Set<string>()
+  // Farklı cari sayıları için Set'ler - Grup bazında (net tutar > 0 olanlar)
+  const yillikCariReluxSet = new Set<string>()
+  const yillikCariElectroluxSet = new Set<string>()
+  const yillikCariToplamSet = new Set<string>()
+
+  const aylikCariReluxSet = new Set<string>()
+  const aylikCariElectroluxSet = new Set<string>()
+  const aylikCariToplamSet = new Set<string>()
 
   let debugCount = 0
   for (let i = 1; i < raw.length; i++) {
@@ -154,30 +169,48 @@ export async function GET(req: Request) {
 
     if (!cariKod) continue
 
-    // Yıllık (2026) - satış yapılan cariler (fatura kesilen)
-    if (rowYil === yil) {
-      yillikCariSet.add(cariKod)
+    // Yıllık (2026) - net tutar > 0 olanları say ve topla
+    if (rowYil === yil && netTutar > 0) {
+      yillikCariToplamSet.add(cariKod)
 
-      // Ciro hesabı için sadece netTutar > 0 olanlar
-      if (netTutar !== 0) {
-        yillikData.push({ cariKod, cariIsim, bsyAdi, grup, netTutar })
+      if (grup === 'RELUX' || grup.includes('RELUX')) {
+        yillikCariReluxSet.add(cariKod)
+      } else if (grup === 'ELECTROLUX' || grup === 'EKEA' || grup.includes('ELECTROLUX')) {
+        yillikCariElectroluxSet.add(cariKod)
       }
+
+      yillikData.push({ cariKod, cariIsim, bsyAdi, grup, netTutar })
     }
 
-    // Aylık - satış yapılan cariler (fatura kesilen)
-    if (rowYil === yil && rowAy === ay) {
-      aylikCariSet.add(cariKod)
+    // Aylık - net tutar > 0 olanları say ve topla
+    if (rowYil === yil && rowAy === ay && netTutar > 0) {
+      aylikCariToplamSet.add(cariKod)
 
-      // Ciro hesabı için sadece netTutar > 0 olanlar
-      if (netTutar !== 0) {
-        aylikData.push({ cariKod, cariIsim, bsyAdi, grup, netTutar })
+      if (grup === 'RELUX' || grup.includes('RELUX')) {
+        aylikCariReluxSet.add(cariKod)
+      } else if (grup === 'ELECTROLUX' || grup === 'EKEA' || grup.includes('ELECTROLUX')) {
+        aylikCariElectroluxSet.add(cariKod)
       }
+
+      aylikData.push({ cariKod, cariIsim, bsyAdi, grup, netTutar })
     }
   }
 
   // === METRIKLER ===
   const yillikCiro = yillikData.reduce((sum, d) => sum + d.netTutar, 0)
   const aylikCiro = aylikData.reduce((sum, d) => sum + d.netTutar, 0)
+
+  const yillikCariSayisi = {
+    relux: yillikCariReluxSet.size,
+    electrolux: yillikCariElectroluxSet.size,
+    toplam: yillikCariToplamSet.size,
+  }
+
+  const aylikCariSayisi = {
+    relux: aylikCariReluxSet.size,
+    electrolux: aylikCariElectroluxSet.size,
+    toplam: aylikCariToplamSet.size,
+  }
 
   // === BSY SIRALAMA ===
   function calculateBsySiralama(data: typeof yillikData) {
@@ -238,8 +271,8 @@ export async function GET(req: Request) {
   const result: DashboardSalesMetrics = {
     yillikCiro,
     aylikCiro,
-    yillikCariSayisi: yillikCariSet.size,
-    aylikCariSayisi: aylikCariSet.size,
+    yillikCariSayisi,
+    aylikCariSayisi,
 
     yillikBsySiralama: calculateBsySiralama(yillikData),
     aylikBsySiralama: calculateBsySiralama(aylikData),

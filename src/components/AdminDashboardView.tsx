@@ -91,8 +91,50 @@ export function AdminDashboardView() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               <MetricCard icon={<DollarSign size={16} />} label="2026 Ciro" value={fmtTL(sales.yillikCiro)} color="blue" />
               <MetricCard icon={<DollarSign size={16} />} label={`${MONTHS_TR[ay - 1]} Ciro`} value={fmtTL(sales.aylikCiro)} color="blue" />
-              <MetricCard icon={<Users size={16} />} label="2026 Cari Sayısı" value={fmtN(sales.yillikCariSayisi)} color="green" />
-              <MetricCard icon={<Users size={16} />} label={`${MONTHS_TR[ay - 1]} Cari Sayısı`} value={fmtN(sales.aylikCariSayisi)} color="green" />
+
+              {/* 2026 Cari Sayısı - Grup bazında */}
+              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-3 border border-green-200">
+                <div className="flex items-center gap-1 mb-1">
+                  <Users size={16} />
+                  <span className="text-xs font-medium text-gray-600">2026 Cari Sayısı</span>
+                </div>
+                <div className="space-y-0.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-gray-500">RELUX</span>
+                    <span className="text-sm font-bold text-gray-900">{fmtN(sales.yillikCariSayisi.relux)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-gray-500">ELECTROLUX</span>
+                    <span className="text-sm font-bold text-blue-600">{fmtN(sales.yillikCariSayisi.electrolux)}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-t border-green-200 pt-0.5">
+                    <span className="text-[10px] font-semibold text-gray-600">TOPLAM</span>
+                    <span className="text-lg font-bold text-green-700">{fmtN(sales.yillikCariSayisi.toplam)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Aylık Cari Sayısı - Grup bazında */}
+              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-3 border border-green-200">
+                <div className="flex items-center gap-1 mb-1">
+                  <Users size={16} />
+                  <span className="text-xs font-medium text-gray-600">{MONTHS_TR[ay - 1]} Cari Sayısı</span>
+                </div>
+                <div className="space-y-0.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-gray-500">RELUX</span>
+                    <span className="text-sm font-bold text-gray-900">{fmtN(sales.aylikCariSayisi.relux)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-gray-500">ELECTROLUX</span>
+                    <span className="text-sm font-bold text-blue-600">{fmtN(sales.aylikCariSayisi.electrolux)}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-t border-green-200 pt-0.5">
+                    <span className="text-[10px] font-semibold text-gray-600">TOPLAM</span>
+                    <span className="text-lg font-bold text-green-700">{fmtN(sales.aylikCariSayisi.toplam)}</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* BSY + Cari Top 10'lar - Kompakt Grid */}
