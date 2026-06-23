@@ -161,9 +161,18 @@ export async function GET(req: Request) {
     const grup = cols['grup'] >= 0 ? String(r[cols['grup']] ?? '').trim().toUpperCase() : ''
     const netTutar = cols['netTutar'] >= 0 ? toNum(r[cols['netTutar']]) : 0
 
-    // İlk 3 satırı logla
-    if (debugCount < 3 && rowYil === yil && netTutar !== 0) {
-      console.log(`  Satır ${i}:`, { cariKod, cariIsim: cariIsim.substring(0, 20), bsyAdi, grup, netTutar })
+    // İlk 5 satırı logla
+    if (debugCount < 5 && rowYil === yil && netTutar > 0) {
+      console.log(`  Satır ${i}:`, {
+        cariKod,
+        cariIsim: cariIsim.substring(0, 20),
+        bsyAdi,
+        grup,
+        grupUpper: grup.toUpperCase(),
+        isRelux: grup === 'RELUX',
+        isEkea: grup === 'EKEA',
+        netTutar
+      })
       debugCount++
     }
 
