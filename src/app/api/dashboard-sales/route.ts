@@ -186,12 +186,15 @@ export async function GET(req: Request) {
 
     // Yıllık (2026) - net tutar > 0 olanları say ve topla
     if (rowYil === yil && netTutar > 0) {
-      yillikCariToplamSet.add(cariKod)
+      // Sadece M ile başlayan cari kodları müşteri olarak say
+      if (cariKod.toUpperCase().startsWith('M')) {
+        yillikCariToplamSet.add(cariKod)
 
-      if (grup === 'RELUX') {
-        yillikCariReluxSet.add(cariKod)
-      } else if (grup === 'EKEA') {
-        yillikCariElectroluxSet.add(cariKod)
+        if (grup === 'RELUX') {
+          yillikCariReluxSet.add(cariKod)
+        } else if (grup === 'EKEA') {
+          yillikCariElectroluxSet.add(cariKod)
+        }
       }
 
       yillikData.push({ cariKod, cariIsim, bsyAdi, grup, netTutar })
@@ -199,12 +202,15 @@ export async function GET(req: Request) {
 
     // Aylık - net tutar > 0 olanları say ve topla
     if (rowYil === yil && rowAy === ay && netTutar > 0) {
-      aylikCariToplamSet.add(cariKod)
+      // Sadece M ile başlayan cari kodları müşteri olarak say
+      if (cariKod.toUpperCase().startsWith('M')) {
+        aylikCariToplamSet.add(cariKod)
 
-      if (grup === 'RELUX') {
-        aylikCariReluxSet.add(cariKod)
-      } else if (grup === 'EKEA') {
-        aylikCariElectroluxSet.add(cariKod)
+        if (grup === 'RELUX') {
+          aylikCariReluxSet.add(cariKod)
+        } else if (grup === 'EKEA') {
+          aylikCariElectroluxSet.add(cariKod)
+        }
       }
 
       aylikData.push({ cariKod, cariIsim, bsyAdi, grup, netTutar })
