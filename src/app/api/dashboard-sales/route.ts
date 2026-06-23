@@ -127,7 +127,7 @@ export async function GET(req: Request) {
     if (h.includes('cari') && h.includes('kod') && !h.includes('kod 1')) cols['cariKod'] = c
     if (h.includes('cari') && h.includes('isim')) cols['cariIsim'] = c
     if (h.includes('plasiyer') && h.includes('ad')) cols['bsyAdi'] = c // Plasiyer Adı = BSY
-    if (h === 'grup') cols['grup'] = c
+    if (h === 'grup kod' || h === 'grupkod') cols['grup'] = c // Grup Kod kolonu (EKEA, RELUX)
     if (h === 'yil' || h === 'yıl') cols['yil'] = c
     if (h === 'ay') cols['ay'] = c
     if (h.includes('net') && h.includes('tutar')) cols['netTutar'] = c
@@ -173,9 +173,9 @@ export async function GET(req: Request) {
     if (rowYil === yil && netTutar > 0) {
       yillikCariToplamSet.add(cariKod)
 
-      if (grup === 'RELUX' || grup.includes('RELUX')) {
+      if (grup === 'RELUX') {
         yillikCariReluxSet.add(cariKod)
-      } else if (grup === 'ELECTROLUX' || grup === 'EKEA' || grup.includes('ELECTROLUX')) {
+      } else if (grup === 'EKEA') {
         yillikCariElectroluxSet.add(cariKod)
       }
 
@@ -186,9 +186,9 @@ export async function GET(req: Request) {
     if (rowYil === yil && rowAy === ay && netTutar > 0) {
       aylikCariToplamSet.add(cariKod)
 
-      if (grup === 'RELUX' || grup.includes('RELUX')) {
+      if (grup === 'RELUX') {
         aylikCariReluxSet.add(cariKod)
-      } else if (grup === 'ELECTROLUX' || grup === 'EKEA' || grup.includes('ELECTROLUX')) {
+      } else if (grup === 'EKEA') {
         aylikCariElectroluxSet.add(cariKod)
       }
 
@@ -231,9 +231,9 @@ export async function GET(req: Request) {
       const entry = bsyMap.get(d.bsyAdi)!
       entry.toplam += d.netTutar
 
-      if (d.grup === 'RELUX' || d.grup.includes('RELUX')) {
+      if (d.grup === 'RELUX') {
         entry.relux += d.netTutar
-      } else if (d.grup === 'EKEA' || d.grup.includes('ELECTROLUX')) {
+      } else if (d.grup === 'EKEA') {
         entry.ekea += d.netTutar
       }
     })
@@ -256,7 +256,7 @@ export async function GET(req: Request) {
     const cariMap = new Map<string, { cariIsim: string; tutar: number }>()
 
     data
-      .filter(d => !grupFilter || d.grup === grupFilter || d.grup.includes(grupFilter))
+      .filter(d => !grupFilter || d.grup === grupFilter)
       .forEach(d => {
         if (!cariMap.has(d.cariKod)) {
           cariMap.set(d.cariKod, { cariIsim: d.cariIsim, tutar: 0 })
@@ -286,11 +286,11 @@ export async function GET(req: Request) {
     aylikBsySiralama: calculateBsySiralama(aylikData),
 
     yillikCariReluxTop10: calculateCariTop10(yillikData, 'RELUX'),
-    yillikCariEkeaTop10: calculateCariTop10(yillikData, 'ELECTROLUX'),
+    yillikCariEkeaTop10: calculateCariTop10(yillikData, 'EKEA'),
     yillikCariToplamTop10: calculateCariTop10(yillikData),
 
     aylikCariReluxTop10: calculateCariTop10(aylikData, 'RELUX'),
-    aylikCariEkeaTop10: calculateCariTop10(aylikData, 'ELECTROLUX'),
+    aylikCariEkeaTop10: calculateCariTop10(aylikData, 'EKEA'),
     aylikCariToplamTop10: calculateCariTop10(aylikData),
   }
 
