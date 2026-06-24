@@ -102,7 +102,10 @@ export function AdminDashboardView() {
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Hedef</span>
-                        <span className="text-sm font-bold text-gray-700">{fmtTL(sales.yillikCiroHedef)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-gray-700">{fmtTL(sales.yillikCiroHedef)}</span>
+                          <span className="text-xs font-semibold text-gray-500">(100%)</span>
+                        </div>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Gerçekleşen</span>
@@ -113,7 +116,10 @@ export function AdminDashboardView() {
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Kalan</span>
-                        <span className="text-sm font-bold text-orange-600">{fmtTL(sales.yillikCiroHedef - sales.yillikCiro)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-orange-600">{fmtTL(sales.yillikCiroHedef - sales.yillikCiro)}</span>
+                          <span className="text-xs font-semibold text-orange-500">({fmtPct((sales.yillikCiroHedef - sales.yillikCiro) / sales.yillikCiroHedef)})</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -123,7 +129,10 @@ export function AdminDashboardView() {
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Hedef</span>
-                        <span className="text-sm font-bold text-gray-700">{fmtTL(sales.aylikCiroHedef)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-gray-700">{fmtTL(sales.aylikCiroHedef)}</span>
+                          <span className="text-xs font-semibold text-gray-500">(100%)</span>
+                        </div>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Gerçekleşen</span>
@@ -134,7 +143,10 @@ export function AdminDashboardView() {
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Kalan</span>
-                        <span className="text-sm font-bold text-orange-600">{fmtTL(sales.aylikCiroHedef - sales.aylikCiro)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-orange-600">{fmtTL(sales.aylikCiroHedef - sales.aylikCiro)}</span>
+                          <span className="text-xs font-semibold text-orange-500">({fmtPct((sales.aylikCiroHedef - sales.aylikCiro) / sales.aylikCiroHedef)})</span>
+                        </div>
                       </div>
                     </div>
                   </div>
