@@ -106,15 +106,14 @@ export function AdminDashboardView() {
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Gerçekleşen</span>
-                        <span className="text-sm font-bold text-blue-700">{fmtTL(sales.yillikCiro)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-blue-700">{fmtTL(sales.yillikCiro)}</span>
+                          <span className="text-xs font-semibold text-blue-600">({fmtPct(sales.yillikCiro / sales.yillikCiroHedef)})</span>
+                        </div>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Kalan</span>
                         <span className="text-sm font-bold text-orange-600">{fmtTL(sales.yillikCiroHedef - sales.yillikCiro)}</span>
-                      </div>
-                      <div className="border-t border-blue-200 pt-2 mt-2 text-center">
-                        <p className="text-xs text-gray-500 mb-1">Gerçekleşme</p>
-                        <p className="text-3xl font-bold text-blue-700">{fmtPct(sales.yillikCiro / sales.yillikCiroHedef)}</p>
                       </div>
                     </div>
                   </div>
@@ -128,15 +127,14 @@ export function AdminDashboardView() {
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Gerçekleşen</span>
-                        <span className="text-sm font-bold text-blue-700">{fmtTL(sales.aylikCiro)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-blue-700">{fmtTL(sales.aylikCiro)}</span>
+                          <span className="text-xs font-semibold text-blue-600">({fmtPct(sales.aylikCiro / sales.aylikCiroHedef)})</span>
+                        </div>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Kalan</span>
                         <span className="text-sm font-bold text-orange-600">{fmtTL(sales.aylikCiroHedef - sales.aylikCiro)}</span>
-                      </div>
-                      <div className="border-t border-blue-200 pt-2 mt-2 text-center">
-                        <p className="text-xs text-gray-500 mb-1">Gerçekleşme</p>
-                        <p className="text-3xl font-bold text-blue-700">{fmtPct(sales.aylikCiro / sales.aylikCiroHedef)}</p>
                       </div>
                     </div>
                   </div>
