@@ -98,7 +98,7 @@ export function AdminDashboardView() {
                 <div className="grid grid-cols-2 gap-4">
                   {/* 2026 */}
                   <div>
-                    <p className="text-xs text-gray-500 mb-2">2026</p>
+                    <p className="text-sm font-bold text-gray-700 mb-2">2026</p>
                     <div className="space-y-1">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Hedef</span>
@@ -120,7 +120,7 @@ export function AdminDashboardView() {
                   </div>
                   {/* Haziran */}
                   <div>
-                    <p className="text-xs text-gray-500 mb-2">{MONTHS_TR[ay - 1]}</p>
+                    <p className="text-sm font-bold text-gray-700 mb-2">{MONTHS_TR[ay - 1]}</p>
                     <div className="space-y-1">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Hedef</span>
@@ -152,7 +152,7 @@ export function AdminDashboardView() {
                 <div className="grid grid-cols-2 gap-4">
                   {/* 2026 */}
                   <div>
-                    <p className="text-xs text-gray-500 mb-2">2026</p>
+                    <p className="text-sm font-bold text-gray-700 mb-2">2026</p>
                     <div className="space-y-1">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">RELUX</span>
@@ -170,7 +170,7 @@ export function AdminDashboardView() {
                   </div>
                   {/* Haziran */}
                   <div>
-                    <p className="text-xs text-gray-500 mb-2">{MONTHS_TR[ay - 1]}</p>
+                    <p className="text-sm font-bold text-gray-700 mb-2">{MONTHS_TR[ay - 1]}</p>
                     <div className="space-y-1">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">RELUX</span>
