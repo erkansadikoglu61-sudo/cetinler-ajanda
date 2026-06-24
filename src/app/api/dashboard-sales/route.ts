@@ -82,13 +82,35 @@ export async function GET(req: Request) {
   const yil = sp.get('yil') ? parseInt(sp.get('yil')!) : 2026
   const ay = sp.get('ay') ? parseInt(sp.get('ay')!) : new Date().getMonth() + 1
 
+  // Supabase'den aylık ciro hedefini çek
+  let aylikCiroHedef = 0
+  try {
+    const sb = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+
+    const { data, error } = await sb
+      .from('tahsilat_planim')
+      .select('ciro_hedef')
+      .eq('yil', yil)
+      .eq('ay', ay)
+
+    if (!error && data) {
+      aylikCiroHedef = data.reduce((sum, row) => sum + (row.ciro_hedef || 0), 0)
+      console.log(`📊 Aylık Ciro Hedefi (${yil}/${ay}):`, aylikCiroHedef)
+    }
+  } catch (e) {
+    console.warn('⚠️ Aylık ciro hedefi alınamadı:', e)
+  }
+
   const buf = await getExcelBuffer()
   if (!buf) {
     return NextResponse.json<DashboardSalesMetrics>({
       yillikCiro: 0,
       yillikCiroHedef: 610_000_000,
       aylikCiro: 0,
-      aylikCiroHedef: 0,
+      aylikCiroHedef,
       yillikCariSayisi: { relux: 0, electrolux: 0, toplam: 0 },
       aylikCariSayisi: { relux: 0, electrolux: 0, toplam: 0 },
       yillikBsySiralama: [],
@@ -305,7 +327,7 @@ export async function GET(req: Request) {
 
   // Hedefler
   const yillikCiroHedef = 610_000_000
-  const aylikCiroHedef = yillikCiroHedef / 12 // Eşit dağıtım
+  // aylikCiroHedef yukarıda Supabase'den çekildi
 
   const result: DashboardSalesMetrics = {
     yillikCiro,
