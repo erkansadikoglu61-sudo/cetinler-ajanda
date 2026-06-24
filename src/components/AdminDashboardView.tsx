@@ -159,10 +159,10 @@ export function AdminDashboardView() {
                   <Users className="text-green-600" size={20} />
                   <h3 className="text-sm font-bold text-gray-800">MÜŞTERİ SAYISI</h3>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 divide-x divide-green-200">
                   {/* 2026 */}
-                  <div>
-                    <p className="text-sm font-bold text-gray-700 mb-2">2026</p>
+                  <div className="pr-3">
+                    <p className="text-base font-bold text-gray-800 mb-3 pb-2 border-b border-green-200">2026</p>
                     <div className="space-y-1">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">RELUX</span>
@@ -179,8 +179,8 @@ export function AdminDashboardView() {
                     </div>
                   </div>
                   {/* Haziran */}
-                  <div>
-                    <p className="text-sm font-bold text-gray-700 mb-2">{MONTHS_TR[ay - 1]}</p>
+                  <div className="pl-3">
+                    <p className="text-base font-bold text-gray-800 mb-3 pb-2 border-b border-green-200">{MONTHS_TR[ay - 1]}</p>
                     <div className="space-y-1">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">RELUX</span>
