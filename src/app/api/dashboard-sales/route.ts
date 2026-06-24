@@ -35,7 +35,9 @@ function toNum(v: unknown): number {
 export interface DashboardSalesMetrics {
   // Toplam metrikler
   yillikCiro: number
+  yillikCiroHedef: number // 2026 hedefi
   aylikCiro: number
+  aylikCiroHedef: number // Aylık hedef
 
   // Cari sayıları - Grup bazında
   yillikCariSayisi: {
@@ -84,7 +86,9 @@ export async function GET(req: Request) {
   if (!buf) {
     return NextResponse.json<DashboardSalesMetrics>({
       yillikCiro: 0,
+      yillikCiroHedef: 610_000_000,
       aylikCiro: 0,
+      aylikCiroHedef: 0,
       yillikCariSayisi: { relux: 0, electrolux: 0, toplam: 0 },
       aylikCariSayisi: { relux: 0, electrolux: 0, toplam: 0 },
       yillikBsySiralama: [],
@@ -299,9 +303,15 @@ export async function GET(req: Request) {
       .slice(0, 10)
   }
 
+  // Hedefler
+  const yillikCiroHedef = 610_000_000
+  const aylikCiroHedef = yillikCiroHedef / 12 // Eşit dağıtım
+
   const result: DashboardSalesMetrics = {
     yillikCiro,
+    yillikCiroHedef,
     aylikCiro,
+    aylikCiroHedef,
     yillikCariSayisi,
     aylikCariSayisi,
 

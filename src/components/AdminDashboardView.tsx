@@ -96,13 +96,49 @@ export function AdminDashboardView() {
                   <h3 className="text-sm font-bold text-gray-800">CİRO</h3>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
+                  {/* 2026 */}
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">2026</p>
-                    <p className="text-2xl font-bold text-blue-700">{fmtTL(sales.yillikCiro)}</p>
+                    <p className="text-xs text-gray-500 mb-2">2026</p>
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-500">Hedef</span>
+                        <span className="text-sm font-semibold text-gray-700">{fmtTL(sales.yillikCiroHedef)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-500">Gerçekleşen</span>
+                        <span className="text-sm font-bold text-blue-700">{fmtTL(sales.yillikCiro)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-500">Kalan</span>
+                        <span className="text-sm font-semibold text-orange-600">{fmtTL(sales.yillikCiroHedef - sales.yillikCiro)}</span>
+                      </div>
+                      <div className="border-t border-blue-200 pt-2 mt-2 text-center">
+                        <p className="text-xs text-gray-500 mb-1">Gerçekleşme</p>
+                        <p className="text-3xl font-bold text-blue-700">{fmtPct(sales.yillikCiro / sales.yillikCiroHedef)}</p>
+                      </div>
+                    </div>
                   </div>
+                  {/* Haziran */}
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">{MONTHS_TR[ay - 1]}</p>
-                    <p className="text-2xl font-bold text-blue-700">{fmtTL(sales.aylikCiro)}</p>
+                    <p className="text-xs text-gray-500 mb-2">{MONTHS_TR[ay - 1]}</p>
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-500">Hedef</span>
+                        <span className="text-sm font-semibold text-gray-700">{fmtTL(sales.aylikCiroHedef)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-500">Gerçekleşen</span>
+                        <span className="text-sm font-bold text-blue-700">{fmtTL(sales.aylikCiro)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-500">Kalan</span>
+                        <span className="text-sm font-semibold text-orange-600">{fmtTL(sales.aylikCiroHedef - sales.aylikCiro)}</span>
+                      </div>
+                      <div className="border-t border-blue-200 pt-2 mt-2 text-center">
+                        <p className="text-xs text-gray-500 mb-1">Gerçekleşme</p>
+                        <p className="text-3xl font-bold text-blue-700">{fmtPct(sales.aylikCiro / sales.aylikCiroHedef)}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
