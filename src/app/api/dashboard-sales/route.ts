@@ -82,7 +82,7 @@ export async function GET(req: Request) {
   const yil = sp.get('yil') ? parseInt(sp.get('yil')!) : 2026
   const ay = sp.get('ay') ? parseInt(sp.get('ay')!) : new Date().getMonth() + 1
 
-  // Supabase'den aylık ciro hedefini çek
+  // Supabase'den aylık ciro hedefini çek (BSY Hedef Girişi toplamı)
   let aylikCiroHedef = 0
   try {
     const sb = createClient(
@@ -91,14 +91,14 @@ export async function GET(req: Request) {
     )
 
     const { data, error } = await sb
-      .from('tahsilat_planim')
-      .select('ciro_hedef')
+      .from('bsy_kisi_hedef')
+      .select('hedef_ciro')
       .eq('yil', yil)
       .eq('ay', ay)
 
     if (!error && data) {
-      aylikCiroHedef = data.reduce((sum, row) => sum + (row.ciro_hedef || 0), 0)
-      console.log(`📊 Aylık Ciro Hedefi (${yil}/${ay}):`, aylikCiroHedef)
+      aylikCiroHedef = data.reduce((sum, row) => sum + (row.hedef_ciro || 0), 0)
+      console.log(`📊 Aylık Ciro Hedefi (${yil}/${ay}):`, aylikCiroHedef, '(BSY Hedef Girişi toplamı)')
     }
   } catch (e) {
     console.warn('⚠️ Aylık ciro hedefi alınamadı:', e)
