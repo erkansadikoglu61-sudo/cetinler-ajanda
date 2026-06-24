@@ -95,14 +95,14 @@ export function AdminDashboardView() {
                   <DollarSign className="text-blue-600" size={20} />
                   <h3 className="text-sm font-bold text-gray-800">CİRO</h3>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 divide-x divide-blue-200">
                   {/* 2026 */}
-                  <div>
-                    <p className="text-sm font-bold text-gray-700 mb-2">2026</p>
-                    <div className="space-y-1">
+                  <div className="pr-3">
+                    <p className="text-base font-bold text-gray-800 mb-3 pb-2 border-b border-blue-200">2026</p>
+                    <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Hedef</span>
-                        <span className="text-sm font-semibold text-gray-700">{fmtTL(sales.yillikCiroHedef)}</span>
+                        <span className="text-sm font-bold text-gray-700">{fmtTL(sales.yillikCiroHedef)}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Gerçekleşen</span>
@@ -110,7 +110,7 @@ export function AdminDashboardView() {
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Kalan</span>
-                        <span className="text-sm font-semibold text-orange-600">{fmtTL(sales.yillikCiroHedef - sales.yillikCiro)}</span>
+                        <span className="text-sm font-bold text-orange-600">{fmtTL(sales.yillikCiroHedef - sales.yillikCiro)}</span>
                       </div>
                       <div className="border-t border-blue-200 pt-2 mt-2 text-center">
                         <p className="text-xs text-gray-500 mb-1">Gerçekleşme</p>
@@ -119,12 +119,12 @@ export function AdminDashboardView() {
                     </div>
                   </div>
                   {/* Haziran */}
-                  <div>
-                    <p className="text-sm font-bold text-gray-700 mb-2">{MONTHS_TR[ay - 1]}</p>
-                    <div className="space-y-1">
+                  <div className="pl-3">
+                    <p className="text-base font-bold text-gray-800 mb-3 pb-2 border-b border-blue-200">{MONTHS_TR[ay - 1]}</p>
+                    <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Hedef</span>
-                        <span className="text-sm font-semibold text-gray-700">{fmtTL(sales.aylikCiroHedef)}</span>
+                        <span className="text-sm font-bold text-gray-700">{fmtTL(sales.aylikCiroHedef)}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Gerçekleşen</span>
@@ -132,7 +132,7 @@ export function AdminDashboardView() {
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-500">Kalan</span>
-                        <span className="text-sm font-semibold text-orange-600">{fmtTL(sales.aylikCiroHedef - sales.aylikCiro)}</span>
+                        <span className="text-sm font-bold text-orange-600">{fmtTL(sales.aylikCiroHedef - sales.aylikCiro)}</span>
                       </div>
                       <div className="border-t border-blue-200 pt-2 mt-2 text-center">
                         <p className="text-xs text-gray-500 mb-1">Gerçekleşme</p>
