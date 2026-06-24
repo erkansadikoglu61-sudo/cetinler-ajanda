@@ -171,14 +171,9 @@ export async function GET(req: Request) {
   const yillikData: Array<{ cariKod: string; cariIsim: string; bsyAdi: string; grup: string; netTutar: number }> = []
   const aylikData: Array<{ cariKod: string; cariIsim: string; bsyAdi: string; grup: string; netTutar: number }> = []
 
-  // Farklı cari sayıları için Set'ler - Grup bazında (net tutar > 0 olanlar)
-  const yillikCariReluxSet = new Set<string>()
-  const yillikCariElectroluxSet = new Set<string>()
-  const yillikCariToplamSet = new Set<string>()
-
-  const aylikCariReluxSet = new Set<string>()
-  const aylikCariElectroluxSet = new Set<string>()
-  const aylikCariToplamSet = new Set<string>()
+  // Müşteri bazında toplam ciro hesaplama için Map'ler
+  const yillikCariCiroMap = new Map<string, { toplam: number; relux: number; ekea: number }>()
+  const aylikCariCiroMap = new Map<string, { toplam: number; relux: number; ekea: number }>()
 
   let debugCount = 0
   for (let i = 1; i < raw.length; i++) {
@@ -210,36 +205,64 @@ export async function GET(req: Request) {
 
     if (!cariKod) continue
 
-    // Yıllık (2026) - net tutar > 0 olanları say ve topla
-    if (rowYil === yil && netTutar > 0) {
-      // Sadece M ile başlayan cari kodları müşteri olarak say
-      if (cariKod.toUpperCase().startsWith('M')) {
-        yillikCariToplamSet.add(cariKod)
-
-        if (grup === 'RELUX') {
-          yillikCariReluxSet.add(cariKod)
-        } else if (grup === 'EKEA') {
-          yillikCariElectroluxSet.add(cariKod)
-        }
-      }
-
+    // Yıllık (2026)
+    if (rowYil === yil) {
+      // Her satırı topla
       yillikData.push({ cariKod, cariIsim, bsyAdi, grup, netTutar })
+
+      // Müşteri bazında toplam ciro hesapla (M ile başlayanlar)
+      if (cariKod.toUpperCase().startsWith('M')) {
+        if (!yillikCariCiroMap.has(cariKod)) {
+          yillikCariCiroMap.set(cariKod, { toplam: 0, relux: 0, ekea: 0 })
+        }
+        const entry = yillikCariCiroMap.get(cariKod)!
+        entry.toplam += netTutar
+        if (grup === 'RELUX') entry.relux += netTutar
+        else if (grup === 'EKEA') entry.ekea += netTutar
+      }
     }
 
-    // Aylık - net tutar > 0 olanları say ve topla
-    if (rowYil === yil && rowAy === ay && netTutar > 0) {
-      // Sadece M ile başlayan cari kodları müşteri olarak say
-      if (cariKod.toUpperCase().startsWith('M')) {
-        aylikCariToplamSet.add(cariKod)
-
-        if (grup === 'RELUX') {
-          aylikCariReluxSet.add(cariKod)
-        } else if (grup === 'EKEA') {
-          aylikCariElectroluxSet.add(cariKod)
-        }
-      }
-
+    // Aylık
+    if (rowYil === yil && rowAy === ay) {
       aylikData.push({ cariKod, cariIsim, bsyAdi, grup, netTutar })
+
+      // Müşteri bazında toplam ciro hesapla (M ile başlayanlar)
+      if (cariKod.toUpperCase().startsWith('M')) {
+        if (!aylikCariCiroMap.has(cariKod)) {
+          aylikCariCiroMap.set(cariKod, { toplam: 0, relux: 0, ekea: 0 })
+        }
+        const entry = aylikCariCiroMap.get(cariKod)!
+        entry.toplam += netTutar
+        if (grup === 'RELUX') entry.relux += netTutar
+        else if (grup === 'EKEA') entry.ekea += netTutar
+      }
+    }
+  }
+
+  // Müşteri sayısını hesapla (>= 1.000 TL ciro olanlar)
+  const MIN_CIRO = 1000
+
+  const yillikCariReluxSet = new Set<string>()
+  const yillikCariElectroluxSet = new Set<string>()
+  const yillikCariToplamSet = new Set<string>()
+
+  for (const [cariKod, ciro] of yillikCariCiroMap.entries()) {
+    if (ciro.toplam >= MIN_CIRO) {
+      yillikCariToplamSet.add(cariKod)
+      if (ciro.relux >= MIN_CIRO) yillikCariReluxSet.add(cariKod)
+      if (ciro.ekea >= MIN_CIRO) yillikCariElectroluxSet.add(cariKod)
+    }
+  }
+
+  const aylikCariReluxSet = new Set<string>()
+  const aylikCariElectroluxSet = new Set<string>()
+  const aylikCariToplamSet = new Set<string>()
+
+  for (const [cariKod, ciro] of aylikCariCiroMap.entries()) {
+    if (ciro.toplam >= MIN_CIRO) {
+      aylikCariToplamSet.add(cariKod)
+      if (ciro.relux >= MIN_CIRO) aylikCariReluxSet.add(cariKod)
+      if (ciro.ekea >= MIN_CIRO) aylikCariElectroluxSet.add(cariKod)
     }
   }
 
