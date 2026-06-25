@@ -239,19 +239,15 @@ export async function GET(req: Request) {
     }
   }
 
-  // Müşteri sayısını hesapla (>= 1.000 TL ciro olanlar)
-  const MIN_CIRO = 1000
-
+  // Müşteri sayısını hesapla (filtre yok - sadece M-prefix ve grup kontrolü)
   const yillikCariReluxSet = new Set<string>()
   const yillikCariElectroluxSet = new Set<string>()
   const yillikCariToplamSet = new Set<string>()
 
   for (const [cariKod, ciro] of yillikCariCiroMap.entries()) {
-    if (ciro.toplam >= MIN_CIRO) {
-      yillikCariToplamSet.add(cariKod)
-      if (ciro.relux >= MIN_CIRO) yillikCariReluxSet.add(cariKod)
-      if (ciro.ekea >= MIN_CIRO) yillikCariElectroluxSet.add(cariKod)
-    }
+    yillikCariToplamSet.add(cariKod)
+    if (ciro.relux !== 0) yillikCariReluxSet.add(cariKod)
+    if (ciro.ekea !== 0) yillikCariElectroluxSet.add(cariKod)
   }
 
   const aylikCariReluxSet = new Set<string>()
@@ -259,11 +255,9 @@ export async function GET(req: Request) {
   const aylikCariToplamSet = new Set<string>()
 
   for (const [cariKod, ciro] of aylikCariCiroMap.entries()) {
-    if (ciro.toplam >= MIN_CIRO) {
-      aylikCariToplamSet.add(cariKod)
-      if (ciro.relux >= MIN_CIRO) aylikCariReluxSet.add(cariKod)
-      if (ciro.ekea >= MIN_CIRO) aylikCariElectroluxSet.add(cariKod)
-    }
+    aylikCariToplamSet.add(cariKod)
+    if (ciro.relux !== 0) aylikCariReluxSet.add(cariKod)
+    if (ciro.ekea !== 0) aylikCariElectroluxSet.add(cariKod)
   }
 
   // === METRIKLER ===
