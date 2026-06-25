@@ -39,6 +39,18 @@ export interface DashboardSalesMetrics {
   aylikCiro: number
   aylikCiroHedef: number // Aylık hedef
 
+  // Grup bazında cirolar
+  yillikCiroGrup: {
+    relux: number
+    ekea: number
+    ebe: number
+  }
+  aylikCiroGrup: {
+    relux: number
+    ekea: number
+    ebe: number
+  }
+
   // Cari sayıları - Grup bazında
   yillikCariSayisi: {
     relux: number
@@ -111,6 +123,8 @@ export async function GET(req: Request) {
       yillikCiroHedef: 610_000_000,
       aylikCiro: 0,
       aylikCiroHedef,
+      yillikCiroGrup: { relux: 0, ekea: 0, ebe: 0 },
+      aylikCiroGrup: { relux: 0, ekea: 0, ebe: 0 },
       yillikCariSayisi: { relux: 0, electrolux: 0, toplam: 0 },
       aylikCariSayisi: { relux: 0, electrolux: 0, toplam: 0 },
       yillikBsySiralama: [],
@@ -264,6 +278,19 @@ export async function GET(req: Request) {
   const yillikCiro = yillikData.reduce((sum, d) => sum + d.netTutar, 0)
   const aylikCiro = aylikData.reduce((sum, d) => sum + d.netTutar, 0)
 
+  // Grup bazında cirolar
+  const yillikCiroGrup = {
+    relux: yillikData.filter(d => d.grup === 'RELUX').reduce((sum, d) => sum + d.netTutar, 0),
+    ekea: yillikData.filter(d => d.grup === 'EKEA').reduce((sum, d) => sum + d.netTutar, 0),
+    ebe: yillikData.filter(d => d.grup === 'EBE').reduce((sum, d) => sum + d.netTutar, 0),
+  }
+
+  const aylikCiroGrup = {
+    relux: aylikData.filter(d => d.grup === 'RELUX').reduce((sum, d) => sum + d.netTutar, 0),
+    ekea: aylikData.filter(d => d.grup === 'EKEA').reduce((sum, d) => sum + d.netTutar, 0),
+    ebe: aylikData.filter(d => d.grup === 'EBE').reduce((sum, d) => sum + d.netTutar, 0),
+  }
+
   const yillikCariSayisi = {
     relux: yillikCariReluxSet.size,
     electrolux: yillikCariElectroluxSet.size,
@@ -351,6 +378,8 @@ export async function GET(req: Request) {
     yillikCiroHedef,
     aylikCiro,
     aylikCiroHedef,
+    yillikCiroGrup,
+    aylikCiroGrup,
     yillikCariSayisi,
     aylikCariSayisi,
 
