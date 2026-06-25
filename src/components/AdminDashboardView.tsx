@@ -238,30 +238,6 @@ export function AdminDashboardView() {
             </div>
           </div>
 
-          {/* ========== SELLOUT BÖLGESİ ========== */}
-          <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-green-500">
-            <div className="flex items-center gap-2 mb-3">
-              <Award className="text-green-600" size={20} />
-              <h2 className="text-lg font-bold text-gray-800">SELLOUT YILDIZLARI</h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-              <SelloutStarCard title="Cari (2026)" data={sellout.yillikCariTop10.slice(0, 5)} nameKey="cariAdi" color="purple" />
-              <SelloutStarCard title="Şube (2026)" data={sellout.yillikSubeTop10.slice(0, 5)} nameKey="subeAdi" color="blue" />
-              <SelloutStarCard title="Süpervizör (2026)" data={sellout.yillikSupervizorler.slice(0, 5)} nameKey="supervizorAdi" color="indigo" />
-              <SelloutStarCard title="Çetinler Merch (2026)" data={sellout.yillikCetinlerMerchTop10.slice(0, 5)} nameKey="merchAdi" color="pink" />
-              <SelloutStarCard title="Bayi Merch (2026)" data={sellout.yillikBayiMerchTop10.slice(0, 5)} nameKey="merchAdi" color="teal" />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-3">
-              <SelloutStarCard title={`Cari (${MONTHS_TR[ay - 1]})`} data={sellout.aylikCariTop10.slice(0, 5)} nameKey="cariAdi" color="purple" />
-              <SelloutStarCard title={`Şube (${MONTHS_TR[ay - 1]})`} data={sellout.aylikSubeTop10.slice(0, 5)} nameKey="subeAdi" color="blue" />
-              <SelloutStarCard title={`Süpervizör (${MONTHS_TR[ay - 1]})`} data={sellout.aylikSupervizorler.slice(0, 5)} nameKey="supervizorAdi" color="indigo" />
-              <SelloutStarCard title={`Çetinler Merch (${MONTHS_TR[ay - 1]})`} data={sellout.aylikCetinlerMerchTop10.slice(0, 5)} nameKey="merchAdi" color="pink" />
-              <SelloutStarCard title={`Bayi Merch (${MONTHS_TR[ay - 1]})`} data={sellout.aylikBayiMerchTop10.slice(0, 5)} nameKey="merchAdi" color="teal" />
-            </div>
-          </div>
-
           {/* ========== TAHSİLAT BÖLGESİ ========== */}
           <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-red-500">
             <div className="flex items-center gap-2 mb-3">
@@ -284,6 +260,30 @@ export function AdminDashboardView() {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* ========== SELLOUT BÖLGESİ ========== */}
+          <div className="bg-white rounded-xl shadow-md p-4 border-l-4 border-green-500">
+            <div className="flex items-center gap-2 mb-3">
+              <Award className="text-green-600" size={20} />
+              <h2 className="text-lg font-bold text-gray-800">SELLOUT YILDIZLARI</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              <SelloutStarCard title="Cari (2026)" data={sellout.yillikCariTop10.slice(0, 5)} nameKey="cariAdi" color="purple" />
+              <SelloutStarCard title="Şube (2026)" data={sellout.yillikSubeTop10.slice(0, 5)} nameKey="subeAdi" color="blue" />
+              <SelloutStarCard title="Süpervizör (2026)" data={sellout.yillikSupervizorler.slice(0, 5)} nameKey="supervizorAdi" color="indigo" />
+              <SelloutStarCard title="Çetinler Merch (2026)" data={sellout.yillikCetinlerMerchTop10.slice(0, 5)} nameKey="merchAdi" color="pink" />
+              <SelloutStarCard title="Bayi Merch (2026)" data={sellout.yillikBayiMerchTop10.slice(0, 5)} nameKey="merchAdi" color="teal" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-3">
+              <SelloutStarCard title={`Cari (${MONTHS_TR[ay - 1]})`} data={sellout.aylikCariTop10.slice(0, 5)} nameKey="cariAdi" color="purple" />
+              <SelloutStarCard title={`Şube (${MONTHS_TR[ay - 1]})`} data={sellout.aylikSubeTop10.slice(0, 5)} nameKey="subeAdi" color="blue" />
+              <SelloutStarCard title={`Süpervizör (${MONTHS_TR[ay - 1]})`} data={sellout.aylikSupervizorler.slice(0, 5)} nameKey="supervizorAdi" color="indigo" />
+              <SelloutStarCard title={`Çetinler Merch (${MONTHS_TR[ay - 1]})`} data={sellout.aylikCetinlerMerchTop10.slice(0, 5)} nameKey="merchAdi" color="pink" />
+              <SelloutStarCard title={`Bayi Merch (${MONTHS_TR[ay - 1]})`} data={sellout.aylikBayiMerchTop10.slice(0, 5)} nameKey="merchAdi" color="teal" />
             </div>
           </div>
         </div>

@@ -69,26 +69,34 @@ export async function GET(req: Request) {
 
   const wb = XLSX.read(buf, { type: 'buffer', dense: true })
 
-  // === AÇIK HESAP (Tahsilat Planım sayfası) ===
+  // === AÇIK HESAP (Tahsilat Planım sayfası - mevcut ay için) ===
   let acikHesap = 0
   const tahsilatPlanimSheet = wb.Sheets['Tahsilat Planım']
   if (tahsilatPlanimSheet) {
     const rows: unknown[][] = XLSX.utils.sheet_to_json(tahsilatPlanimSheet, { header: 1, defval: null })
     if (rows.length > 1) {
       const header = rows[0] as unknown[]
+      let yilCol = -1
+      let ayCol = -1
       let toplamCol = -1
+
       for (let c = 0; c < header.length; c++) {
         const h = normalizeText(String(header[c] ?? ''))
-        if (h === 'toplam') {
-          toplamCol = c
-          break
-        }
+        if (h === 'yıl' || h === 'yil') yilCol = c
+        if (h === 'ay') ayCol = c
+        if (h === 'toplam') toplamCol = c
       }
 
       if (toplamCol >= 0) {
         for (let i = 1; i < rows.length; i++) {
           const r = rows[i]
-          if (r && toplamCol < r.length) {
+          if (!r) continue
+
+          const rowYil = yilCol >= 0 ? toNum(r[yilCol]) : 0
+          const rowAy = ayCol >= 0 ? toNum(r[ayCol]) : 0
+
+          // Sadece mevcut yıl ve ay için topla
+          if (rowYil === yil && rowAy === ay && toplamCol < r.length) {
             acikHesap += toNum(r[toplamCol])
           }
         }
