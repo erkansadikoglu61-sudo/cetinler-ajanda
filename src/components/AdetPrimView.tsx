@@ -449,7 +449,7 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
   const now = new Date()
   const [yil, setYil] = useState(now.getFullYear())
   const [ay,  setAy]  = useState(now.getMonth() + 1)
-  const [view, setView] = useState<'genel' | 'ozel'>('genel')
+  const [view, setView] = useState<'genel' | 'ozel' | 'destek'>('genel')
   const [rows,    setRows]    = useState<PrimRow[]>([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -553,7 +553,7 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
           </>
         )}
 
-        {/* Sub-tabs — Özel Primler sadece admin */}
+        {/* Sub-tabs */}
         <div className="flex items-center gap-1 ml-2 bg-gray-100 rounded-lg p-0.5">
           <button onClick={() => setView('genel')}
             className={clsx('px-3 py-1 text-xs rounded-md font-medium transition-colors',
@@ -565,6 +565,13 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
               className={clsx('px-3 py-1 text-xs rounded-md font-medium transition-colors',
                 view === 'ozel' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
               Özel Primler
+            </button>
+          )}
+          {isAdmin && (
+            <button onClick={() => setView('destek')}
+              className={clsx('px-3 py-1 text-xs rounded-md font-medium transition-colors',
+                view === 'destek' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
+              Destek Personelleri
             </button>
           )}
         </div>
@@ -668,6 +675,16 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
           </div>
         )}
         </>}
+
+        {/* Destek Personelleri Prim Hakedişleri */}
+        {view === 'destek' && isAdmin && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <div className="text-center py-16">
+              <p className="text-sm text-gray-500 mb-2">Destek Personelleri Prim Hakedişleri</p>
+              <p className="text-xs text-gray-400">Bu özellik yakında eklenecek...</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
