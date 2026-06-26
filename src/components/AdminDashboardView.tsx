@@ -69,7 +69,7 @@ export function AdminDashboardView() {
           <p className="text-sm text-purple-100">Güncel Durum: {MONTHS_TR[ay - 1]} {yil}</p>
           {sales?.excelGuncellemeZamani && (
             <p className="text-xs text-purple-200 mt-0.5">
-              Güncelleme Saati: {new Date(sales.excelGuncellemeZamani).toLocaleString('tr-TR', {
+              Son Güncelleme: {new Date(sales.excelGuncellemeZamani).toLocaleString('tr-TR', {
                 day: '2-digit',
                 month: '2-digit',
                 year: 'numeric',
