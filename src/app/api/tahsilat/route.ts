@@ -123,9 +123,10 @@ export async function GET(req: Request) {
     const r = hedefRaw[i]
     if (!r) continue
 
-    // Plasiyer Kodu'ndan BSY kodu al
+    // Plasiyer Kodu'ndan BSY kodu al (format: "IB2 / Okan OĞUZ" veya "IB2")
     const plasiyerKod = hedefPlasiyerCol >= 0 ? String(r[hedefPlasiyerCol] ?? '').trim() : ''
-    const bsyKod = plasiyerKod ? plasiyerKod.toUpperCase() : ''
+    // Slash varsa öncesini al, yoksa tamamını al
+    const bsyKod = plasiyerKod ? plasiyerKod.split('/')[0].trim().toUpperCase() : ''
     const cariIsim = hedefCariIsimCol >= 0 ? String(r[hedefCariIsimCol] ?? '').trim() : ''
 
     if (!bsyKod) continue
@@ -207,8 +208,10 @@ export async function GET(req: Request) {
     const r = gercRaw[i]
     if (!r) continue
 
+    // Plasiyer Kodu'ndan BSY kodu al (format: "IB2 / Okan OĞUZ" veya "IB2")
     const plasiyerKod = gercPlasiyerCol >= 0 ? String(r[gercPlasiyerCol] ?? '').trim() : ''
-    const bsyKod = plasiyerKod ? plasiyerKod.toUpperCase() : ''
+    // Slash varsa öncesini al, yoksa tamamını al
+    const bsyKod = plasiyerKod ? plasiyerKod.split('/')[0].trim().toUpperCase() : ''
     const bsyAdi = bsyKod ? (BSY_KOD_TO_NAME[bsyKod] || bsyKod) : ''
     const cariIsim = gercCariIsimCol >= 0 ? String(r[gercCariIsimCol] ?? '').trim() : ''
     const rowAy = gercAyCol >= 0 ? (typeof r[gercAyCol] === 'number' ? r[gercAyCol] : parseInt(String(r[gercAyCol] ?? '0'))) : 0
