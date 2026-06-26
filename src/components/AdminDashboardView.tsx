@@ -155,9 +155,9 @@ export function AdminDashboardView() {
                 {/* Grup Bazında Cirolar */}
                 <div className="mt-4 pt-4 border-t border-blue-200">
                   <h4 className="text-xs font-semibold text-gray-600 mb-3">Grup Bazında Ciro</h4>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-4 divide-x divide-blue-200">
                     {/* 2026 Grup */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 pr-3">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-purple-600 font-medium">RELUX</span>
                         <span className="text-sm font-bold text-purple-700">{fmtTL(sales.yillikCiroGrup.relux)}</span>
@@ -172,7 +172,7 @@ export function AdminDashboardView() {
                       </div>
                     </div>
                     {/* Haziran Grup */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 pl-3">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-purple-600 font-medium">RELUX</span>
                         <span className="text-sm font-bold text-purple-700">{fmtTL(sales.aylikCiroGrup.relux)}</span>
