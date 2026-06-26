@@ -67,6 +67,17 @@ export function AdminDashboardView() {
         <div>
           <h1 className="text-2xl font-bold">Dashboard 2026</h1>
           <p className="text-sm text-purple-100">Güncel Durum: {MONTHS_TR[ay - 1]} {yil}</p>
+          {sales?.excelGuncellemeZamani && (
+            <p className="text-xs text-purple-200 mt-0.5">
+              Güncelleme Saati: {new Date(sales.excelGuncellemeZamani).toLocaleString('tr-TR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </p>
+          )}
         </div>
         <button
           onClick={loadData}

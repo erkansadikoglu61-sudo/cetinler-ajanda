@@ -11,16 +11,19 @@ const EXCEL_PATH =
 const BUCKET = 'bsy-excel'
 const OBJ_NAME = 'SAHA.xlsx'
 
-async function getExcelBuffer(): Promise<Buffer | null> {
-  if (fs.existsSync(EXCEL_PATH)) return fs.readFileSync(EXCEL_PATH)
+async function getExcelBuffer(): Promise<{ buffer: Buffer; mtime: Date } | null> {
+  if (fs.existsSync(EXCEL_PATH)) {
+    const stats = fs.statSync(EXCEL_PATH)
+    return { buffer: fs.readFileSync(EXCEL_PATH), mtime: stats.mtime }
+  }
   try {
     const sb = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY!
     )
     const { data, error } = await sb.storage.from(BUCKET).download(OBJ_NAME)
     if (error || !data) return null
-    return Buffer.from(await data.arrayBuffer())
+    return { buffer: Buffer.from(await data.arrayBuffer()), mtime: new Date() }
   } catch {
     return null
   }
@@ -33,6 +36,9 @@ function toNum(v: unknown): number {
 }
 
 export interface DashboardSalesMetrics {
+  // Excel son güncelleme zamanı
+  excelGuncellemeZamani: string // ISO 8601 format
+
   // Toplam metrikler
   yillikCiro: number
   yillikCiroHedef: number // 2026 hedefi
@@ -116,9 +122,10 @@ export async function GET(req: Request) {
     console.warn('⚠️ Aylık ciro hedefi alınamadı:', e)
   }
 
-  const buf = await getExcelBuffer()
-  if (!buf) {
+  const result = await getExcelBuffer()
+  if (!result) {
     return NextResponse.json<DashboardSalesMetrics>({
+      excelGuncellemeZamani: new Date().toISOString(),
       yillikCiro: 0,
       yillikCiroHedef: 610_000_000,
       aylikCiro: 0,
@@ -138,6 +145,7 @@ export async function GET(req: Request) {
     })
   }
 
+  const { buffer: buf, mtime: excelMtime } = result
   const wb = XLSX.read(buf, { type: 'buffer', dense: true })
   const sheet = wb.Sheets['Data']
   if (!sheet) {
@@ -374,6 +382,7 @@ export async function GET(req: Request) {
   // aylikCiroHedef yukarıda Supabase'den çekildi
 
   const result: DashboardSalesMetrics = {
+    excelGuncellemeZamani: excelMtime.toISOString(),
     yillikCiro,
     yillikCiroHedef,
     aylikCiro,
