@@ -30,7 +30,7 @@ import { SellinSelloutView } from '@/components/SellinSelloutView'
 import { AdetPrimTablosu, BayiMerchHakdis } from '@/components/AdetPrimView'
 import { AnalizView } from '@/components/AnalizView'
 import { AdminDashboardView } from '@/components/AdminDashboardView'
-type TabType = 'month' | 'week' | 'day' | 'report' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'analiz' | 'tahsilat-planim' | 'dashboard'
+type TabType = 'month' | 'week' | 'day' | 'report' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'destek-personel' | 'analiz' | 'tahsilat-planim' | 'dashboard'
 
 // Renk hex'ine alpha ekle
 function hexWithAlpha(hex: string, alpha: string) {
@@ -1963,11 +1963,12 @@ export default function AppPage() {
             </div>
           )}
           {/* Primler alt sekmeleri (admin) */}
-          {(currentProfile?.role === 'admin' || isBsy || isSup) && ['adet-prim','bayi-merch'].includes(tab) && (
+          {(currentProfile?.role === 'admin' || isBsy || isSup) && ['adet-prim','bayi-merch','destek-personel'].includes(tab) && (
             <div className="flex overflow-x-auto items-center gap-1 px-3 pb-1.5 scrollbar-none">
               {([
                 { key: 'adet-prim' as const,  label: 'Adet Prim Tablosu' },
                 { key: 'bayi-merch' as const,  label: 'Bayi Merch Prim Hakedişleri' },
+                { key: 'destek-personel' as const,  label: 'Destek Personelleri Prim Hakedişleri' },
               ] as const).map(({ key, label }) => (
                 <button key={key} onClick={() => setTab(key)}
                   className={clsx(
@@ -2120,6 +2121,16 @@ export default function AppPage() {
               />
             </div>
           )}
+          {tab === 'destek-personel' && (currentProfile?.role === 'admin' || isBsy || isSup) && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <div className="flex items-center justify-center h-full bg-gray-50">
+                <div className="text-center p-8 bg-white rounded-xl border border-gray-200 shadow-sm">
+                  <p className="text-sm text-gray-500 mb-2">Destek Personelleri Prim Hakedişleri</p>
+                  <p className="text-xs text-gray-400">Bu özellik yakında eklenecek...</p>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -2164,7 +2175,7 @@ export default function AppPage() {
                   (key === 'month' && ['month','week','day'].includes(tab)) ||
                   (key === 'bsy' && ['bsy','kpi','genel-raporlar'].includes(tab)) ||
                   (key === 'noktalar' && tab === 'kullanicilar') ||
-                  (key === 'adet-prim' && tab === 'bayi-merch'))
+                  (key === 'adet-prim' && ['bayi-merch','destek-personel'].includes(tab)))
                   ? 'text-brand-500' : 'text-gray-400'
               )}
             >
