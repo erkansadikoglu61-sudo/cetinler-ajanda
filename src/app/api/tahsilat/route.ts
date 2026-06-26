@@ -67,7 +67,7 @@ export async function GET(req: Request) {
   // ── 1. Tahsilat Hedef Datası ────────────────────────────────────
   // Kolon: [0]CariKod [1]GrupKodu [2]CariIsim [3]Aciklama
   //        [4]PlasiyerKodu [5]Önceki [6]Tutar [7]Toplam
-  const hedefSheet = wb.Sheets['Tahsilat Hedef Datası']
+  const hedefSheet = wb.Sheets['Tahsilat_hedef_datası'] || wb.Sheets['Tahsilat_hedef_datasi'] || wb.Sheets['Tahsilat Hedef Datası']
   const hedefRaw: unknown[][] = hedefSheet
     ? XLSX.utils.sheet_to_json(hedefSheet, { header: 1, defval: null })
     : []
