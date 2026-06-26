@@ -68,6 +68,11 @@ export async function GET(req: Request) {
   // Kolon: [0]CariKod [1]GrupKodu [2]CariIsim [3]Aciklama
   //        [4]PlasiyerKodu [5]Önceki [6]Tutar [7]Toplam
   const hedefSheet = wb.Sheets['Tahsilat_hedef_datası'] || wb.Sheets['Tahsilat_hedef_datasi'] || wb.Sheets['Tahsilat Hedef Datası']
+
+  if (!hedefSheet) {
+    console.warn('⚠️ Tahsilat_hedef_datası sayfası bulunamadı! Mevcut sayfalar:', Object.keys(wb.Sheets))
+  }
+
   const hedefRaw: unknown[][] = hedefSheet
     ? XLSX.utils.sheet_to_json(hedefSheet, { header: 1, defval: null })
     : []
@@ -76,9 +81,11 @@ export async function GET(req: Request) {
   let hedefAyCol = -1
   if (hedefRaw.length > 0) {
     const header = hedefRaw[0] as unknown[]
+    console.log('📊 Tahsilat_hedef_datası - Header:', header.slice(0, 12))
     for (let c = 0; c < header.length; c++) {
       if (String(header[c] ?? '').trim().toLowerCase() === 'ay') { hedefAyCol = c; break }
     }
+    console.log('📊 Tahsilat_hedef_datası - Ay kolonu index:', hedefAyCol)
   }
 
   // BSY kodu → BSY toplam açık hesap
@@ -86,6 +93,7 @@ export async function GET(req: Request) {
   // (bsyKod + cariIsim) → cari bazında açık hesap (detay için)
   const cariAcikMap  = new Map<string, number>()   // key: `${bsyKod}||${cariIsim}`
 
+  let matchCount = 0
   for (let i = 1; i < hedefRaw.length; i++) {
     const r = hedefRaw[i]
     if (!r) continue
@@ -98,11 +106,17 @@ export async function GET(req: Request) {
     }
     const toplam = toNum(r[7])
     acikHesapMap.set(bsyKod, (acikHesapMap.get(bsyKod) ?? 0) + toplam)
+    matchCount++
+    if (matchCount <= 3) {
+      console.log(`  ✓ Satır ${i}: bsyKod=[${bsyKod}], cariIsim=[${cariIsim.substring(0, 30)}], toplam=${toplam}`)
+    }
     if (cariIsim) {
       const ck = `${bsyKod}||${cariIsim}`
       cariAcikMap.set(ck, (cariAcikMap.get(ck) ?? 0) + toplam)
     }
   }
+  console.log(`📊 Açık Hesap Map: ${acikHesapMap.size} BSY, ${matchCount} satır işlendi`)
+  console.log('📊 İlk 3 BSY:', Array.from(acikHesapMap.entries()).slice(0, 3))
 
   // ── 2. Gerçekleşen Tahsilat ─────────────────────────────────────
   // Kolon: [0]BSY [1]CariKod [2]CariIsim [3]KayitTarihi
