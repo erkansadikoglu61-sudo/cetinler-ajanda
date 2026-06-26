@@ -65,27 +65,37 @@ export async function GET(req: Request) {
   const wb = XLSX.read(buf, { type: 'buffer', dense: true })
 
   // ── 1. Tahsilat Hedef Datası ────────────────────────────────────
-  // Kolon: [0]CariKod [1]GrupKodu [2]CariIsim [3]Aciklama
-  //        [4]PlasiyerKodu [5]Önceki [6]Tutar [7]Toplam
-  const hedefSheet = wb.Sheets['Tahsilat_hedef_datası'] || wb.Sheets['Tahsilat_hedef_datasi'] || wb.Sheets['Tahsilat Hedef Datası']
+  const hedefSheet = wb.Sheets['Tahsilat_Hedef_Datası'] || wb.Sheets['Tahsilat_hedef_datası'] || wb.Sheets['Tahsilat_hedef_datasi']
 
   if (!hedefSheet) {
-    console.warn('⚠️ Tahsilat_hedef_datası sayfası bulunamadı! Mevcut sayfalar:', Object.keys(wb.Sheets))
+    console.warn('⚠️ Tahsilat_Hedef_Datası sayfası bulunamadı! Mevcut sayfalar:', Object.keys(wb.Sheets))
   }
 
   const hedefRaw: unknown[][] = hedefSheet
     ? XLSX.utils.sheet_to_json(hedefSheet, { header: 1, defval: null })
     : []
 
-  // "Ay" sütun indeksini bul
+  // Header'dan kolon indexlerini bul
   let hedefAyCol = -1
+  let hedefYilCol = -1
+  let hedefPlasiyerCol = -1
+  let hedefCariIsimCol = -1
+  let hedefToplamCol = -1
+
   if (hedefRaw.length > 0) {
     const header = hedefRaw[0] as unknown[]
-    console.log('📊 Tahsilat_hedef_datası - Header:', header.slice(0, 12))
+    console.log('📊 Tahsilat_Hedef_Datası - Header:', header.slice(0, 12))
+
     for (let c = 0; c < header.length; c++) {
-      if (String(header[c] ?? '').trim().toLowerCase() === 'ay') { hedefAyCol = c; break }
+      const h = String(header[c] ?? '').trim().toLowerCase().replace(/_/g, '')
+      if (h === 'ay') hedefAyCol = c
+      if (h === 'yil' || h === 'yıl') hedefYilCol = c
+      if (h.includes('plasiyer') && h.includes('kod')) hedefPlasiyerCol = c
+      if (h.includes('cari') && h.includes('isim')) hedefCariIsimCol = c
+      if (h === 'toplam') hedefToplamCol = c
     }
-    console.log('📊 Tahsilat_hedef_datası - Ay kolonu index:', hedefAyCol)
+
+    console.log('📊 Kolonlar:', { hedefAyCol, hedefYilCol, hedefPlasiyerCol, hedefCariIsimCol, hedefToplamCol })
   }
 
   // BSY kodu → BSY toplam açık hesap
@@ -97,21 +107,36 @@ export async function GET(req: Request) {
   for (let i = 1; i < hedefRaw.length; i++) {
     const r = hedefRaw[i]
     if (!r) continue
-    const bsyKod   = String(r[1] ?? '').trim().toUpperCase()
-    const cariIsim = String(r[2] ?? '').trim()
+
+    // Plasiyer Kodu'ndan BSY kodu al
+    const plasiyerKod = hedefPlasiyerCol >= 0 ? String(r[hedefPlasiyerCol] ?? '').trim() : ''
+    const bsyKod = plasiyerKod ? plasiyerKod.toUpperCase() : ''
+    const cariIsim = hedefCariIsimCol >= 0 ? String(r[hedefCariIsimCol] ?? '').trim() : ''
+
     if (!bsyKod) continue
+
+    // Yıl ve Ay filtresi
+    if (hedefYilCol >= 0) {
+      const rowYil = typeof r[hedefYilCol] === 'number' ? r[hedefYilCol] : parseInt(String(r[hedefYilCol] ?? '0'))
+      if (rowYil !== yil) continue
+    }
     if (hedefAyCol >= 0) {
       const rowAy = typeof r[hedefAyCol] === 'number' ? r[hedefAyCol] : parseInt(String(r[hedefAyCol] ?? '0'))
       if (rowAy !== ay) continue
     }
-    const toplam = toNum(r[7])
-    acikHesapMap.set(bsyKod, (acikHesapMap.get(bsyKod) ?? 0) + toplam)
+
+    const toplam = hedefToplamCol >= 0 ? toNum(r[hedefToplamCol]) : 0
+
+    // BSY adına çevir
+    const bsyAdi = BSY_KOD_TO_NAME[bsyKod] || bsyKod
+
+    acikHesapMap.set(bsyAdi, (acikHesapMap.get(bsyAdi) ?? 0) + toplam)
     matchCount++
     if (matchCount <= 3) {
-      console.log(`  ✓ Satır ${i}: bsyKod=[${bsyKod}], cariIsim=[${cariIsim.substring(0, 30)}], toplam=${toplam}`)
+      console.log(`  ✓ Satır ${i}: plasiyerKod=[${plasiyerKod}], bsyAdi=[${bsyAdi}], toplam=${toplam}`)
     }
     if (cariIsim) {
-      const ck = `${bsyKod}||${cariIsim}`
+      const ck = `${bsyAdi}||${cariIsim}`
       cariAcikMap.set(ck, (cariAcikMap.get(ck) ?? 0) + toplam)
     }
   }
@@ -119,12 +144,32 @@ export async function GET(req: Request) {
   console.log('📊 İlk 3 BSY:', Array.from(acikHesapMap.entries()).slice(0, 3))
 
   // ── 2. Gerçekleşen Tahsilat ─────────────────────────────────────
-  // Kolon: [0]BSY [1]CariKod [2]CariIsim [3]KayitTarihi
-  //        [4]TahsilatVadesi [5]KayitliVade [6]Ay [7]Yil [8]Tur [9]Tutar
   const gercSheet = wb.Sheets['Gerçekleşen Tahsilat']
   const gercRaw: unknown[][] = gercSheet
     ? XLSX.utils.sheet_to_json(gercSheet, { header: 1, defval: null })
     : []
+
+  // Header'dan kolon indexlerini bul
+  let gercPlasiyerCol = -1
+  let gercCariIsimCol = -1
+  let gercAyCol = -1
+  let gercYilCol = -1
+  let gercTurCol = -1
+  let gercTutarCol = -1
+
+  if (gercRaw.length > 0) {
+    const header = gercRaw[0] as unknown[]
+    for (let c = 0; c < header.length; c++) {
+      const h = String(header[c] ?? '').trim().toLowerCase().replace(/_/g, '')
+      if (h.includes('plasiyer') && h.includes('kod')) gercPlasiyerCol = c
+      if (h.includes('cari') && h.includes('isim')) gercCariIsimCol = c
+      if (h === 'ay') gercAyCol = c
+      if (h === 'yil' || h === 'yıl') gercYilCol = c
+      if (h.includes('tur') || h.includes('tür') || h.includes('tip')) gercTurCol = c
+      if (h.includes('tutar') || h === 'tutar') gercTutarCol = c
+    }
+    console.log('📊 Gerçekleşen Tahsilat - Kolonlar:', { gercPlasiyerCol, gercCariIsimCol, gercAyCol, gercYilCol, gercTurCol, gercTutarCol })
+  }
 
   // BSY → toplam (özet için)
   const gercMap = new Map<string, number>()
@@ -134,13 +179,17 @@ export async function GET(req: Request) {
   for (let i = 1; i < gercRaw.length; i++) {
     const r = gercRaw[i]
     if (!r) continue
-    const bsyAdi   = String(r[0] ?? '').trim()
-    const cariIsim = String(r[2] ?? '').trim()
-    const rowAy    = typeof r[6] === 'number' ? r[6] : parseInt(String(r[6] ?? '0'))
-    const rowYil   = typeof r[7] === 'number' ? r[7] : parseInt(String(r[7] ?? '0'))
-    const tur      = String(r[8] ?? '').trim()
+
+    const plasiyerKod = gercPlasiyerCol >= 0 ? String(r[gercPlasiyerCol] ?? '').trim() : ''
+    const bsyKod = plasiyerKod ? plasiyerKod.toUpperCase() : ''
+    const bsyAdi = bsyKod ? (BSY_KOD_TO_NAME[bsyKod] || bsyKod) : ''
+    const cariIsim = gercCariIsimCol >= 0 ? String(r[gercCariIsimCol] ?? '').trim() : ''
+    const rowAy = gercAyCol >= 0 ? (typeof r[gercAyCol] === 'number' ? r[gercAyCol] : parseInt(String(r[gercAyCol] ?? '0'))) : 0
+    const rowYil = gercYilCol >= 0 ? (typeof r[gercYilCol] === 'number' ? r[gercYilCol] : parseInt(String(r[gercYilCol] ?? '0'))) : 0
+    const tur = gercTurCol >= 0 ? String(r[gercTurCol] ?? '').trim() : ''
+
     if (!bsyAdi || rowYil !== yil) continue
-    const tutar = toNum(r[9])
+    const tutar = gercTutarCol >= 0 ? toNum(r[gercTutarCol]) : 0
 
     // Özet: sadece seçili ay
     if (rowAy === ay) {
