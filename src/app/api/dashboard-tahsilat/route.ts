@@ -12,16 +12,25 @@ const BUCKET = 'bsy-excel'
 const OBJ_NAME = 'SAHA.xlsx'
 
 async function getExcelBuffer(): Promise<Buffer | null> {
-  if (fs.existsSync(EXCEL_PATH)) return fs.readFileSync(EXCEL_PATH)
+  if (fs.existsSync(EXCEL_PATH)) {
+    console.log('📂 Excel dosyası local path\'ten okunuyor:', EXCEL_PATH)
+    return fs.readFileSync(EXCEL_PATH)
+  }
   try {
+    console.log('☁️ Excel dosyası Supabase Storage\'dan indiriliyor...')
     const sb = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
     const { data, error } = await sb.storage.from(BUCKET).download(OBJ_NAME)
-    if (error || !data) return null
+    if (error || !data) {
+      console.error('❌ Excel indirme hatası:', error)
+      return null
+    }
+    console.log('✅ Excel başarıyla indirildi, boyut:', data.size, 'bytes')
     return Buffer.from(await data.arrayBuffer())
-  } catch {
+  } catch (e) {
+    console.error('❌ Excel indirme exception:', e)
     return null
   }
 }
