@@ -122,8 +122,8 @@ export async function GET(req: Request) {
     console.warn('⚠️ Aylık ciro hedefi alınamadı:', e)
   }
 
-  const result = await getExcelBuffer()
-  if (!result) {
+  const excelResult = await getExcelBuffer()
+  if (!excelResult) {
     return NextResponse.json<DashboardSalesMetrics>({
       excelGuncellemeZamani: new Date().toISOString(),
       yillikCiro: 0,
@@ -145,7 +145,7 @@ export async function GET(req: Request) {
     })
   }
 
-  const { buffer: buf, mtime: excelMtime } = result
+  const { buffer: buf, mtime: excelMtime } = excelResult
   const wb = XLSX.read(buf, { type: 'buffer', dense: true })
   const sheet = wb.Sheets['Data']
   if (!sheet) {
