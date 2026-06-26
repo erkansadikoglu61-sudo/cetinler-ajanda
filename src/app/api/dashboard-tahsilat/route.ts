@@ -96,7 +96,11 @@ export async function GET(req: Request) {
         if (h === 'toplam') toplamCol = c
       }
 
+      console.log('📊 Tahsilat Planım - Kolonlar:', { yilCol, ayCol, toplamCol })
+      console.log('📊 Tahsilat Planım - Header örneği:', header.slice(0, 10))
+
       if (toplamCol >= 0) {
+        let matchCount = 0
         for (let i = 1; i < rows.length; i++) {
           const r = rows[i]
           if (!r) continue
@@ -106,11 +110,21 @@ export async function GET(req: Request) {
 
           // Sadece mevcut yıl ve ay için topla
           if (rowYil === yil && rowAy === ay && toplamCol < r.length) {
-            acikHesap += toNum(r[toplamCol])
+            const tutar = toNum(r[toplamCol])
+            acikHesap += tutar
+            matchCount++
+            if (matchCount <= 3) {
+              console.log(`  ✓ Satır ${i}: Yıl=${rowYil}, Ay=${rowAy}, Toplam=${tutar}`)
+            }
           }
         }
+        console.log(`📊 Açık Hesap: ${acikHesap} (${matchCount} satır toplandı)`)
+      } else {
+        console.warn('⚠️ Toplam kolonu bulunamadı!')
       }
     }
+  } else {
+    console.warn('⚠️ Tahsilat Planım sayfası bulunamadı!')
   }
 
   // === TAHSİLAT HEDEF ===
@@ -131,6 +145,10 @@ export async function GET(req: Request) {
         if (h.includes('hedef') || h.includes('tutar')) hedefCol = c
       }
 
+      console.log('📊 Tahsilat Hedef - Kolonlar:', { yilCol, ayCol, hedefCol })
+      console.log('📊 Tahsilat Hedef - Header örneği:', header.slice(0, 10))
+
+      let matchCount = 0
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i]
         if (!r) continue
@@ -139,10 +157,18 @@ export async function GET(req: Request) {
         const rowAy = ayCol >= 0 ? toNum(r[ayCol]) : 0
 
         if (rowYil === yil && rowAy === ay && hedefCol >= 0) {
-          tahsilatHedef += toNum(r[hedefCol])
+          const tutar = toNum(r[hedefCol])
+          tahsilatHedef += tutar
+          matchCount++
+          if (matchCount <= 3) {
+            console.log(`  ✓ Satır ${i}: Yıl=${rowYil}, Ay=${rowAy}, Hedef=${tutar}`)
+          }
         }
       }
+      console.log(`📊 Tahsilat Hedef: ${tahsilatHedef} (${matchCount} satır toplandı)`)
     }
+  } else {
+    console.warn('⚠️ Tahsilat Hedef sayfası bulunamadı!')
   }
 
   // === GERÇEKLEŞEN TAHSİLAT ===
