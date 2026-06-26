@@ -143,16 +143,15 @@ export async function GET(req: Request) {
 
     const toplam = hedefToplamCol >= 0 ? toNum(r[hedefToplamCol]) : 0
 
-    // BSY adına çevir
-    const bsyAdi = BSY_KOD_TO_NAME[bsyKod] || bsyKod
-
-    acikHesapMap.set(bsyAdi, (acikHesapMap.get(bsyAdi) ?? 0) + toplam)
+    // Map'e BSY KODU ile kaydet (IB2, KB1 vs.) - özet satırlarında kod ile okuyacağız
+    acikHesapMap.set(bsyKod, (acikHesapMap.get(bsyKod) ?? 0) + toplam)
     matchCount++
     if (matchCount <= 3) {
-      console.log(`  ✓ Satır ${i}: plasiyerKod=[${plasiyerKod}], bsyAdi=[${bsyAdi}], toplam=${toplam}`)
+      const bsyAdi = BSY_KOD_TO_NAME[bsyKod] || bsyKod
+      console.log(`  ✓ Satır ${i}: plasiyerKod=[${plasiyerKod}], bsyKod=[${bsyKod}], bsyAdi=[${bsyAdi}], toplam=${toplam}`)
     }
     if (cariIsim) {
-      const ck = `${bsyAdi}||${cariIsim}`
+      const ck = `${bsyKod}||${cariIsim}`
       cariAcikMap.set(ck, (cariAcikMap.get(ck) ?? 0) + toplam)
     }
   }
@@ -236,13 +235,14 @@ export async function GET(req: Request) {
   }
 
   // Detay satırlarına cari bazında açık hesap ekle
-  // BSY adını koda çevirip cariAcikMap'ten al
+  // cariAcikMap key formatı: "${bsyKod}||${cariIsim}"
+  // detayMap'teki bsyAdi'yi BSY koduna çevirmeliyiz
   const bsyNameToKod = Object.fromEntries(
-    Object.entries(BSY_KOD_TO_NAME).map(([k, v]) => [v.toLocaleLowerCase('tr'), k])
+    Object.entries(BSY_KOD_TO_NAME).map(([kod, adi]) => [adi.toLocaleLowerCase('tr'), kod])
   )
   const detayRows: TahsilatDetayRow[] = [...detayMap.values()].map(row => {
-    const kod = bsyNameToKod[row.bsyAdi.toLocaleLowerCase('tr')] ?? ''
-    const ck  = `${kod}||${row.cariIsim}`
+    const bsyKod = bsyNameToKod[row.bsyAdi.toLocaleLowerCase('tr')] ?? ''
+    const ck = `${bsyKod}||${row.cariIsim}`
     return { ...row, acikHesap: cariAcikMap.get(ck) ?? 0 }
   }).sort((a, b) => a.bsyAdi.localeCompare(b.bsyAdi, 'tr') || a.cariIsim.localeCompare(b.cariIsim, 'tr') || a.ay - b.ay)
 
