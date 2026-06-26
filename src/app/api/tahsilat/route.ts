@@ -90,9 +90,21 @@ export async function GET(req: Request) {
     console.log('📊 Tahsilat_Hedef_Datası - Header:', header.slice(0, 12))
 
     for (let c = 0; c < header.length; c++) {
-      const h = String(header[c] ?? '').trim().toLowerCase().replace(/_/g, '')
+      const h = String(header[c] ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/i̇/g, 'i')  // Türkçe İ → i
+        .replace(/ı/g, 'i')   // Türkçe ı → i
+        .replace(/ğ/g, 'g')
+        .replace(/ü/g, 'u')
+        .replace(/ş/g, 's')
+        .replace(/ö/g, 'o')
+        .replace(/ç/g, 'c')
+        .replace(/_/g, '')     // Alt çizgi
+        .replace(/\s/g, '')    // Boşluk
+
       if (h === 'ay') hedefAyCol = c
-      if (h === 'yil' || h === 'yıl') hedefYilCol = c
+      if (h === 'yil') hedefYilCol = c
       if (h.includes('plasiyer') && h.includes('kod')) hedefPlasiyerCol = c
       if (h.includes('cari') && h.includes('isim')) hedefCariIsimCol = c
       if (h === 'toplam') hedefToplamCol = c
@@ -163,12 +175,24 @@ export async function GET(req: Request) {
   if (gercRaw.length > 0) {
     const header = gercRaw[0] as unknown[]
     for (let c = 0; c < header.length; c++) {
-      const h = String(header[c] ?? '').trim().toLowerCase().replace(/_/g, '')
+      const h = String(header[c] ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/i̇/g, 'i')
+        .replace(/ı/g, 'i')
+        .replace(/ğ/g, 'g')
+        .replace(/ü/g, 'u')
+        .replace(/ş/g, 's')
+        .replace(/ö/g, 'o')
+        .replace(/ç/g, 'c')
+        .replace(/_/g, '')
+        .replace(/\s/g, '')
+
       if (h.includes('plasiyer') && h.includes('kod')) gercPlasiyerCol = c
       if (h.includes('cari') && h.includes('isim')) gercCariIsimCol = c
       if (h === 'ay') gercAyCol = c
-      if (h === 'yil' || h === 'yıl') gercYilCol = c
-      if (h.includes('tur') || h.includes('tür') || h.includes('tip')) gercTurCol = c
+      if (h === 'yil') gercYilCol = c
+      if (h.includes('tur') || h.includes('tip')) gercTurCol = c
       if (h.includes('tutar') || h === 'tutar') gercTutarCol = c
     }
     console.log('📊 Gerçekleşen Tahsilat - Kolonlar:', { gercPlasiyerCol, gercCariIsimCol, gercAyCol, gercYilCol, gercTurCol, gercTutarCol })
