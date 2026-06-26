@@ -65,10 +65,13 @@ export async function GET(req: Request) {
   const wb = XLSX.read(buf, { type: 'buffer', dense: true })
 
   // ── 1. Tahsilat Hedef Datası ────────────────────────────────────
-  const hedefSheet = wb.Sheets['Tahsilat_Hedef_Datası'] || wb.Sheets['Tahsilat_hedef_datası'] || wb.Sheets['Tahsilat_hedef_datasi']
+  // Excel'deki tam isim: "Tahsilat_Hedef_Datası" (büyük T, H, D, son İ)
+  const hedefSheet = wb.Sheets['Tahsilat_Hedef_Datası']
 
   if (!hedefSheet) {
     console.warn('⚠️ Tahsilat_Hedef_Datası sayfası bulunamadı! Mevcut sayfalar:', Object.keys(wb.Sheets))
+  } else {
+    console.log('✅ Tahsilat_Hedef_Datası sayfası bulundu!')
   }
 
   const hedefRaw: unknown[][] = hedefSheet
