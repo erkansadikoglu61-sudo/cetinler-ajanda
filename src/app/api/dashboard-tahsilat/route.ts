@@ -82,7 +82,15 @@ export async function GET(req: Request) {
   let acikHesap = 0
   let tahsilatHedef = 0
 
-  const hedefDatasiSheet = wb.Sheets['Tahsilat_hedef_datası'] || wb.Sheets['Tahsilat_hedef_datasi']
+  // Excel'deki tam isim: "Tahsilat_Hedef_Datası" (büyük T, H, D)
+  const hedefDatasiSheet = wb.Sheets['Tahsilat_Hedef_Datası']
+
+  if (!hedefDatasiSheet) {
+    console.warn('⚠️ Tahsilat_Hedef_Datası sayfası bulunamadı! Mevcut sayfalar:', Object.keys(wb.Sheets))
+  } else {
+    console.log('✅ Tahsilat_Hedef_Datası sayfası bulundu!')
+  }
+
   if (hedefDatasiSheet) {
     const rows: unknown[][] = XLSX.utils.sheet_to_json(hedefDatasiSheet, { header: 1, defval: null })
     if (rows.length > 1) {
