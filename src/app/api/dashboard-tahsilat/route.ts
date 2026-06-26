@@ -95,9 +95,8 @@ export async function GET(req: Request) {
         const h = normalizeText(String(header[c] ?? ''))
         if (h === 'yıl' || h === 'yil') yilCol = c
         if (h === 'ay') ayCol = c
-        // Açık Hesap kolonu - farklı isimleri dene
-        if (h.includes('acik') && h.includes('hesap')) acikHesapCol = c
-        if (acikHesapCol === -1 && (h.includes('hedef') || h.includes('tutar'))) acikHesapCol = c
+        // Açık Hesap = Toplam kolonu (H kolonu)
+        if (h === 'toplam') acikHesapCol = c
       }
 
       console.log('📊 Tahsilat_hedef_datası - Kolonlar:', { yilCol, ayCol, acikHesapCol })
