@@ -78,28 +78,32 @@ export async function GET(req: Request) {
 
   const wb = XLSX.read(buf, { type: 'buffer', dense: true })
 
-  // === AÇIK HESAP (Tahsilat Planım sayfası - mevcut ay için) ===
+  // === AÇIK HESAP ve TAHSİLAT HEDEF (Tahsilat_hedef_datası sayfasından) ===
   let acikHesap = 0
-  const tahsilatPlanimSheet = wb.Sheets['Tahsilat Planım']
-  if (tahsilatPlanimSheet) {
-    const rows: unknown[][] = XLSX.utils.sheet_to_json(tahsilatPlanimSheet, { header: 1, defval: null })
+  let tahsilatHedef = 0
+
+  const hedefDatasiSheet = wb.Sheets['Tahsilat_hedef_datası'] || wb.Sheets['Tahsilat_hedef_datasi']
+  if (hedefDatasiSheet) {
+    const rows: unknown[][] = XLSX.utils.sheet_to_json(hedefDatasiSheet, { header: 1, defval: null })
     if (rows.length > 1) {
       const header = rows[0] as unknown[]
       let yilCol = -1
       let ayCol = -1
-      let toplamCol = -1
+      let acikHesapCol = -1
 
       for (let c = 0; c < header.length; c++) {
         const h = normalizeText(String(header[c] ?? ''))
         if (h === 'yıl' || h === 'yil') yilCol = c
         if (h === 'ay') ayCol = c
-        if (h === 'toplam') toplamCol = c
+        // Açık Hesap kolonu - farklı isimleri dene
+        if (h.includes('acik') && h.includes('hesap')) acikHesapCol = c
+        if (acikHesapCol === -1 && (h.includes('hedef') || h.includes('tutar'))) acikHesapCol = c
       }
 
-      console.log('📊 Tahsilat Planım - Kolonlar:', { yilCol, ayCol, toplamCol })
-      console.log('📊 Tahsilat Planım - Header örneği:', header.slice(0, 10))
+      console.log('📊 Tahsilat_hedef_datası - Kolonlar:', { yilCol, ayCol, acikHesapCol })
+      console.log('📊 Tahsilat_hedef_datası - Header örneği:', header.slice(0, 10))
 
-      if (toplamCol >= 0) {
+      if (acikHesapCol >= 0) {
         let matchCount = 0
         for (let i = 1; i < rows.length; i++) {
           const r = rows[i]
@@ -109,66 +113,27 @@ export async function GET(req: Request) {
           const rowAy = ayCol >= 0 ? toNum(r[ayCol]) : 0
 
           // Sadece mevcut yıl ve ay için topla
-          if (rowYil === yil && rowAy === ay && toplamCol < r.length) {
-            const tutar = toNum(r[toplamCol])
+          if (rowYil === yil && rowAy === ay && acikHesapCol < r.length) {
+            const tutar = toNum(r[acikHesapCol])
             acikHesap += tutar
             matchCount++
             if (matchCount <= 3) {
-              console.log(`  ✓ Satır ${i}: Yıl=${rowYil}, Ay=${rowAy}, Toplam=${tutar}`)
+              console.log(`  ✓ Satır ${i}: Yıl=${rowYil}, Ay=${rowAy}, Tutar=${tutar}`)
             }
           }
         }
-        console.log(`📊 Açık Hesap: ${acikHesap} (${matchCount} satır toplandı)`)
+
+        // Tahsilat Hedef = Açık Hesap'ın %90'ı
+        tahsilatHedef = acikHesap * 0.90
+
+        console.log(`📊 Açık Hesap: ${acikHesap} (${matchCount} satır toplandı, %100)`)
+        console.log(`📊 Tahsilat Hedef: ${tahsilatHedef} (Açık Hesap'ın %90'ı)`)
       } else {
-        console.warn('⚠️ Toplam kolonu bulunamadı!')
+        console.warn('⚠️ Açık Hesap/Hedef kolonu bulunamadı!')
       }
     }
   } else {
-    console.warn('⚠️ Tahsilat Planım sayfası bulunamadı!')
-  }
-
-  // === TAHSİLAT HEDEF ===
-  let tahsilatHedef = 0
-  const hedefSheet = wb.Sheets['Tahsilat Hedef'] || wb.Sheets['tahsilat_hedef']
-  if (hedefSheet) {
-    const rows: unknown[][] = XLSX.utils.sheet_to_json(hedefSheet, { header: 1, defval: null })
-    if (rows.length > 1) {
-      const header = rows[0] as unknown[]
-      let yilCol = -1
-      let ayCol = -1
-      let hedefCol = -1
-
-      for (let c = 0; c < header.length; c++) {
-        const h = normalizeText(String(header[c] ?? ''))
-        if (h === 'yıl' || h === 'yil') yilCol = c
-        if (h === 'ay') ayCol = c
-        if (h.includes('hedef') || h.includes('tutar')) hedefCol = c
-      }
-
-      console.log('📊 Tahsilat Hedef - Kolonlar:', { yilCol, ayCol, hedefCol })
-      console.log('📊 Tahsilat Hedef - Header örneği:', header.slice(0, 10))
-
-      let matchCount = 0
-      for (let i = 1; i < rows.length; i++) {
-        const r = rows[i]
-        if (!r) continue
-
-        const rowYil = yilCol >= 0 ? toNum(r[yilCol]) : 0
-        const rowAy = ayCol >= 0 ? toNum(r[ayCol]) : 0
-
-        if (rowYil === yil && rowAy === ay && hedefCol >= 0) {
-          const tutar = toNum(r[hedefCol])
-          tahsilatHedef += tutar
-          matchCount++
-          if (matchCount <= 3) {
-            console.log(`  ✓ Satır ${i}: Yıl=${rowYil}, Ay=${rowAy}, Hedef=${tutar}`)
-          }
-        }
-      }
-      console.log(`📊 Tahsilat Hedef: ${tahsilatHedef} (${matchCount} satır toplandı)`)
-    }
-  } else {
-    console.warn('⚠️ Tahsilat Hedef sayfası bulunamadı!')
+    console.warn('⚠️ Tahsilat_hedef_datası sayfası bulunamadı!')
   }
 
   // === GERÇEKLEŞEN TAHSİLAT ===
