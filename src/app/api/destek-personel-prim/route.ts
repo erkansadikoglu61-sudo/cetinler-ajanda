@@ -100,7 +100,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: fpError.message }, { status: 500 })
     }
 
+    console.log('📊 Destek Personeli sayısı:', destekPersonel?.length || 0)
+
     if (!destekPersonel || destekPersonel.length === 0) {
+      console.warn('⚠️ field_personnel tablosunda Destek Personeli bulunamadı!')
       return NextResponse.json({ rows: [] })
     }
 
@@ -117,11 +120,15 @@ export async function GET(req: Request) {
     })
 
     if (!selloutRes.ok) {
+      console.warn('⚠️ PHP Sellout API error:', selloutRes.status)
       return NextResponse.json({ rows: [] })
     }
 
     const selloutData = await selloutRes.json()
+    console.log('📊 Sellout data rows:', Array.isArray(selloutData) ? selloutData.length : 0)
+
     if (!Array.isArray(selloutData)) {
+      console.warn('⚠️ Sellout data is not array')
       return NextResponse.json({ rows: [] })
     }
 
@@ -210,6 +217,14 @@ export async function GET(req: Request) {
 
     // Hak ediş büyükten küçüğe sırala
     rows.sort((a, b) => b.hak_edis - a.hak_edis)
+
+    console.log('✅ Toplam row sayısı:', rows.length)
+    console.log('📊 İlk 3 row:', rows.slice(0, 3).map(r => ({
+      merch: r.merch_adi,
+      sube: r.sube_adi,
+      cetinler: r.cetinler_merch,
+      performans: r.kategori_performans,
+    })))
 
     return NextResponse.json({ rows })
   } catch (e: unknown) {
