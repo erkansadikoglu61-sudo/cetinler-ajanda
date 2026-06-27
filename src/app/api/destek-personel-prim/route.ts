@@ -20,11 +20,32 @@ interface DestekPersonelRow {
   hak_edis: number               // ₺
 }
 
-// Merch hedef takip verisini çek (kategori performansı + satış adedi)
-// Key: merch_adi → { kategori, hedef, gerceklesen, satisAdedi }[]
-async function fetchMerchPerformance(phpUrl: string, yil: number, ay: number): Promise<Map<string, { kategori: string; hedefGerceklesme: number; satisAdedi: number }[]>> {
+// Merch hedef ve satış verilerini çek
+// Key: merch_adi → { kategori, hedef, gerceklesen, hedefGerceklesme }[]
+async function fetchMerchPerformance(phpUrl: string, donem: string): Promise<Map<string, { kategori: string; hedef: number; gerceklesen: number; hedefGerceklesme: number }[]>> {
   try {
-    const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
+    // 1. Merch hedeflerini Supabase'den çek
+    const sb = getAdmin()
+    const { data: hedefData } = await sb
+      .from('sellout_targets_merch')
+      .select('merch_name, grup, hedef')
+      .eq('donem', donem)
+
+    const hedefMap = new Map<string, Map<string, number>>() // merchName → { kategori → hedef }
+
+    if (hedefData) {
+      hedefData.forEach((row: { merch_name: string; grup: string; hedef: number }) => {
+        const merchKey = row.merch_name.toLowerCase()
+        if (!hedefMap.has(merchKey)) {
+          hedefMap.set(merchKey, new Map())
+        }
+        hedefMap.get(merchKey)!.set(row.grup, row.hedef || 0)
+      })
+    }
+
+    // 2. Satış verilerini PHP API'den çek (HTML)
+    const [yil, ay] = donem.split('-')
+    const params = new URLSearchParams({ yil, ay })
     const response = await fetch(`${phpUrl}?${params}`, {
       next: { revalidate: 300 },
     })
@@ -32,14 +53,11 @@ async function fetchMerchPerformance(phpUrl: string, yil: number, ay: number): P
     if (!response.ok) return new Map()
 
     const htmlText = await response.text()
-
-    // HTML table parse et
-    // Kolonlar: MERCH_PERSONEL, CARI_ISIM, SUBE_ADI, STOK_ADI, STOK_KODU, GRUP_ACIKLAMA, SATILAN_ADET, ...
-    const map = new Map<string, Map<string, { hedef: number; gerceklesen: number; satisAdedi: number }>>()
+    const satisMap = new Map<string, Map<string, number>>() // merchName → { kategori → satış }
 
     const trMatches = htmlText.match(/<tr>[\s\S]*?<\/tr>/gi) || []
 
-    for (let i = 1; i < trMatches.length; i++) { // i=1 → header atla
+    for (let i = 1; i < trMatches.length; i++) {
       const tr = trMatches[i]
       const tdMatches = tr.match(/<td>([\s\S]*?)<\/td>/gi) || []
 
@@ -51,48 +69,50 @@ async function fetchMerchPerformance(phpUrl: string, yil: number, ay: number): P
         const kategori = tdMatches[5]?.replace(/<\/?td>/gi, '').trim()
         const satisAdedi = parseFloat(tdMatches[6]?.replace(/<\/?td>/gi, '').trim() || '0') || 0
 
-        if (merchAdi && kategori && satisAdedi > 0) {
+        if (merchAdi && kategori) {
           const merchKey = merchAdi.toLowerCase()
 
-          if (!map.has(merchKey)) {
-            map.set(merchKey, new Map())
+          if (!satisMap.has(merchKey)) {
+            satisMap.set(merchKey, new Map())
           }
 
-          const kategoriMap = map.get(merchKey)!
-
-          if (!kategoriMap.has(kategori)) {
-            kategoriMap.set(kategori, { hedef: 0, gerceklesen: 0, satisAdedi: 0 })
-          }
-
-          const existing = kategoriMap.get(kategori)!
-          existing.gerceklesen += satisAdedi
-          existing.satisAdedi += satisAdedi
+          const kategoriMap = satisMap.get(merchKey)!
+          kategoriMap.set(kategori, (kategoriMap.get(kategori) || 0) + satisAdedi)
         }
       }
     }
 
-    // Hedefleri çek (ayrı API call veya varsayılan değer)
-    // Şimdilik gerceklesen = satisAdedi, hedef = gerceklesen (yani %100 varsayımı)
-    // TODO: Gerçek hedef API'si eklenirse burası güncellenecek
+    // 3. Hedef + Satış → Performans hesapla
+    const result = new Map<string, { kategori: string; hedef: number; gerceklesen: number; hedefGerceklesme: number }[]>()
 
-    const result = new Map<string, { kategori: string; hedefGerceklesme: number; satisAdedi: number }[]>()
+    // Tüm merch'leri topla (hedef veya satış olanlar)
+    const allMerchKeys = new Set([...hedefMap.keys(), ...satisMap.keys()])
 
-    map.forEach((kategoriMap, merchKey) => {
-      const rows: { kategori: string; hedefGerceklesme: number; satisAdedi: number }[] = []
+    allMerchKeys.forEach(merchKey => {
+      const hedefKategoriMap = hedefMap.get(merchKey) || new Map()
+      const satisKategoriMap = satisMap.get(merchKey) || new Map()
 
-      kategoriMap.forEach((data, kategori) => {
-        // Geçici: hedef = gerceklesen (yani %100)
-        // Gerçek hedef API'si geldiğinde düzeltilecek
-        const hedefGerceklesme = 100
+      // Tüm kategorileri topla
+      const allKategoriler = new Set([...hedefKategoriMap.keys(), ...satisKategoriMap.keys()])
+
+      const rows: { kategori: string; hedef: number; gerceklesen: number; hedefGerceklesme: number }[] = []
+
+      allKategoriler.forEach(kategori => {
+        const hedef = hedefKategoriMap.get(kategori) || 0
+        const gerceklesen = satisKategoriMap.get(kategori) || 0
+        const hedefGerceklesme = hedef > 0 ? (gerceklesen / hedef) * 100 : 0
 
         rows.push({
           kategori,
+          hedef,
+          gerceklesen,
           hedefGerceklesme,
-          satisAdedi: data.satisAdedi,
         })
       })
 
-      result.set(merchKey, rows)
+      if (rows.length > 0) {
+        result.set(merchKey, rows)
+      }
     })
 
     return result
@@ -190,6 +210,7 @@ export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams
   const yil = sp.get('yil') ? parseInt(sp.get('yil')!) : new Date().getFullYear()
   const ay = sp.get('ay') ? parseInt(sp.get('ay')!) : new Date().getMonth() + 1
+  const donem = `${yil}-${String(ay).padStart(2, '0')}`
 
   try {
     const sb = getAdmin()
@@ -291,8 +312,8 @@ export async function GET(req: Request) {
       }
     }
 
-    // 3. Merch performans verileri (kategori bazında + satış adedi)
-    const merchPerformanceMap = await fetchMerchPerformance(phpUrl, yil, ay)
+    // 3. Merch performans verileri (hedef + satış → performans)
+    const merchPerformanceMap = await fetchMerchPerformance(phpUrl, donem)
 
     // 4. Koşullu destek prim değerleri (kategori bazında ortalama)
     const kosulluDestekPrimMap = await fetchKosulluDestekPrim(phpUrl, yil, ay)
@@ -350,17 +371,17 @@ export async function GET(req: Request) {
           })
         } else {
           // Her kategori için hesaplama
-          kategoriData.forEach(({ kategori, hedefGerceklesme, satisAdedi }) => {
+          kategoriData.forEach(({ kategori, hedef, gerceklesen, hedefGerceklesme }) => {
             const kategoriPrim = kosulluDestekPrimMap.get(kategori) || 0
 
             // HAK EDİŞ FORMÜLÜ:
-            // %0-%99.99 → (gerceklesme / 100) × prim × adet
-            // %100+     → prim × adet (tam prim)
+            // %0-%99.99 → (gerceklesme / 100) × prim × satış
+            // %100+     → prim × satış (tam prim)
             let hakEdis = 0
             if (hedefGerceklesme < 100) {
-              hakEdis = (hedefGerceklesme / 100) * kategoriPrim * satisAdedi
+              hakEdis = (hedefGerceklesme / 100) * kategoriPrim * gerceklesen
             } else {
-              hakEdis = kategoriPrim * satisAdedi
+              hakEdis = kategoriPrim * gerceklesen
             }
 
             rows.push({
@@ -370,7 +391,7 @@ export async function GET(req: Request) {
               cetinler_merch: cetinlerMerch,
               kategori,
               hedef_gerceklesme: hedefGerceklesme,
-              satis_adedi: satisAdedi,
+              satis_adedi: gerceklesen,
               kosullu_destek_prim: kategoriPrim,
               hak_edis: hakEdis,
             })
