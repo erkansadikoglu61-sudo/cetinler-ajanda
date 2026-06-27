@@ -125,8 +125,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ rows: [] })
     }
 
-    // Şube + Cari → Çetinler Merch mapping
-    const subeCarimierchMap = new Map<string, string>()
+    // Şube + Cari → Çetinler Merch'ler (birden fazla olabilir)
+    const subeCarimierchMap = new Map<string, string[]>()
     selloutData.forEach((row: any) => {
       const subeAdi = String(row.sube_adi || row.sube || '').trim()
       const cariAdi = String(row.cari_adi || row.cari_isim || row.cari || '').trim()
@@ -135,7 +135,12 @@ export async function GET(req: Request) {
 
       if (subeAdi && cariAdi && merchAdi && merchTipi === 'Çetinler Merch') {
         const key = `${subeAdi.toLowerCase()}||${cariAdi.toLowerCase()}`
-        subeCarimierchMap.set(key, merchAdi)
+        if (!subeCarimierchMap.has(key)) {
+          subeCarimierchMap.set(key, [])
+        }
+        if (!subeCarimierchMap.get(key)!.includes(merchAdi)) {
+          subeCarimierchMap.get(key)!.push(merchAdi)
+        }
       }
     })
 
@@ -150,12 +155,20 @@ export async function GET(req: Request) {
 
     destekPersonel.forEach(dp => {
       const subeKey = `${dp.sube_adi.toLowerCase()}||${dp.cari_adi.toLowerCase()}`
-      const cetinlerMerch = subeCarimierchMap.get(subeKey) || '-'
+      const cetinlerMerchList = subeCarimierchMap.get(subeKey) || []
 
-      // Merch performansı
-      const performans = cetinlerMerch !== '-'
-        ? merchPerformanceMap.get(cetinlerMerch.toLowerCase()) || 0
-        : 0
+      // Şubedeki tüm Çetinler merch'lerin ortalaması
+      let avgPerformans = 0
+      let merchNames = '-'
+
+      if (cetinlerMerchList.length > 0) {
+        merchNames = cetinlerMerchList.join(', ')
+        let totalPerformans = 0
+        cetinlerMerchList.forEach(merch => {
+          totalPerformans += merchPerformanceMap.get(merch.toLowerCase()) || 0
+        })
+        avgPerformans = totalPerformans / cetinlerMerchList.length
+      }
 
       // Koşullu destek prim - ortalama al (tüm ürünlerin ortalaması)
       let avgPrim = 0
@@ -164,14 +177,14 @@ export async function GET(req: Request) {
         avgPrim = primValues.reduce((sum, val) => sum + val, 0) / primValues.length
       }
 
-      const hakEdis = (performans / 100) * avgPrim
+      const hakEdis = (avgPerformans / 100) * avgPrim
 
       rows.push({
         merch_adi: dp.merch_adi,
         sube_adi: dp.sube_adi,
         cari_adi: dp.cari_adi,
-        cetinler_merch: cetinlerMerch,
-        kategori_performans: performans,
+        cetinler_merch: merchNames,
+        kategori_performans: avgPerformans,
         kosullu_destek_prim: avgPrim,
         hak_edis: hakEdis,
       })
