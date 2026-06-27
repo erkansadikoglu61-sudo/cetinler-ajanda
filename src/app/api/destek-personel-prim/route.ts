@@ -408,7 +408,7 @@ export async function GET(req: Request) {
       merch: r.merch_adi,
       sube: r.sube_adi,
       cetinler: r.cetinler_merch,
-      performans: r.kategori_performans,
+      performans: r.hedef_gerceklesme,
     })))
 
     return NextResponse.json({ rows })
