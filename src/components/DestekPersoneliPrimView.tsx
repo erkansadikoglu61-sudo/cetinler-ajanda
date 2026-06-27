@@ -31,15 +31,12 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId }: Prop
   const loadData = async () => {
     setLoading(true)
     try {
-      // TODO: API endpoint oluştur
-      // const res = await fetch(`/api/destek-personel-prim?yil=${yil}&ay=${ay}`)
-      // const data = await res.json()
-      // setRows(data.rows || [])
-
-      // Placeholder
-      setRows([])
+      const res = await fetch(`/api/destek-personel-prim?yil=${yil}&ay=${ay}`)
+      const data = await res.json()
+      setRows(data.rows || [])
     } catch (e) {
       console.error('Destek personeli prim yükleme hatası:', e)
+      setRows([])
     } finally {
       setLoading(false)
     }
