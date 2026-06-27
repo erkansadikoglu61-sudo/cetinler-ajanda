@@ -24,31 +24,20 @@ export async function GET(req: Request) {
 
   // Fetch kategoriler from PHP API (HTML table formatında geliyor)
   const phpUrl = process.env.PHP_API_URL
-  console.log('📊 Adet Prim API - PHP_API_URL:', phpUrl ? 'TANIMLI ✓' : 'YOK ✗')
-
   if (phpUrl) {
     try {
       const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
-      const url = `${phpUrl}?${params}`
-      console.log('📊 Kategori fetch URL:', url)
-
-      const response = await fetch(url, {
+      const response = await fetch(`${phpUrl}?${params}`, {
         next: { revalidate: 300 },
       })
 
-      console.log('📊 PHP API Response status:', response.status)
-
       if (response.ok) {
         const htmlText = await response.text()
-        console.log('📊 HTML response length:', htmlText.length)
 
         // HTML table'dan kategori parse et
         // Format: <tr><td>...</td><td>...</td><td>...</td><td>STOK_ADI</td><td>STOK_KODU</td><td>GRUP_ACIKLAMA</td>...</tr>
         const kategoriMap = new Map<string, string>()
-
-        // <tr> satırlarını bul (header'ı atla)
         const trMatches = htmlText.match(/<tr>[\s\S]*?<\/tr>/gi) || []
-        console.log('📊 Toplam <tr> sayısı:', trMatches.length)
 
         for (let i = 1; i < trMatches.length; i++) { // i=1 → header'ı atla
           const tr = trMatches[i]
@@ -56,7 +45,7 @@ export async function GET(req: Request) {
 
           if (tdMatches.length >= 6) {
             // Index 4: STOK_KODU (5. kolon)
-            // Index 5: GRUP_ACIKLAMA (6. kolon)
+            // Index 5: GRUP_ACIKLAMA (6. kolon) = Kategori
             const stokKodu = tdMatches[4]?.replace(/<\/?td>/gi, '').trim()
             const grupAciklama = tdMatches[5]?.replace(/<\/?td>/gi, '').trim()
 
@@ -66,24 +55,16 @@ export async function GET(req: Request) {
           }
         }
 
-        console.log('📊 Parse edilen kategori sayısı:', kategoriMap.size)
-        console.log('📊 İlk 5 kategori:', Array.from(kategoriMap.entries()).slice(0, 5))
-
         // Kategori bilgisini merge et
-        let mergedCount = 0
         for (const [stokKodu, kategori] of kategoriMap) {
           if (merged[stokKodu]) {
             merged[stokKodu].kategori = kategori
-            mergedCount++
           }
         }
-        console.log('📊 Merge edilen kategori sayısı:', mergedCount)
       }
     } catch (e) {
-      console.error('❌ Kategori fetch error:', e)
+      console.error('Kategori fetch error:', e)
     }
-  } else {
-    console.warn('⚠️ PHP_API_URL tanımlı değil - kategoriler boş olacak')
   }
 
   // Fetch overrides from DB
