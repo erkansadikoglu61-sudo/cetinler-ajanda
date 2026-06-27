@@ -132,7 +132,14 @@ export async function GET(req: Request) {
     const normalize = (str: string) => {
       return str
         .trim()
-        .toLocaleLowerCase('tr')
+        .toLowerCase()
+        .replace(/i̇/g, 'i')  // Türkçe İ → i
+        .replace(/ı/g, 'i')   // Türkçe ı → i
+        .replace(/ğ/g, 'g')
+        .replace(/ü/g, 'u')
+        .replace(/ş/g, 's')
+        .replace(/ö/g, 'o')
+        .replace(/ç/g, 'c')
         .replace(/\s+/g, ' ')  // Multiple spaces → tek space
     }
 
@@ -157,16 +164,23 @@ export async function GET(req: Request) {
     // 5. Her destek personeli için hesaplama
     const rows: DestekPersonelRow[] = []
 
-    // Normalize fonksiyonu (aynı)
-    const normalize = (str: string) => {
+    // Normalize fonksiyonu - Türkçe karakter dönüşümü
+    const normalizeStr = (str: string) => {
       return str
         .trim()
-        .toLocaleLowerCase('tr')
+        .toLowerCase()
+        .replace(/i̇/g, 'i')
+        .replace(/ı/g, 'i')
+        .replace(/ğ/g, 'g')
+        .replace(/ü/g, 'u')
+        .replace(/ş/g, 's')
+        .replace(/ö/g, 'o')
+        .replace(/ç/g, 'c')
         .replace(/\s+/g, ' ')
     }
 
     destekPersonel.forEach(dp => {
-      const subeKey = `${normalize(dp.sube_adi)}||${normalize(dp.cari_adi)}`
+      const subeKey = `${normalizeStr(dp.sube_adi)}||${normalizeStr(dp.cari_adi)}`
       const cetinlerMerch = subeCarimierchMap.get(subeKey) || '-'
 
       // Merch performansı
