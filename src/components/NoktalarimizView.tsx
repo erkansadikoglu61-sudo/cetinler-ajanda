@@ -435,6 +435,8 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
   const [filterBsy,   setFilterBsy]    = useState('')   // bsy profile id
   const [filterSup,   setFilterSup]    = useState('')   // sup profile id
   const [selected,     setSelected]    = useState<SubeItem | null>(null)
+  const [importing,    setImporting]   = useState(false)
+  const [importMsg,    setImportMsg]   = useState('')
 
   // ── field_personnel'dan Jr. atamaları yükle ────────────────────
   const [fpJrEntries,    setFpJrEntries]    = useState<FpJrEntry[]>([])
@@ -460,6 +462,37 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
   const handleRefresh = () => {
     setFpRefreshKey(k => k + 1)
     reload()
+  }
+
+  // Bulk import destek personeli
+  const handleBulkImport = async () => {
+    if (!confirm('97 adet destek personelini sisteme eklemek istediğinizden emin misiniz?\n\nBu işlem sadece yeni kayıtları ekler, mevcut kayıtları değiştirmez.')) {
+      return
+    }
+
+    setImporting(true)
+    setImportMsg('')
+
+    try {
+      const res = await fetch('/api/destek-personel/bulk-import', {
+        method: 'POST',
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setImportMsg(`❌ ${data.error || 'Hata oluştu'}`)
+        return
+      }
+
+      setImportMsg(`✓ ${data.inserted} yeni kayıt eklendi, ${data.skipped} kayıt zaten mevcuttu`)
+      setTimeout(() => setImportMsg(''), 5000)
+      handleRefresh()
+    } catch (e) {
+      setImportMsg('❌ Bağlantı hatası')
+    } finally {
+      setImporting(false)
+    }
   }
 
   // normalize("sube||cari") → Set<jr_profile_id>
@@ -591,6 +624,27 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
         <button onClick={reload} disabled={loading} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-50">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
+
+        {/* Admin bulk import butonu */}
+        {currentProfile.role === 'admin' && (
+          <button
+            onClick={handleBulkImport}
+            disabled={importing}
+            className="text-[10px] px-2 py-1 bg-sky-600 text-white rounded-md hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 font-medium transition-colors"
+          >
+            {importing ? <RefreshCw size={10} className="animate-spin" /> : <Plus size={10} />}
+            Destek Personeli Yükle
+          </button>
+        )}
+
+        {importMsg && (
+          <span className={clsx('text-[10px] px-2 py-1 rounded-md font-medium',
+            importMsg.startsWith('✓') ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+          )}>
+            {importMsg}
+          </span>
+        )}
+
         <div className="flex-1" />
         {!loading && (
           <span className="text-[10px] text-gray-400">{filtered.length} / {subeList.length} şube</span>
