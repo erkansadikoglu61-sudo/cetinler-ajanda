@@ -2158,6 +2158,7 @@ export default function AppPage() {
               { key: 'month'  as const, icon: Calendar, label: 'Takvim' },
               { key: 'report' as const, icon: FileText,  label: 'Rapor'  },
             ] : []),
+            ...(currentProfile?.role === 'admin' ? [{ key: 'dashboard' as const, icon: BarChart2, label: 'Dashboard' }] : []),
             ...(isBsyOrAdmin ? [{ key: 'bsy'      as const, icon: Target,    label: 'BSY'     }] : []),
             ...(isBsyOrAdmin ? [{ key: 'sellinout' as const, icon: BarChart2, label: 'S.In/Out'}] : []),
             { key: 'sellout' as const, icon: TrendingUp, label: 'Sellout' },

@@ -625,16 +625,16 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
 
-        {/* Admin bulk import butonu - mobilde hidden */}
+        {/* Admin bulk import butonu */}
         {currentProfile.role === 'admin' && (
           <button
             onClick={handleBulkImport}
             disabled={importing}
-            className="hidden sm:flex text-[10px] px-2 py-1 bg-sky-600 text-white rounded-md hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed items-center gap-1 font-medium transition-colors"
+            className="text-[10px] px-2 py-1 bg-sky-600 text-white rounded-md hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 font-medium transition-colors"
           >
             {importing ? <RefreshCw size={10} className="animate-spin" /> : <Plus size={10} />}
-            <span className="hidden md:inline">Destek Personeli Yükle</span>
-            <span className="md:hidden">Yükle</span>
+            <span className="hidden sm:inline">Destek Personeli Yükle</span>
+            <span className="sm:hidden">Yükle</span>
           </button>
         )}
 
