@@ -367,17 +367,17 @@ function SubeDetail({ sube, onClose, currentProfile, onRefresh }: SubeDetailProp
                       value={newMerchName}
                       onChange={e => setNewMerchName(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                      placeholder="Yeni destek personeli adı..."
-                      className="flex-1 text-xs px-2.5 py-1.5 border border-sky-300 rounded-lg focus:outline-none focus:border-sky-500 bg-white"
+                      placeholder="İsim..."
+                      className="flex-1 text-xs px-2.5 py-1.5 border border-sky-300 rounded-lg focus:outline-none focus:border-sky-500 bg-white min-w-0"
                       disabled={adding}
                     />
                     <button
                       onClick={handleAdd}
                       disabled={adding || !newMerchName.trim()}
-                      className="px-3 py-1.5 bg-sky-600 text-white rounded-lg hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium transition-colors"
+                      className="px-2 sm:px-3 py-1.5 bg-sky-600 text-white rounded-lg hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium transition-colors whitespace-nowrap"
                     >
                       {adding ? <RefreshCw size={12} className="animate-spin" /> : <Plus size={12} />}
-                      Ekle
+                      <span className="hidden sm:inline">Ekle</span>
                     </button>
                   </div>
                 )}
@@ -619,21 +619,22 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
     <div className="flex flex-col h-full bg-gray-50">
 
       {/* ── Üst Bar ─────────────────────────────────────────── */}
-      <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-100">
+      <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-100 flex-wrap">
         <span className="text-xs text-gray-500 font-semibold">Noktalarımız</span>
         <button onClick={reload} disabled={loading} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-50">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
 
-        {/* Admin bulk import butonu */}
+        {/* Admin bulk import butonu - mobilde hidden */}
         {currentProfile.role === 'admin' && (
           <button
             onClick={handleBulkImport}
             disabled={importing}
-            className="text-[10px] px-2 py-1 bg-sky-600 text-white rounded-md hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 font-medium transition-colors"
+            className="hidden sm:flex text-[10px] px-2 py-1 bg-sky-600 text-white rounded-md hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed items-center gap-1 font-medium transition-colors"
           >
             {importing ? <RefreshCw size={10} className="animate-spin" /> : <Plus size={10} />}
-            Destek Personeli Yükle
+            <span className="hidden md:inline">Destek Personeli Yükle</span>
+            <span className="md:hidden">Yükle</span>
           </button>
         )}
 
@@ -647,7 +648,7 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
 
         <div className="flex-1" />
         {!loading && (
-          <span className="text-[10px] text-gray-400">{filtered.length} / {subeList.length} şube</span>
+          <span className="text-[10px] text-gray-400 whitespace-nowrap">{filtered.length} / {subeList.length}</span>
         )}
       </div>
 
