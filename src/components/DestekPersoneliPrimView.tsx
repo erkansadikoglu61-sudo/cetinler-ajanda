@@ -12,9 +12,10 @@ interface DestekPersonelRow {
   cari_adi: string
   cetinler_merch: string
   kategori: string
-  kategori_performans: number // Çetinler merch'ün kategori performansı (%)
-  kosullu_destek_prim: number // Adet prim tablosundan
-  hak_edis: number // kategori_performans × kosullu_destek_prim
+  hedef_gerceklesme: number   // %
+  satis_adedi: number
+  kosullu_destek_prim: number // ₺/adet
+  hak_edis: number            // ₺
 }
 
 interface Props {
@@ -128,8 +129,9 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId }: Prop
                   <th className="text-left px-4 py-2.5 font-semibold min-w-[200px]">Cari</th>
                   <th className="text-left px-4 py-2.5 font-semibold min-w-[150px]">Çetinler Merch</th>
                   <th className="text-left px-4 py-2.5 font-semibold min-w-[120px]">Kategori</th>
-                  <th className="text-right px-4 py-2.5 font-semibold min-w-[100px]">Kategori Performans</th>
-                  <th className="text-right px-4 py-2.5 font-semibold min-w-[120px]">Koşullu Destek Prim</th>
+                  <th className="text-right px-4 py-2.5 font-semibold min-w-[110px]">Hedef Gerçekleşme</th>
+                  <th className="text-right px-4 py-2.5 font-semibold min-w-[100px]">Satış Adedi</th>
+                  <th className="text-right px-4 py-2.5 font-semibold min-w-[130px]">Koşullu Destek Prim</th>
                   <th className="text-right px-4 py-2.5 font-semibold min-w-[120px] bg-brand-700">Hak Ediş</th>
                 </tr>
               </thead>
@@ -149,10 +151,13 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId }: Prop
                     <td className="px-4 py-2 text-gray-800">{row.cetinler_merch}</td>
                     <td className="px-4 py-2 text-gray-700 font-medium">{row.kategori}</td>
                     <td className="px-4 py-2 text-right tabular-nums font-medium text-blue-700">
-                      {row.kategori_performans.toFixed(1)}%
+                      {row.hedef_gerceklesme.toFixed(1)}%
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums text-gray-700">
+                      {row.satis_adedi.toLocaleString('tr-TR')}
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums font-medium text-gray-800">
-                      {row.kosullu_destek_prim.toLocaleString('tr-TR')} ₺
+                      {row.kosullu_destek_prim.toLocaleString('tr-TR')} ₺/adet
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums font-bold text-brand-700 bg-brand-50">
                       {row.hak_edis.toLocaleString('tr-TR')} ₺
@@ -162,7 +167,7 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId }: Prop
               </tbody>
               <tfoot>
                 <tr className="bg-gray-100 font-bold">
-                  <td colSpan={8} className="px-4 py-3 text-right text-gray-700">
+                  <td colSpan={9} className="px-4 py-3 text-right text-gray-700">
                     TOPLAM
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-brand-700 bg-brand-100">
