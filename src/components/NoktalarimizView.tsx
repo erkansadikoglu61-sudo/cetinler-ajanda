@@ -262,7 +262,7 @@ function SubeDetail({ sube, onClose, currentProfile, onRefresh }: SubeDetailProp
         return
       }
 
-      const res = await fetch(`/api/destek-personel?id=${record.id}&yil=${record.yil}&ay=${record.ay}`, {
+      const res = await fetch(`/api/destek-personel?id=${record.id}`, {
         method: 'DELETE',
       })
 

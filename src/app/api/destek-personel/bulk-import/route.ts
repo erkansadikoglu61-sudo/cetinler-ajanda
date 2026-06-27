@@ -107,9 +107,6 @@ const DESTEK_PERSONELLERI = [
 export async function POST() {
   try {
     const sb = getAdmin()
-    const now = new Date()
-    const currentYear = now.getFullYear()
-    const currentMonth = now.getMonth() + 1
 
     // Duplicate kontrolü için existing kayıtları al
     const { data: existing } = await sb
@@ -132,8 +129,6 @@ export async function POST() {
       cari_adi: p.cari,
       merch_adi: p.merch,
       merch_grubu: 'Destek Personeli',
-      yil: currentYear,
-      ay: currentMonth,
     }))
 
     if (toInsert.length === 0) {

@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   const sb = getAdmin()
   const { data, error } = await sb
     .from('field_personnel')
-    .select('id, merch_adi, merch_grubu, yil, ay, created_at')
+    .select('id, merch_adi, merch_grubu, created_at')
     .eq('sube_adi', subeAdi)
     .eq('cari_adi', cariAdi)
     .eq('merch_grubu', 'Destek Personeli')
@@ -38,27 +38,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { sube_adi, cari_adi, merch_adi, yil, ay } = body
+    const { sube_adi, cari_adi, merch_adi } = body
 
     if (!sube_adi || !cari_adi || !merch_adi) {
       return NextResponse.json(
         { error: 'sube_adi, cari_adi ve merch_adi gerekli' },
-        { status: 400 }
-      )
-    }
-
-    // Yıl/Ay kontrolü - sadece mevcut ay ve sonrası
-    const now = new Date()
-    const currentYear = now.getFullYear()
-    const currentMonth = now.getMonth() + 1
-
-    const targetYear = yil ?? currentYear
-    const targetMonth = ay ?? currentMonth
-
-    // Geçmiş tarih kontrolü
-    if (targetYear < currentYear || (targetYear === currentYear && targetMonth < currentMonth)) {
-      return NextResponse.json(
-        { error: 'Geçmiş aylara destek personeli eklenemez' },
         { status: 400 }
       )
     }
@@ -73,8 +57,6 @@ export async function POST(req: Request) {
       .eq('cari_adi', cari_adi)
       .eq('merch_adi', merch_adi)
       .eq('merch_grubu', 'Destek Personeli')
-      .eq('yil', targetYear)
-      .eq('ay', targetMonth)
       .limit(1)
 
     if (existing && existing.length > 0) {
@@ -92,8 +74,6 @@ export async function POST(req: Request) {
         cari_adi,
         merch_adi,
         merch_grubu: 'Destek Personeli',
-        yil: targetYear,
-        ay: targetMonth,
       })
       .select()
 
@@ -113,26 +93,9 @@ export async function DELETE(req: Request) {
   try {
     const sp = new URL(req.url).searchParams
     const id = sp.get('id')
-    const yil = sp.get('yil') ? parseInt(sp.get('yil')!) : null
-    const ay = sp.get('ay') ? parseInt(sp.get('ay')!) : null
 
     if (!id) {
       return NextResponse.json({ error: 'id gerekli' }, { status: 400 })
-    }
-
-    // Tarih kontrolü
-    const now = new Date()
-    const currentYear = now.getFullYear()
-    const currentMonth = now.getMonth() + 1
-
-    if (yil && ay) {
-      // Geçmiş tarih kontrolü
-      if (yil < currentYear || (yil === currentYear && ay < currentMonth)) {
-        return NextResponse.json(
-          { error: 'Geçmiş aylardaki destek personeli silinemez' },
-          { status: 400 }
-        )
-      }
     }
 
     const sb = getAdmin()
