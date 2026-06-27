@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     merged[r.stokKodu] = { ...r, kategori: null }
   }
 
-  // Fetch kategoriler from PHP API
+  // Fetch kategoriler from PHP API (HTML table formatında geliyor)
   const phpUrl = process.env.PHP_API_URL
   console.log('📊 Adet Prim API - PHP_API_URL:', phpUrl ? 'TANIMLI ✓' : 'YOK ✗')
 
@@ -33,45 +33,51 @@ export async function GET(req: Request) {
       console.log('📊 Kategori fetch URL:', url)
 
       const response = await fetch(url, {
-        headers: { 'Accept': 'application/json' },
         next: { revalidate: 300 },
       })
 
       console.log('📊 PHP API Response status:', response.status)
 
       if (response.ok) {
-        const selloutData = await response.json()
-        console.log('📊 Sellout data rows:', Array.isArray(selloutData) ? selloutData.length : 'NOT ARRAY')
+        const htmlText = await response.text()
+        console.log('📊 HTML response length:', htmlText.length)
 
-        if (Array.isArray(selloutData)) {
-          // İlk satırı logla
-          if (selloutData.length > 0) {
-            console.log('📊 İlk satır örneği:', JSON.stringify(selloutData[0]).substring(0, 200))
-          }
+        // HTML table'dan kategori parse et
+        // Format: <tr><td>...</td><td>...</td><td>...</td><td>STOK_ADI</td><td>STOK_KODU</td><td>GRUP_ACIKLAMA</td>...</tr>
+        const kategoriMap = new Map<string, string>()
 
-          // stok_kodu → kategori mapping
-          const kategoriMap = new Map<string, string>()
-          selloutData.forEach((row: any) => {
-            const stokKodu = String(row.stok_kodu || '').trim()
-            const kategori = String(row.kategori || row.kategori_adi || '').trim()
-            if (stokKodu && kategori && !kategoriMap.has(stokKodu)) {
-              kategoriMap.set(stokKodu, kategori)
-            }
-          })
+        // <tr> satırlarını bul (header'ı atla)
+        const trMatches = htmlText.match(/<tr>[\s\S]*?<\/tr>/gi) || []
+        console.log('📊 Toplam <tr> sayısı:', trMatches.length)
 
-          console.log('📊 Kategori map size:', kategoriMap.size)
-          console.log('📊 İlk 3 kategori:', Array.from(kategoriMap.entries()).slice(0, 3))
+        for (let i = 1; i < trMatches.length; i++) { // i=1 → header'ı atla
+          const tr = trMatches[i]
+          const tdMatches = tr.match(/<td>([\s\S]*?)<\/td>/gi) || []
 
-          // Kategori bilgisini merge et
-          let mergedCount = 0
-          for (const [stokKodu, kategori] of kategoriMap) {
-            if (merged[stokKodu]) {
-              merged[stokKodu].kategori = kategori
-              mergedCount++
+          if (tdMatches.length >= 6) {
+            // Index 4: STOK_KODU (5. kolon)
+            // Index 5: GRUP_ACIKLAMA (6. kolon)
+            const stokKodu = tdMatches[4]?.replace(/<\/?td>/gi, '').trim()
+            const grupAciklama = tdMatches[5]?.replace(/<\/?td>/gi, '').trim()
+
+            if (stokKodu && grupAciklama && !kategoriMap.has(stokKodu)) {
+              kategoriMap.set(stokKodu, grupAciklama)
             }
           }
-          console.log('📊 Merge edilen kategori sayısı:', mergedCount)
         }
+
+        console.log('📊 Parse edilen kategori sayısı:', kategoriMap.size)
+        console.log('📊 İlk 5 kategori:', Array.from(kategoriMap.entries()).slice(0, 5))
+
+        // Kategori bilgisini merge et
+        let mergedCount = 0
+        for (const [stokKodu, kategori] of kategoriMap) {
+          if (merged[stokKodu]) {
+            merged[stokKodu].kategori = kategori
+            mergedCount++
+          }
+        }
+        console.log('📊 Merge edilen kategori sayısı:', mergedCount)
       }
     } catch (e) {
       console.error('❌ Kategori fetch error:', e)
