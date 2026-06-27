@@ -798,12 +798,13 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                     <th className="px-3 py-2.5 text-right font-semibold min-w-[80px]">Satılan Adet</th>
                     <th className="px-3 py-2.5 text-left font-semibold min-w-[120px]">Süpervizör</th>
                     <th className="px-3 py-2.5 text-left font-semibold min-w-[100px]">Merch Tipi</th>
+                    <th className="px-3 py-2.5 text-left font-semibold min-w-[80px]">BSY</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredPeriodRows.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-gray-400 text-[11px]">
+                      <td colSpan={10} className="px-4 py-8 text-center text-gray-400 text-[11px]">
                         Bu dönem için satış verisi yok
                       </td>
                     </tr>
@@ -836,6 +837,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                             {row.merch_tipi || '—'}
                           </span>
                         </td>
+                        <td className="px-3 py-2 font-mono text-gray-700 text-[11px]">{row.bsy || '—'}</td>
                       </tr>
                     ))
                   )}
@@ -846,7 +848,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                     <td className="px-3 py-2.5 text-right tabular-nums">
                       {filteredPeriodRows.reduce((sum, r) => sum + (r.satilan_adet || 0), 0).toLocaleString('tr-TR')}
                     </td>
-                    <td colSpan={2} className="px-3 py-2.5 text-center text-[10px]">
+                    <td colSpan={3} className="px-3 py-2.5 text-center text-[10px]">
                       {filteredPeriodRows.length.toLocaleString('tr-TR')} kayıt
                     </td>
                   </tr>
