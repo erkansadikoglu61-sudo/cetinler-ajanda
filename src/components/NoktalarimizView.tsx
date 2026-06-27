@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
-import { Search, X, ChevronRight, RefreshCw, User, Users, ShoppingBag, Store, ChevronDown } from 'lucide-react'
+import { Search, X, ChevronRight, RefreshCw, User, Users, ShoppingBag, Store, ChevronDown, Plus, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 import { useSellout, SelloutRow } from '@/hooks/useSellout'
 import { Profile, BsySupervisor, supabase } from '@/lib/supabase'
@@ -195,16 +195,103 @@ interface SubeDetailProps {
   sube:           SubeItem
   onClose:        () => void
   currentProfile: Profile
+  onRefresh:      () => void
 }
 
-function SubeDetail({ sube, onClose, currentProfile }: SubeDetailProps) {
+function SubeDetail({ sube, onClose, currentProfile, onRefresh }: SubeDetailProps) {
+  const [destekList, setDestekList] = useState<string[]>(sube.destekPersoneli)
+  const [newMerchName, setNewMerchName] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [msg, setMsg] = useState('')
+
+  const canEdit = currentProfile.role === 'admin' || currentProfile.role === 'sup' || currentProfile.role === 'jr'
+
+  // Yeni destek personeli ekle
+  const handleAdd = async () => {
+    if (!newMerchName.trim()) return
+    setAdding(true)
+    setMsg('')
+
+    try {
+      const res = await fetch('/api/destek-personel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sube_adi: sube.subeAdi,
+          cari_adi: sube.cariIsim,
+          merch_adi: newMerchName.trim(),
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setMsg(`❌ ${data.error || 'Hata oluştu'}`)
+        return
+      }
+
+      setDestekList([...destekList, newMerchName.trim()].sort())
+      setNewMerchName('')
+      setMsg('✓ Eklendi')
+      setTimeout(() => setMsg(''), 2000)
+      onRefresh()
+    } catch (e) {
+      setMsg('❌ Bağlantı hatası')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  // Destek personeli sil
+  const handleDelete = async (merchName: string) => {
+    if (!confirm(`${merchName} isimli destek personelini silmek istediğinizden emin misiniz?`)) return
+
+    setDeleting(merchName)
+    setMsg('')
+
+    try {
+      // Önce ID'yi bul
+      const getRes = await fetch(`/api/destek-personel?sube_adi=${encodeURIComponent(sube.subeAdi)}&cari_adi=${encodeURIComponent(sube.cariIsim)}`)
+      const getData = await getRes.json()
+
+      const record = getData.data?.find((d: { merch_adi: string }) => d.merch_adi === merchName)
+      if (!record) {
+        setMsg('❌ Kayıt bulunamadı')
+        setDeleting(null)
+        return
+      }
+
+      const res = await fetch(`/api/destek-personel?id=${record.id}&yil=${record.yil}&ay=${record.ay}`, {
+        method: 'DELETE',
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setMsg(`❌ ${data.error || 'Silinemedi'}`)
+        return
+      }
+
+      setDestekList(destekList.filter(n => n !== merchName))
+      setMsg('✓ Silindi')
+      setTimeout(() => setMsg(''), 2000)
+      onRefresh()
+    } catch (e) {
+      setMsg('❌ Bağlantı hatası')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
   const sections = [
-    { title: 'Süpervizör',       icon: <User size={14} />,       color: 'blue',    items: sube.sups.map(p => ({ name: p.full_name, color: p.color })) },
-    { title: 'Jr. Süpervizör',   icon: <Users size={14} />,      color: 'violet',  items: sube.jrs.map(p => ({ name: p.full_name, color: p.color })) },
-    { title: 'Çetinler Merch',   icon: <ShoppingBag size={14} />,color: 'emerald', items: sube.cetinlerMerch.map(n => ({ name: n, color: undefined })) },
-    { title: 'Bayi Merch',       icon: <Store size={14} />,      color: 'amber',   items: sube.bayiMerch.map(n => ({ name: n, color: undefined })) },
-    { title: 'Destek Personeli', icon: <User size={14} />,       color: 'sky',     items: sube.destekPersoneli.map(n => ({ name: n, color: undefined })) },
+    { title: 'Süpervizör',       icon: <User size={14} />,       color: 'blue',    items: sube.sups.map(p => ({ name: p.full_name, color: p.color })), editable: false },
+    { title: 'Jr. Süpervizör',   icon: <Users size={14} />,      color: 'violet',  items: sube.jrs.map(p => ({ name: p.full_name, color: p.color })), editable: false },
+    { title: 'Çetinler Merch',   icon: <ShoppingBag size={14} />,color: 'emerald', items: sube.cetinlerMerch.map(n => ({ name: n, color: undefined })), editable: false },
+    { title: 'Bayi Merch',       icon: <Store size={14} />,      color: 'amber',   items: sube.bayiMerch.map(n => ({ name: n, color: undefined })), editable: false },
+    { title: 'Destek Personeli', icon: <User size={14} />,       color: 'sky',     items: destekList.map(n => ({ name: n, color: undefined })), editable: true },
   ]
+
   const colorMap: Record<string, string> = {
     blue:    'bg-blue-100 text-blue-700 border-blue-200',
     violet:  'bg-violet-100 text-violet-700 border-violet-200',
@@ -229,27 +316,76 @@ function SubeDetail({ sube, onClose, currentProfile }: SubeDetailProps) {
             <X size={16} />
           </button>
         </div>
+
+        {msg && (
+          <div className={clsx('px-5 py-2 text-xs font-medium border-b',
+            msg.startsWith('✓') ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
+          )}>
+            {msg}
+          </div>
+        )}
+
         <div className="overflow-y-auto flex-1 p-4 space-y-3">
-          {sections.map(sec => sec.items.length === 0 ? null : (
+          {sections.map(sec => sec.items.length === 0 && !sec.editable ? null : (
             <div key={sec.title} className={clsx('rounded-xl border p-3', colorMap[sec.color])}>
               <div className="flex items-center gap-1.5 mb-2 font-semibold text-xs">
                 {sec.icon}{sec.title}
                 <span className="ml-auto bg-white/60 rounded-full px-1.5 py-0.5 text-[10px]">{sec.items.length}</span>
               </div>
+
               <div className="space-y-1.5">
                 {sec.items.map((item, i) => (
                   <div key={i} className="flex items-center gap-2 bg-white/70 rounded-lg px-2.5 py-1.5">
                     {item.color
                       ? <Avatar name={item.name} color={item.color} size={24} />
                       : <div className={clsx('w-2 h-2 rounded-full flex-shrink-0', dotMap[sec.color])} />}
-                    <span className="text-xs font-medium text-gray-800">{item.name}</span>
+                    <span className="text-xs font-medium text-gray-800 flex-1">{item.name}</span>
+
+                    {/* Sil butonu - sadece Destek Personeli için */}
+                    {sec.editable && canEdit && (
+                      <button
+                        onClick={() => handleDelete(item.name)}
+                        disabled={deleting === item.name}
+                        className="p-1 rounded hover:bg-red-100 text-red-600 disabled:opacity-50 transition-colors"
+                        title="Sil"
+                      >
+                        {deleting === item.name ? (
+                          <RefreshCw size={12} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={12} />
+                        )}
+                      </button>
+                    )}
                   </div>
                 ))}
+
+                {/* Ekle formu - sadece Destek Personeli için */}
+                {sec.editable && canEdit && (
+                  <div className="flex gap-2 pt-2 border-t border-sky-200">
+                    <input
+                      type="text"
+                      value={newMerchName}
+                      onChange={e => setNewMerchName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                      placeholder="Yeni destek personeli adı..."
+                      className="flex-1 text-xs px-2.5 py-1.5 border border-sky-300 rounded-lg focus:outline-none focus:border-sky-500 bg-white"
+                      disabled={adding}
+                    />
+                    <button
+                      onClick={handleAdd}
+                      disabled={adding || !newMerchName.trim()}
+                      className="px-3 py-1.5 bg-sky-600 text-white rounded-lg hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium transition-colors"
+                    >
+                      {adding ? <RefreshCw size={12} className="animate-spin" /> : <Plus size={12} />}
+                      Ekle
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
 
-          {sections.every(s => s.items.length === 0) && (
+          {sections.every(s => s.items.length === 0 && !s.editable) && (
             <p className="text-xs text-gray-400 text-center py-8">Bilgi bulunamadı.</p>
           )}
         </div>
@@ -303,8 +439,9 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
   // ── field_personnel'dan Jr. atamaları yükle ────────────────────
   const [fpJrEntries,    setFpJrEntries]    = useState<FpJrEntry[]>([])
   const [fpDestekEntries, setFpDestekEntries] = useState<FpDestekEntry[]>([])
+  const [fpRefreshKey, setFpRefreshKey] = useState(0)
 
-  useEffect(() => {
+  const loadFieldPersonnel = () => {
     supabase
       .from('field_personnel')
       .select('sube_adi, cari_adi, jr_profile_id')
@@ -314,7 +451,16 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
       .select('sube_adi, cari_adi, merch_adi, merch_grubu')
       .eq('merch_grubu', 'Destek Personeli')
       .then(({ data }) => setFpDestekEntries(data ?? []))
-  }, [])
+  }
+
+  useEffect(() => {
+    loadFieldPersonnel()
+  }, [fpRefreshKey])
+
+  const handleRefresh = () => {
+    setFpRefreshKey(k => k + 1)
+    reload()
+  }
 
   // normalize("sube||cari") → Set<jr_profile_id>
   const fpJrMap = useMemo(() => {
@@ -590,6 +736,7 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
           sube={selected}
           onClose={() => setSelected(null)}
           currentProfile={currentProfile}
+          onRefresh={handleRefresh}
         />
       )}
     </div>
