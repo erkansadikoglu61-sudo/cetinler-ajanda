@@ -24,17 +24,31 @@ export async function GET(req: Request) {
 
   // Fetch kategoriler from PHP API
   const phpUrl = process.env.PHP_API_URL
+  console.log('📊 Adet Prim API - PHP_API_URL:', phpUrl ? 'TANIMLI ✓' : 'YOK ✗')
+
   if (phpUrl) {
     try {
       const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
-      const response = await fetch(`${phpUrl}?${params}`, {
+      const url = `${phpUrl}?${params}`
+      console.log('📊 Kategori fetch URL:', url)
+
+      const response = await fetch(url, {
         headers: { 'Accept': 'application/json' },
         next: { revalidate: 300 },
       })
 
+      console.log('📊 PHP API Response status:', response.status)
+
       if (response.ok) {
         const selloutData = await response.json()
+        console.log('📊 Sellout data rows:', Array.isArray(selloutData) ? selloutData.length : 'NOT ARRAY')
+
         if (Array.isArray(selloutData)) {
+          // İlk satırı logla
+          if (selloutData.length > 0) {
+            console.log('📊 İlk satır örneği:', JSON.stringify(selloutData[0]).substring(0, 200))
+          }
+
           // stok_kodu → kategori mapping
           const kategoriMap = new Map<string, string>()
           selloutData.forEach((row: any) => {
@@ -45,17 +59,25 @@ export async function GET(req: Request) {
             }
           })
 
+          console.log('📊 Kategori map size:', kategoriMap.size)
+          console.log('📊 İlk 3 kategori:', Array.from(kategoriMap.entries()).slice(0, 3))
+
           // Kategori bilgisini merge et
+          let mergedCount = 0
           for (const [stokKodu, kategori] of kategoriMap) {
             if (merged[stokKodu]) {
               merged[stokKodu].kategori = kategori
+              mergedCount++
             }
           }
+          console.log('📊 Merge edilen kategori sayısı:', mergedCount)
         }
       }
     } catch (e) {
-      console.error('Kategori fetch error:', e)
+      console.error('❌ Kategori fetch error:', e)
     }
+  } else {
+    console.warn('⚠️ PHP_API_URL tanımlı değil - kategoriler boş olacak')
   }
 
   // Fetch overrides from DB
