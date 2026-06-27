@@ -13,13 +13,15 @@ interface DestekPersonelRow {
   sube_adi: string
   cari_adi: string
   cetinler_merch: string
+  kategori: string
   kategori_performans: number
   kosullu_destek_prim: number
   hak_edis: number
 }
 
 // Merch hedef takip verisini çek (kategori performansı)
-async function fetchMerchPerformance(yil: number, ay: number): Promise<Map<string, number>> {
+// Key: "merch_adi||kategori" → performans %
+async function fetchMerchPerformance(yil: number, ay: number): Promise<Map<string, { kategori: string; performans: number }[]>> {
   try {
     const phpUrl = process.env.PHP_API_URL
     if (!phpUrl) return new Map()
@@ -35,17 +37,23 @@ async function fetchMerchPerformance(yil: number, ay: number): Promise<Map<strin
     const data = await response.json()
     if (!Array.isArray(data)) return new Map()
 
-    // Merch adı → kategori gerçekleşme oranı (%)
-    const map = new Map<string, number>()
+    // Merch adı → kategori bazında performans listesi
+    const map = new Map<string, { kategori: string; performans: number }[]>()
 
     data.forEach((row: any) => {
       const merchAdi = String(row.merch_adi || row.merch || '').trim()
+      const kategori = String(row.kategori || row.kategori_adi || '').trim()
       const hedef = parseFloat(row.hedef || row.kategori_hedef || '0') || 0
       const gerceklesen = parseFloat(row.gerceklesen || row.kategori_gerceklesen || row.adet || '0') || 0
 
-      if (merchAdi && hedef > 0) {
+      if (merchAdi && kategori && hedef > 0) {
         const performans = (gerceklesen / hedef) * 100
-        map.set(merchAdi.toLowerCase(), performans)
+        const key = merchAdi.toLowerCase()
+
+        if (!map.has(key)) {
+          map.set(key, [])
+        }
+        map.get(key)!.push({ kategori, performans })
       }
     })
 
@@ -57,25 +65,60 @@ async function fetchMerchPerformance(yil: number, ay: number): Promise<Map<strin
 }
 
 // Koşullu destek prim değerlerini çek (adet_prim tablosundan)
-async function fetchKosulluDestekPrim(yil: number, ay: number): Promise<Map<string, number>> {
+// Kategori bazında ortalama prim hesapla
+async function fetchKosulluDestekPrim(yil: number, ay: number, phpUrl: string): Promise<Map<string, number>> {
   try {
     const sb = getAdmin()
-    const { data, error } = await sb
+    const { data: primData, error } = await sb
       .from('adet_prim')
       .select('stok_kodu, kosullu_destek')
       .eq('yil', yil)
       .eq('ay', ay)
 
-    if (error || !data) return new Map()
+    if (error || !primData) return new Map()
 
-    const map = new Map<string, number>()
-    data.forEach((row: { stok_kodu: string; kosullu_destek: number | null }) => {
+    // Stok kodu → kategori mapping (PHP API'den)
+    const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
+    const response = await fetch(`${phpUrl}?${params}`, {
+      headers: { 'Accept': 'application/json' },
+      next: { revalidate: 300 },
+    })
+
+    const kategoriMap = new Map<string, string>() // stok_kodu → kategori
+    if (response.ok) {
+      const selloutData = await response.json()
+      if (Array.isArray(selloutData)) {
+        selloutData.forEach((row: any) => {
+          const stokKodu = String(row.stok_kodu || '').trim()
+          const kategori = String(row.kategori || row.kategori_adi || '').trim()
+          if (stokKodu && kategori) {
+            kategoriMap.set(stokKodu, kategori)
+          }
+        })
+      }
+    }
+
+    // Kategori bazında ortalama prim hesapla
+    const kategoriPrimler = new Map<string, number[]>()
+
+    primData.forEach((row: { stok_kodu: string; kosullu_destek: number | null }) => {
       if (row.kosullu_destek != null && row.kosullu_destek > 0) {
-        map.set(row.stok_kodu, row.kosullu_destek)
+        const kategori = kategoriMap.get(row.stok_kodu) || 'Diğer'
+        if (!kategoriPrimler.has(kategori)) {
+          kategoriPrimler.set(kategori, [])
+        }
+        kategoriPrimler.get(kategori)!.push(row.kosullu_destek)
       }
     })
 
-    return map
+    // Her kategori için ortalama al
+    const result = new Map<string, number>()
+    kategoriPrimler.forEach((primler, kategori) => {
+      const avg = primler.reduce((sum, val) => sum + val, 0) / primler.length
+      result.set(kategori, avg)
+    })
+
+    return result
   } catch (error) {
     console.error('Koşullu destek prim fetch error:', error)
     return new Map()
@@ -118,6 +161,7 @@ export async function GET(req: Request) {
         sube_adi: dp.sube_adi,
         cari_adi: dp.cari_adi,
         cetinler_merch: '-',
+        kategori: '-',
         kategori_performans: 0,
         kosullu_destek_prim: 0,
         hak_edis: 0,
@@ -178,11 +222,11 @@ export async function GET(req: Request) {
       }
     })
 
-    // 3. Merch performans verileri
+    // 3. Merch performans verileri (kategori bazında)
     const merchPerformanceMap = await fetchMerchPerformance(yil, ay)
 
-    // 4. Koşullu destek prim değerleri
-    const kosulluDestekPrimMap = await fetchKosulluDestekPrim(yil, ay)
+    // 4. Koşullu destek prim değerleri (kategori bazında ortalama)
+    const kosulluDestekPrimMap = await fetchKosulluDestekPrim(yil, ay, phpUrl)
 
     // 5. Her destek personeli için hesaplama
     const rows: DestekPersonelRow[] = []
@@ -206,29 +250,53 @@ export async function GET(req: Request) {
       const subeKey = `${normalizeStr(dp.sube_adi)}||${normalizeStr(dp.cari_adi)}`
       const cetinlerMerch = subeCarimierchMap.get(subeKey) || '-'
 
-      // Merch performansı
-      const performans = cetinlerMerch !== '-'
-        ? merchPerformanceMap.get(cetinlerMerch.toLowerCase()) || 0
-        : 0
+      if (cetinlerMerch === '-') {
+        // Çetinler merch bulunamadı - tek satır ekle
+        rows.push({
+          merch_adi: dp.merch_adi,
+          sube_adi: dp.sube_adi,
+          cari_adi: dp.cari_adi,
+          cetinler_merch: '-',
+          kategori: '-',
+          kategori_performans: 0,
+          kosullu_destek_prim: 0,
+          hak_edis: 0,
+        })
+      } else {
+        // Çetinler merch bulundu - kategori bazında satırlar ekle
+        const kategoriPerformanslar = merchPerformanceMap.get(cetinlerMerch.toLowerCase()) || []
 
-      // Koşullu destek prim - ortalama al (tüm ürünlerin ortalaması)
-      let avgPrim = 0
-      if (kosulluDestekPrimMap.size > 0) {
-        const primValues = Array.from(kosulluDestekPrimMap.values())
-        avgPrim = primValues.reduce((sum, val) => sum + val, 0) / primValues.length
+        if (kategoriPerformanslar.length === 0) {
+          // Performans verisi yok - tek satır
+          rows.push({
+            merch_adi: dp.merch_adi,
+            sube_adi: dp.sube_adi,
+            cari_adi: dp.cari_adi,
+            cetinler_merch: cetinlerMerch,
+            kategori: '-',
+            kategori_performans: 0,
+            kosullu_destek_prim: 0,
+            hak_edis: 0,
+          })
+        } else {
+          // Her kategori için ayrı satır
+          kategoriPerformanslar.forEach(({ kategori, performans }) => {
+            const kategoriPrim = kosulluDestekPrimMap.get(kategori) || 0
+            const hakEdis = (performans / 100) * kategoriPrim
+
+            rows.push({
+              merch_adi: dp.merch_adi,
+              sube_adi: dp.sube_adi,
+              cari_adi: dp.cari_adi,
+              cetinler_merch: cetinlerMerch,
+              kategori,
+              kategori_performans: performans,
+              kosullu_destek_prim: kategoriPrim,
+              hak_edis: hakEdis,
+            })
+          })
+        }
       }
-
-      const hakEdis = (performans / 100) * avgPrim
-
-      rows.push({
-        merch_adi: dp.merch_adi,
-        sube_adi: dp.sube_adi,
-        cari_adi: dp.cari_adi,
-        cetinler_merch: cetinlerMerch,
-        kategori_performans: performans,
-        kosullu_destek_prim: avgPrim,
-        hak_edis: hakEdis,
-      })
     })
 
     // Hak ediş büyükten küçüğe sırala

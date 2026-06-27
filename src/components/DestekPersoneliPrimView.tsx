@@ -11,6 +11,7 @@ interface DestekPersonelRow {
   sube_adi: string
   cari_adi: string
   cetinler_merch: string
+  kategori: string
   kategori_performans: number // Çetinler merch'ün kategori performansı (%)
   kosullu_destek_prim: number // Adet prim tablosundan
   hak_edis: number // kategori_performans × kosullu_destek_prim
@@ -126,6 +127,7 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId }: Prop
                   <th className="text-left px-4 py-2.5 font-semibold min-w-[120px]">Şube</th>
                   <th className="text-left px-4 py-2.5 font-semibold min-w-[200px]">Cari</th>
                   <th className="text-left px-4 py-2.5 font-semibold min-w-[150px]">Çetinler Merch</th>
+                  <th className="text-left px-4 py-2.5 font-semibold min-w-[120px]">Kategori</th>
                   <th className="text-right px-4 py-2.5 font-semibold min-w-[100px]">Kategori Performans</th>
                   <th className="text-right px-4 py-2.5 font-semibold min-w-[120px]">Koşullu Destek Prim</th>
                   <th className="text-right px-4 py-2.5 font-semibold min-w-[120px] bg-brand-700">Hak Ediş</th>
@@ -145,6 +147,7 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId }: Prop
                     <td className="px-4 py-2 text-gray-600">{row.sube_adi}</td>
                     <td className="px-4 py-2 text-gray-600 text-xs">{row.cari_adi}</td>
                     <td className="px-4 py-2 text-gray-800">{row.cetinler_merch}</td>
+                    <td className="px-4 py-2 text-gray-700 font-medium">{row.kategori}</td>
                     <td className="px-4 py-2 text-right tabular-nums font-medium text-blue-700">
                       {row.kategori_performans.toFixed(1)}%
                     </td>
@@ -159,7 +162,7 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId }: Prop
               </tbody>
               <tfoot>
                 <tr className="bg-gray-100 font-bold">
-                  <td colSpan={7} className="px-4 py-3 text-right text-gray-700">
+                  <td colSpan={8} className="px-4 py-3 text-right text-gray-700">
                     TOPLAM
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-brand-700 bg-brand-100">

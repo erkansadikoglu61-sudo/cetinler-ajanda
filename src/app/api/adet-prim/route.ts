@@ -16,10 +16,46 @@ export async function GET(req: Request) {
   const yil = parseInt(sp.get('yil') ?? String(new Date().getFullYear()))
   const ay  = parseInt(sp.get('ay')  ?? String(new Date().getMonth() + 1))
 
-  // Start with defaults
+  // Start with defaults (kategori = null)
   const merged: Record<string, AdetPrimRow> = {}
   for (const r of ADET_PRIM_DEFAULTS) {
-    merged[r.stokKodu] = { ...r }
+    merged[r.stokKodu] = { ...r, kategori: null }
+  }
+
+  // Fetch kategoriler from PHP API
+  const phpUrl = process.env.PHP_API_URL
+  if (phpUrl) {
+    try {
+      const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
+      const response = await fetch(`${phpUrl}?${params}`, {
+        headers: { 'Accept': 'application/json' },
+        next: { revalidate: 300 },
+      })
+
+      if (response.ok) {
+        const selloutData = await response.json()
+        if (Array.isArray(selloutData)) {
+          // stok_kodu → kategori mapping
+          const kategoriMap = new Map<string, string>()
+          selloutData.forEach((row: any) => {
+            const stokKodu = String(row.stok_kodu || '').trim()
+            const kategori = String(row.kategori || row.kategori_adi || '').trim()
+            if (stokKodu && kategori && !kategoriMap.has(stokKodu)) {
+              kategoriMap.set(stokKodu, kategori)
+            }
+          })
+
+          // Kategori bilgisini merge et
+          for (const [stokKodu, kategori] of kategoriMap) {
+            if (merged[stokKodu]) {
+              merged[stokKodu].kategori = kategori
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Kategori fetch error:', e)
+    }
   }
 
   // Fetch overrides from DB
@@ -35,13 +71,14 @@ export async function GET(req: Request) {
       for (const row of data) {
         if (merged[row.stok_kodu]) {
           merged[row.stok_kodu] = {
-            stokKodu:     row.stok_kodu,
+            ...merged[row.stok_kodu],
             bayiMerch:    row.bayi_merch,
             kosulluDestek: row.kosullu_destek,
           }
         } else {
           merged[row.stok_kodu] = {
             stokKodu:     row.stok_kodu,
+            kategori:     null,
             bayiMerch:    row.bayi_merch,
             kosulluDestek: row.kosullu_destek,
           }

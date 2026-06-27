@@ -124,6 +124,7 @@ function MultiSelectBox({
 // ─── Adet Prim Tablosu ────────────────────────────────────────────
 interface PrimRow {
   stokKodu:     string
+  kategori:     string | null
   bayiMerch:    number | null
   kosulluDestek: number | null
 }
@@ -617,6 +618,7 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
                 <tr className="bg-gray-800 text-white">
                   <th className="text-left px-4 py-2.5 font-semibold w-8">#</th>
                   <th className="text-left px-4 py-2.5 font-semibold">Stok Kodu</th>
+                  <th className="text-left px-4 py-2.5 font-semibold min-w-[150px]">Kategori</th>
                   <th className="text-right px-4 py-2.5 font-semibold min-w-[160px]">Bayi Merch (₺/adet)</th>
                   <th className="text-right px-4 py-2.5 font-semibold min-w-[200px]">Koşullu Destek Personeli (₺/adet)</th>
                 </tr>
@@ -629,6 +631,7 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
                   )}>
                     <td className="px-4 py-2 text-gray-400 font-mono">{idx + 1}</td>
                     <td className="px-4 py-2 font-mono font-semibold text-gray-800">{row.stokKodu}</td>
+                    <td className="px-4 py-2 text-gray-700">{row.kategori ?? <span className="text-gray-300">—</span>}</td>
 
                     {editing ? (
                       <>
