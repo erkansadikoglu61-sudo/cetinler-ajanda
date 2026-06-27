@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { RefreshCw, X, Save, Target, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -284,6 +284,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   )
   const [targetModal, setTargetModal] = useState<SubTab | null>(null)
   const [merchSearch, setMerchSearch] = useState('')
+  const [adetPrimData, setAdetPrimData] = useState<{ stokKodu: string; bayiMerch: number | null; kosulluDestek: number | null; kategori: string | null }[]>([])
+  const [merchHedefData, setMerchHedefData] = useState<{ merch_name: string; grup: string; hedef: number }[]>([])
 
   const isAdmin = currentProfile.role === 'admin'
   const isSup   = currentProfile.role === 'sup'
@@ -293,6 +295,25 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const {
     rows: allRows, loading: selloutLoading, fetchedAt, reload: reloadSellout,
   } = useSellout(active)
+
+  // Adet prim verilerini fetch et
+  useEffect(() => {
+    if (!active) return
+    const [yil, ay] = donem.split('-')
+    fetch(`/api/adet-prim?yil=${yil}&ay=${ay}`)
+      .then(r => r.json())
+      .then(d => setAdetPrimData(d.rows || []))
+      .catch(() => setAdetPrimData([]))
+  }, [active, donem])
+
+  // Merch hedef verilerini fetch et
+  useEffect(() => {
+    if (!active) return
+    fetch(`/api/sellout-targets?donem=${donem}`)
+      .then(r => r.json())
+      .then(d => setMerchHedefData(d.merch_targets || []))
+      .catch(() => setMerchHedefData([]))
+  }, [active, donem])
 
   const {
     getProfileHedef, getMerchHedef,
@@ -389,6 +410,58 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       return allSupNames.some(n => normalizeName(n) === normApi)
     })
   }, [periodRows, allSupNames])
+
+  // ── Adet prim lookup ──
+  const adetPrimMap = useMemo(() => {
+    const map = new Map<string, { bayiMerch: number; kosulluDestek: number; kategori: string }>()
+    adetPrimData.forEach(p => {
+      map.set(p.stokKodu, {
+        bayiMerch: p.bayiMerch || 0,
+        kosulluDestek: p.kosulluDestek || 0,
+        kategori: p.kategori || '',
+      })
+    })
+    return map
+  }, [adetPrimData])
+
+  // ── Merch kategori performans hesapla ──
+  const merchKategoriPerformans = useMemo(() => {
+    // merch_name → { kategori → { hedef, gerçekleşen, oran } }
+    const map = new Map<string, Map<string, { hedef: number; gerceklesen: number; oran: number }>>()
+
+    // Hedefleri ekle
+    merchHedefData.forEach(h => {
+      const merchKey = h.merch_name.toLowerCase()
+      if (!map.has(merchKey)) {
+        map.set(merchKey, new Map())
+      }
+      map.get(merchKey)!.set(h.grup, { hedef: h.hedef, gerceklesen: 0, oran: 0 })
+    })
+
+    // Gerçekleşenleri topla (sadece Çetinler Merch satışları)
+    periodRows.forEach(r => {
+      if (r.merch_tipi !== 'Çetinler Merch' || !r.merch_personel || !r.grup_aciklama) return
+      const merchKey = r.merch_personel.toLowerCase()
+      if (!map.has(merchKey)) {
+        map.set(merchKey, new Map())
+      }
+      const kategoriMap = map.get(merchKey)!
+      if (!kategoriMap.has(r.grup_aciklama)) {
+        kategoriMap.set(r.grup_aciklama, { hedef: 0, gerceklesen: 0, oran: 0 })
+      }
+      const existing = kategoriMap.get(r.grup_aciklama)!
+      existing.gerceklesen += r.satilan_adet || 0
+    })
+
+    // Oranları hesapla
+    map.forEach(kategoriMap => {
+      kategoriMap.forEach(data => {
+        data.oran = data.hedef > 0 ? (data.gerceklesen / data.hedef) * 100 : 0
+      })
+    })
+
+    return map
+  }, [merchHedefData, periodRows])
 
   // Filtre: MERCH_TIPI === 'Çetinler Merch' olan satırlardan unique kişi listesi
   // Sadece seçili dönemde satışı olan kişiler (toplam satış > 0)
@@ -799,47 +872,93 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                     <th className="px-3 py-2.5 text-left font-semibold min-w-[120px]">Süpervizör</th>
                     <th className="px-3 py-2.5 text-left font-semibold min-w-[100px]">Merch Tipi</th>
                     <th className="px-3 py-2.5 text-left font-semibold min-w-[80px]">BSY</th>
+                    <th className="px-3 py-2.5 text-right font-semibold min-w-[110px] bg-blue-700">Bayi Merch Adet Primi</th>
+                    <th className="px-3 py-2.5 text-right font-semibold min-w-[130px] bg-blue-800">Bayi Merch Prim Hakedişi</th>
+                    <th className="px-3 py-2.5 text-right font-semibold min-w-[140px] bg-purple-700">Destek Per. Adet Primi</th>
+                    <th className="px-3 py-2.5 text-right font-semibold min-w-[140px] bg-green-700">Çet. Merch Kat. Gerç. %</th>
+                    <th className="px-3 py-2.5 text-right font-semibold min-w-[160px] bg-green-800">Çet. Merch Gerç.Oranına Göre Prim</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredPeriodRows.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-8 text-center text-gray-400 text-[11px]">
+                      <td colSpan={15} className="px-4 py-8 text-center text-gray-400 text-[11px]">
                         Bu dönem için satış verisi yok
                       </td>
                     </tr>
                   ) : (
-                    filteredPeriodRows.map((row, idx) => (
-                      <tr
-                        key={idx}
-                        className={clsx(
-                          'border-b border-gray-100 last:border-0',
-                          idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
-                        )}
-                      >
-                        <td className="px-3 py-2 font-medium text-gray-800">{row.merch_personel || '—'}</td>
-                        <td className="px-3 py-2 text-gray-700">{row.cari_isim || '—'}</td>
-                        <td className="px-3 py-2 text-gray-600">{row.sube_adi || '—'}</td>
-                        <td className="px-3 py-2 text-gray-700 text-[11px]">{row.stok_adi || '—'}</td>
-                        <td className="px-3 py-2 font-mono text-gray-800">{row.stok_kodu || '—'}</td>
-                        <td className="px-3 py-2 text-gray-600">{row.grup_aciklama || '—'}</td>
-                        <td className="px-3 py-2 text-right tabular-nums font-semibold text-gray-900">
-                          {row.satilan_adet?.toLocaleString('tr-TR') || 0}
-                        </td>
-                        <td className="px-3 py-2 text-gray-700">{row.supervisor_adi || '—'}</td>
-                        <td className="px-3 py-2">
-                          <span className={clsx(
-                            'inline-block px-2 py-0.5 rounded-full text-[10px] font-medium',
-                            row.merch_tipi === 'Çetinler Merch'
-                              ? 'bg-brand-100 text-brand-700'
-                              : 'bg-gray-100 text-gray-600'
-                          )}>
-                            {row.merch_tipi || '—'}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 font-mono text-gray-700 text-[11px]">{row.bsy || '—'}</td>
-                      </tr>
-                    ))
+                    filteredPeriodRows.map((row, idx) => {
+                      // Hesaplamalar
+                      const primData = adetPrimMap.get(row.stok_kodu || '') || { bayiMerch: 0, kosulluDestek: 0, kategori: '' }
+                      const satisAdedi = row.satilan_adet || 0
+
+                      // 1. Bayi Merch Adet Primi
+                      const bayiMerchPrimAdet = primData.bayiMerch
+
+                      // 2. Bayi Merch Prim Hakedişi
+                      const bayiMerchHakedis = bayiMerchPrimAdet * satisAdedi
+
+                      // 3. Destek Personeli Adet Primi
+                      const destekPrimAdet = primData.kosulluDestek
+
+                      // 4. Çetinler Merch Kategori Gerçekleşme Oranı
+                      const merchKey = (row.merch_personel || '').toLowerCase()
+                      const kategori = row.grup_aciklama || ''
+                      const merchKategoriData = merchKategoriPerformans.get(merchKey)?.get(kategori)
+                      const cetinlerMerchGercOran = merchKategoriData?.oran || 0
+
+                      // 5. Çetinler Merch Gerç.Oranına Göre Adet Primi
+                      const cetinlerMerchPrim = (cetinlerMerchGercOran / 100) * destekPrimAdet * satisAdedi
+
+                      return (
+                        <tr
+                          key={idx}
+                          className={clsx(
+                            'border-b border-gray-100 last:border-0',
+                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                          )}
+                        >
+                          <td className="px-3 py-2 font-medium text-gray-800">{row.merch_personel || '—'}</td>
+                          <td className="px-3 py-2 text-gray-700">{row.cari_isim || '—'}</td>
+                          <td className="px-3 py-2 text-gray-600">{row.sube_adi || '—'}</td>
+                          <td className="px-3 py-2 text-gray-700 text-[11px]">{row.stok_adi || '—'}</td>
+                          <td className="px-3 py-2 font-mono text-gray-800">{row.stok_kodu || '—'}</td>
+                          <td className="px-3 py-2 text-gray-600">{row.grup_aciklama || '—'}</td>
+                          <td className="px-3 py-2 text-right tabular-nums font-semibold text-gray-900">
+                            {satisAdedi.toLocaleString('tr-TR')}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">{row.supervisor_adi || '—'}</td>
+                          <td className="px-3 py-2">
+                            <span className={clsx(
+                              'inline-block px-2 py-0.5 rounded-full text-[10px] font-medium',
+                              row.merch_tipi === 'Çetinler Merch'
+                                ? 'bg-brand-100 text-brand-700'
+                                : 'bg-gray-100 text-gray-600'
+                            )}>
+                              {row.merch_tipi || '—'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 font-mono text-gray-700 text-[11px]">{row.bsy || '—'}</td>
+
+                          {/* YENİ KOLONLAR */}
+                          <td className="px-3 py-2 text-right tabular-nums text-blue-700 font-medium bg-blue-50">
+                            {bayiMerchPrimAdet > 0 ? `${bayiMerchPrimAdet.toLocaleString('tr-TR')} ₺` : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-blue-800 font-bold bg-blue-100">
+                            {bayiMerchHakedis > 0 ? `${bayiMerchHakedis.toLocaleString('tr-TR')} ₺` : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-purple-700 font-medium bg-purple-50">
+                            {destekPrimAdet > 0 ? `${destekPrimAdet.toLocaleString('tr-TR')} ₺` : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-green-700 font-medium bg-green-50">
+                            {cetinlerMerchGercOran > 0 ? `%${cetinlerMerchGercOran.toFixed(1)}` : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-green-800 font-bold bg-green-100">
+                            {cetinlerMerchPrim > 0 ? `${cetinlerMerchPrim.toLocaleString('tr-TR')} ₺` : '—'}
+                          </td>
+                        </tr>
+                      )
+                    })
                   )}
                 </tbody>
                 <tfoot>
@@ -850,6 +969,24 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                     </td>
                     <td colSpan={3} className="px-3 py-2.5 text-center text-[10px]">
                       {filteredPeriodRows.length.toLocaleString('tr-TR')} kayıt
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums bg-blue-900">—</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums bg-blue-900">
+                      {filteredPeriodRows.reduce((sum, r) => {
+                        const prim = adetPrimMap.get(r.stok_kodu || '')?.bayiMerch || 0
+                        return sum + (prim * (r.satilan_adet || 0))
+                      }, 0).toLocaleString('tr-TR')} ₺
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums bg-purple-900">—</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums bg-green-900">—</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums bg-green-900">
+                      {filteredPeriodRows.reduce((sum, r) => {
+                        const primData = adetPrimMap.get(r.stok_kodu || '') || { kosulluDestek: 0 }
+                        const merchKey = (r.merch_personel || '').toLowerCase()
+                        const kategori = r.grup_aciklama || ''
+                        const oran = merchKategoriPerformans.get(merchKey)?.get(kategori)?.oran || 0
+                        return sum + ((oran / 100) * primData.kosulluDestek * (r.satilan_adet || 0))
+                      }, 0).toLocaleString('tr-TR')} ₺
                     </td>
                   </tr>
                 </tfoot>
