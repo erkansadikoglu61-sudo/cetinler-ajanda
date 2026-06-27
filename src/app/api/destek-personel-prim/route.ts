@@ -110,7 +110,23 @@ export async function GET(req: Request) {
     // 2. Sellout verisinden Çetinler merch'leri bul (şube + cari bazında)
     const phpUrl = process.env.PHP_API_URL
     if (!phpUrl) {
-      return NextResponse.json({ rows: [] })
+      console.warn('⚠️ PHP_API_URL not configured - returning placeholder data')
+
+      // PHP API olmadan placeholder data
+      const placeholderRows: DestekPersonelRow[] = destekPersonel.map(dp => ({
+        merch_adi: dp.merch_adi,
+        sube_adi: dp.sube_adi,
+        cari_adi: dp.cari_adi,
+        cetinler_merch: '-',
+        kategori_performans: 0,
+        kosullu_destek_prim: 0,
+        hak_edis: 0,
+      }))
+
+      return NextResponse.json({
+        rows: placeholderRows,
+        warning: 'PHP_API_URL not configured - showing placeholder data'
+      })
     }
 
     const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
