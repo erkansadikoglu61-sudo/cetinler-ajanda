@@ -14,7 +14,7 @@ import {
 } from '@/lib/sellout'
 import { Profile } from '@/lib/supabase'
 
-type SubTab = 'sup' | 'jr' | 'merch' | 'top20'
+type SubTab = 'sup' | 'jr' | 'merch' | 'top20' | 'satislar'
 
 // ─── Top-30 yardımcı tipler ───
 interface Top20Row { cariIsim: string; subeAdi: string; adet: number }
@@ -382,6 +382,14 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     [team, visibleIds]
   )
 
+  // ── Filtered period rows (sadece bağlı supervisorlar) ──
+  const filteredPeriodRows = useMemo(() => {
+    return periodRows.filter(r => {
+      const normApi = normalizeName(r.supervisor_adi || '')
+      return allSupNames.some(n => normalizeName(n) === normApi)
+    })
+  }, [periodRows, allSupNames])
+
   // Filtre: MERCH_TIPI === 'Çetinler Merch' olan satırlardan unique kişi listesi
   // Sadece seçili dönemde satışı olan kişiler (toplam satış > 0)
   const uniqueMerch = useMemo(() => {
@@ -637,6 +645,13 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             subTab === 'top20' ? 'border-amber-500 text-amber-700' : 'border-transparent text-gray-500 hover:text-gray-800'
           )}
         >Top 20</button>
+        <button
+          onClick={() => setSubTab('satislar')}
+          className={clsx(
+            'px-3 py-2 text-xs font-medium border-b-2 transition-colors',
+            subTab === 'satislar' ? 'border-brand-700 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'
+          )}
+        >Satışlar</button>
         <div className="flex-1" />
         {/* Target entry button */}
         {(isAdmin || isSup) && subTab !== 'sup' && (
@@ -760,6 +775,83 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                   colorMap={globalCariColorMap}
                 />
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Satışlar Tablosu ── */}
+        {!selloutLoading && subTab === 'satislar' && (
+          <div className="p-2">
+            <div className="mb-3 text-[10px] text-gray-400">
+              Seçilen dönem için satış kayıtları (sadece bağlı şubeler)
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+              <table className="text-xs border-collapse w-full bg-white">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-gray-800 text-white">
+                    <th className="px-3 py-2.5 text-left font-semibold min-w-[140px]">Merch Personel</th>
+                    <th className="px-3 py-2.5 text-left font-semibold min-w-[200px]">Cari</th>
+                    <th className="px-3 py-2.5 text-left font-semibold min-w-[120px]">Şube</th>
+                    <th className="px-3 py-2.5 text-left font-semibold min-w-[200px]">Stok Adı</th>
+                    <th className="px-3 py-2.5 text-left font-semibold min-w-[100px]">Stok Kodu</th>
+                    <th className="px-3 py-2.5 text-left font-semibold min-w-[150px]">Grup/Kategori</th>
+                    <th className="px-3 py-2.5 text-right font-semibold min-w-[80px]">Satılan Adet</th>
+                    <th className="px-3 py-2.5 text-left font-semibold min-w-[120px]">Süpervizör</th>
+                    <th className="px-3 py-2.5 text-left font-semibold min-w-[100px]">Merch Tipi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPeriodRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-8 text-center text-gray-400 text-[11px]">
+                        Bu dönem için satış verisi yok
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredPeriodRows.map((row, idx) => (
+                      <tr
+                        key={idx}
+                        className={clsx(
+                          'border-b border-gray-100 last:border-0',
+                          idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                        )}
+                      >
+                        <td className="px-3 py-2 font-medium text-gray-800">{row.merch_personel || '—'}</td>
+                        <td className="px-3 py-2 text-gray-700">{row.cari_isim || '—'}</td>
+                        <td className="px-3 py-2 text-gray-600">{row.sube_adi || '—'}</td>
+                        <td className="px-3 py-2 text-gray-700 text-[11px]">{row.stok_adi || '—'}</td>
+                        <td className="px-3 py-2 font-mono text-gray-800">{row.stok_kodu || '—'}</td>
+                        <td className="px-3 py-2 text-gray-600">{row.grup_aciklama || '—'}</td>
+                        <td className="px-3 py-2 text-right tabular-nums font-semibold text-gray-900">
+                          {row.satilan_adet?.toLocaleString('tr-TR') || 0}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">{row.supervisor_adi || '—'}</td>
+                        <td className="px-3 py-2">
+                          <span className={clsx(
+                            'inline-block px-2 py-0.5 rounded-full text-[10px] font-medium',
+                            row.merch_tipi === 'Çetinler Merch'
+                              ? 'bg-brand-100 text-brand-700'
+                              : 'bg-gray-100 text-gray-600'
+                          )}>
+                            {row.merch_tipi || '—'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-800 text-white font-semibold">
+                    <td colSpan={6} className="px-3 py-2.5 text-right">TOPLAM</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {filteredPeriodRows.reduce((sum, r) => sum + (r.satilan_adet || 0), 0).toLocaleString('tr-TR')}
+                    </td>
+                    <td colSpan={2} className="px-3 py-2.5 text-center text-[10px]">
+                      {filteredPeriodRows.length.toLocaleString('tr-TR')} kayıt
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
         )}
