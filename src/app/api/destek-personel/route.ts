@@ -38,7 +38,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { sube_adi, cari_adi, merch_adi } = body
+    let { sube_adi, cari_adi, merch_adi } = body
 
     if (!sube_adi || !cari_adi || !merch_adi) {
       return NextResponse.json(
@@ -47,23 +47,33 @@ export async function POST(req: Request) {
       )
     }
 
+    // Trim ve normalize
+    sube_adi = sube_adi.trim()
+    cari_adi = cari_adi.trim()
+    merch_adi = merch_adi.trim()
+
     const sb = getAdmin()
 
-    // Aynı kişi zaten var mı kontrol et
+    // Aynı kişi zaten var mı kontrol et (case-insensitive)
     const { data: existing } = await sb
       .from('field_personnel')
-      .select('id')
+      .select('id, merch_adi')
       .eq('sube_adi', sube_adi)
       .eq('cari_adi', cari_adi)
-      .eq('merch_adi', merch_adi)
       .eq('merch_grubu', 'Destek Personeli')
-      .limit(1)
 
+    // Case-insensitive karşılaştırma
     if (existing && existing.length > 0) {
-      return NextResponse.json(
-        { error: 'Bu destek personeli bu şube için zaten eklenmiş' },
-        { status: 409 }
+      const duplicate = existing.find(
+        (r: { merch_adi: string }) =>
+          r.merch_adi.toLowerCase().trim() === merch_adi.toLowerCase().trim()
       )
+      if (duplicate) {
+        return NextResponse.json(
+          { error: 'Bu destek personeli bu şube için zaten eklenmiş' },
+          { status: 409 }
+        )
+      }
     }
 
     // Ekle
@@ -78,6 +88,13 @@ export async function POST(req: Request) {
       .select()
 
     if (error) {
+      // Unique constraint hatası için özel mesaj
+      if (error.code === '23505') {
+        return NextResponse.json(
+          { error: 'Bu destek personeli bu şube için zaten eklenmiş' },
+          { status: 409 }
+        )
+      }
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 

@@ -140,21 +140,35 @@ export async function POST() {
       })
     }
 
-    // Batch insert
-    const { data, error } = await sb
-      .from('field_personnel')
-      .insert(toInsert)
-      .select()
+    // Batch insert - tek tek ekle ki duplicate'leri skip edebilsin
+    let inserted = 0
+    let failed = 0
+    const errors: string[] = []
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    for (const item of toInsert) {
+      const { error } = await sb
+        .from('field_personnel')
+        .insert(item)
+
+      if (error) {
+        // Unique constraint hatası bekleniyor - skip et
+        if (error.code === '23505') {
+          failed++
+        } else {
+          errors.push(`${item.merch_adi}: ${error.message}`)
+          failed++
+        }
+      } else {
+        inserted++
+      }
     }
 
     return NextResponse.json({
       ok: true,
-      inserted: toInsert.length,
-      skipped: DESTEK_PERSONELLERI.length - toInsert.length,
-      data,
+      inserted,
+      skipped: DESTEK_PERSONELLERI.length - inserted,
+      failed,
+      errors: errors.length > 0 ? errors : undefined,
     })
   } catch (e: unknown) {
     const err = e as Error
