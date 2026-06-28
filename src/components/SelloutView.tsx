@@ -426,15 +426,16 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
   // ── Merch kategori performans hesapla ──
   const merchKategoriPerformans = useMemo(() => {
-    // merch_name → { kategori → { hedef, gerçekleşen, oran } }
+    // merch_name → { kategori_normalized → { hedef, gerçekleşen, oran } }
     const map = new Map<string, Map<string, { hedef: number; gerceklesen: number; oran: number }>>()
 
-    // Hedefleri ekle
+    // Hedefleri ekle (grup = normalized isim)
     merchHedefData.forEach(h => {
       const merchKey = h.merch_name.toLowerCase()
       if (!map.has(merchKey)) {
         map.set(merchKey, new Map())
       }
+      // h.grup zaten normalized (Düzleştirici&Maşa Grubu)
       map.get(merchKey)!.set(h.grup, { hedef: h.hedef, gerceklesen: 0, oran: 0 })
     })
 
@@ -442,14 +443,18 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     periodRows.forEach(r => {
       if (r.merch_tipi !== 'Çetinler Merch' || !r.merch_personel || !r.grup_aciklama) return
       const merchKey = r.merch_personel.toLowerCase()
+
+      // API'den gelen kategoriyi normalize et
+      const normalizedKategori = GRUP_NORMALIZE[r.grup_aciklama] || r.grup_aciklama
+
       if (!map.has(merchKey)) {
         map.set(merchKey, new Map())
       }
       const kategoriMap = map.get(merchKey)!
-      if (!kategoriMap.has(r.grup_aciklama)) {
-        kategoriMap.set(r.grup_aciklama, { hedef: 0, gerceklesen: 0, oran: 0 })
+      if (!kategoriMap.has(normalizedKategori)) {
+        kategoriMap.set(normalizedKategori, { hedef: 0, gerceklesen: 0, oran: 0 })
       }
-      const existing = kategoriMap.get(r.grup_aciklama)!
+      const existing = kategoriMap.get(normalizedKategori)!
       existing.gerceklesen += r.satilan_adet || 0
     })
 
@@ -903,8 +908,9 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
                       // 4. Çetinler Merch Kategori Gerçekleşme Oranı
                       const merchKey = (row.merch_personel || '').toLowerCase()
-                      const kategori = row.grup_aciklama || ''
-                      const merchKategoriData = merchKategoriPerformans.get(merchKey)?.get(kategori)
+                      const kategoriRaw = row.grup_aciklama || ''
+                      const kategoriNormalized = GRUP_NORMALIZE[kategoriRaw] || kategoriRaw
+                      const merchKategoriData = merchKategoriPerformans.get(merchKey)?.get(kategoriNormalized)
                       const cetinlerMerchGercOran = merchKategoriData?.oran || 0
 
                       // 5. Çetinler Merch Gerç.Oranına Göre Adet Primi
@@ -983,8 +989,9 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                       {filteredPeriodRows.reduce((sum, r) => {
                         const primData = adetPrimMap.get(r.stok_kodu || '') || { kosulluDestek: 0 }
                         const merchKey = (r.merch_personel || '').toLowerCase()
-                        const kategori = r.grup_aciklama || ''
-                        const oran = merchKategoriPerformans.get(merchKey)?.get(kategori)?.oran || 0
+                        const kategoriRaw = r.grup_aciklama || ''
+                        const kategoriNormalized = GRUP_NORMALIZE[kategoriRaw] || kategoriRaw
+                        const oran = merchKategoriPerformans.get(merchKey)?.get(kategoriNormalized)?.oran || 0
                         return sum + ((oran / 100) * primData.kosulluDestek * (r.satilan_adet || 0))
                       }, 0).toLocaleString('tr-TR')} ₺
                     </td>
