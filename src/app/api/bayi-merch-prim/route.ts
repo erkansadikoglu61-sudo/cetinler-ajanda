@@ -18,8 +18,10 @@ const COL = {
   STOK_ADI:       3,
   STOK_KODU:      4,
   SATILAN_ADET:   6,
+  GRUP_KODU:      7,
   SUPERVISOR_ADI: 9,
   DONEM:          12,
+  TARIH:          13,
   MERCH_TIPI:     14,
   BSY_KOD:        16,
 } as const
@@ -103,15 +105,16 @@ export async function GET(req: Request) {
     .toISOString().slice(0, 10)
 
   /** Bir satır için prim_ozel'de eşleşen kuralı bul (tarih aralığı kontrolü dahil) */
-  function findOzelRule(stokKodu: string, cariAdi: string, subeAdi: string): OzelPrimRow | undefined {
+  function findOzelRule(stokKodu: string, grupKodu: string, cariAdi: string, subeAdi: string, tarih: string): OzelPrimRow | undefined {
     for (const rule of ozelPrimRows) {
       const stokOk = !rule.stok_kodu || rule.stok_kodu.some(s => s.toUpperCase() === stokKodu.toUpperCase())
+      const grupOk = !rule.grup_kodu || rule.grup_kodu.some(g => g.toUpperCase() === grupKodu.toUpperCase())
       const cariOk = !rule.cari_adi  || rule.cari_adi.some(c => c === cariAdi)
       const subeOk = !rule.sube_adi  || rule.sube_adi.some(s => s === subeAdi)
-      // Tarih aralığı: kural döneme kesiyor mu?
-      const basOk = !rule.tarih_baslangic || rule.tarih_baslangic <= donemSon
-      const bitOk = !rule.tarih_bitis     || rule.tarih_bitis     >= donemIlk
-      if (stokOk && cariOk && subeOk && basOk && bitOk) return rule
+      // Tarih aralığı: satış tarihi kural aralığında mı?
+      const basOk = !rule.tarih_baslangic || rule.tarih_baslangic <= tarih
+      const bitOk = !rule.tarih_bitis     || rule.tarih_bitis     >= tarih
+      if (stokOk && grupOk && cariOk && subeOk && basOk && bitOk) return rule
     }
     return undefined
   }
@@ -154,11 +157,13 @@ export async function GET(req: Request) {
     if (cells[COL.MERCH_TIPI] !== 'Bayi Merch') continue
 
     const stokKodu  = cells[COL.STOK_KODU].toUpperCase()
+    const grupKodu  = cells[COL.GRUP_KODU]?.toUpperCase() || ''
+    const tarih     = cells[COL.TARIH] || ''
     const satisAdet = parseFloat(cells[COL.SATILAN_ADET]) || 0
     const standardRate = primMap.get(stokKodu) ?? null
 
     // Özel kural varsa uygula
-    const ozelRule = findOzelRule(stokKodu, cells[COL.CARI_ISIM], cells[COL.SUBE_ADI])
+    const ozelRule = findOzelRule(stokKodu, grupKodu, cells[COL.CARI_ISIM], cells[COL.SUBE_ADI], tarih)
     let bayiMerchPrim: number | null
     if (ozelRule) {
       if (ozelRule.prim_carpan != null && standardRate != null) {
