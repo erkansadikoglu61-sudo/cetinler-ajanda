@@ -28,7 +28,7 @@ export async function GET(req: Request) {
     try {
       const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
       const response = await fetch(`${phpUrl}?${params}`, {
-        next: { revalidate: 300 },
+        next: { revalidate: 900 }, // 15 dakika cache
       })
 
       if (response.ok) {

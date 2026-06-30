@@ -47,7 +47,7 @@ async function fetchMerchPerformance(phpUrl: string, donem: string): Promise<Map
     const [yil, ay] = donem.split('-')
     const params = new URLSearchParams({ yil, ay })
     const response = await fetch(`${phpUrl}?${params}`, {
-      next: { revalidate: 300 },
+      next: { revalidate: 900 }, // 15 dakika cache
     })
 
     if (!response.ok) return new Map()
@@ -156,7 +156,7 @@ async function fetchKosulluDestekPrim(phpUrl: string, yil: number, ay: number): 
     // 2. Stok kodu → kategori mapping (PHP API HTML'den)
     const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
     const response = await fetch(`${phpUrl}?${params}`, {
-      next: { revalidate: 300 },
+      next: { revalidate: 900 }, // 15 dakika cache
     })
 
     const kategoriMap = new Map<string, string>() // stok_kodu → kategori
@@ -258,7 +258,7 @@ export async function GET(req: Request) {
 
     const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
     const selloutRes = await fetch(`${phpUrl}?${params}`, {
-      next: { revalidate: 300 },
+      next: { revalidate: 900 }, // 15 dakika cache
     })
 
     if (!selloutRes.ok) {
