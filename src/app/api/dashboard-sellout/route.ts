@@ -29,7 +29,7 @@ async function fetchPhpSellout(yil: number, ay?: number): Promise<any[]> {
 
     const response = await fetch(`${phpUrl}?${params}`, {
       headers: { 'Accept': 'application/json' },
-      next: { revalidate: 300 }, // 5 dakika cache
+      next: { revalidate: 900 }, // 15 dakika cache (bandwidth optimizasyonu)
     })
 
     if (!response.ok) {
