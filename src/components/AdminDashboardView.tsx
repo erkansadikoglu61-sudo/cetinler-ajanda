@@ -163,7 +163,7 @@ export function AdminDashboardView() {
                 <option key={index} value={index + 1} className="text-gray-900">{month}</option>
               ))}
             </select>
-            <span className="text-[8px] text-purple-100">{yil}</span>
+            <span className="text-[10px] text-purple-100">{yil}</span>
           </div>
         </div>
         <button onClick={loadData} disabled={loading} className="p-1 hover:bg-white/20 rounded">
@@ -179,7 +179,7 @@ export function AdminDashboardView() {
             {/* Vertical Label */}
             <div className="w-4 bg-gradient-to-b from-blue-500 to-blue-600 rounded flex items-center justify-center">
               <div className="transform -rotate-90 whitespace-nowrap">
-                <span className="text-[8px] font-bold text-white tracking-wider">SATIŞ</span>
+                <span className="text-[10px] font-bold text-white tracking-wider">SATIŞ</span>
               </div>
             </div>
 
@@ -207,15 +207,15 @@ export function AdminDashboardView() {
                       />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-[11px] font-bold text-blue-400">{fmtPct(sales.aylikCiro / sales.aylikCiroHedef)}</span>
+                      <span className="text-[13px] font-bold text-blue-400">{fmtPct(sales.aylikCiro / sales.aylikCiroHedef)}</span>
                     </div>
                   </div>
-                  <div className="text-[9px] text-gray-400 mb-1">Aylık Ciro</div>
-                  <div className="text-[16px] font-bold mb-1">{fmtTL(sales.aylikCiro)}</div>
-                  <div className="text-[8px] text-blue-200">
+                  <div className="text-[10px] text-gray-400 mb-1">Aylık Ciro</div>
+                  <div className="text-[22px] font-bold mb-1">{fmtTL(sales.aylikCiro)}</div>
+                  <div className="text-[13px] text-blue-200">
                     <span>{MONTHS_TR[ay - 1]} Gerçekleşen</span>
                   </div>
-                  <div className="text-[8px] text-white/90 mt-0.5">Hedef: {fmtTL(sales.aylikCiroHedef)}</div>
+                  <div className="text-[13px] text-white/90 mt-0.5">Hedef: {fmtTL(sales.aylikCiroHedef)}</div>
                 </div>
 
                 {/* Yıllık Ciro Kartı */}
@@ -239,15 +239,15 @@ export function AdminDashboardView() {
                       />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-[11px] font-bold text-teal-400">{fmtPct(sales.yillikCiro / sales.yillikCiroHedef)}</span>
+                      <span className="text-[13px] font-bold text-teal-400">{fmtPct(sales.yillikCiro / sales.yillikCiroHedef)}</span>
                     </div>
                   </div>
-                  <div className="text-[9px] text-gray-400 mb-1">2026 Toplam Ciro</div>
-                  <div className="text-[16px] font-bold mb-1">{fmtTL(sales.yillikCiro)}</div>
-                  <div className="text-[8px] text-teal-200">
+                  <div className="text-[13px] text-gray-400 mb-1">2026 Toplam Ciro</div>
+                  <div className="text-[20px] font-bold mb-1">{fmtTL(sales.yillikCiro)}</div>
+                  <div className="text-[10px] text-teal-200">
                     <span>Yıl İçi Gerçekleşen</span>
                   </div>
-                  <div className="text-[8px] text-white/90 mt-0.5">Hedef: {fmtTL(sales.yillikCiroHedef)}</div>
+                  <div className="text-[10px] text-white/90 mt-0.5">Hedef: {fmtTL(sales.yillikCiroHedef)}</div>
                 </div>
 
                 {/* Grup Bazında Ciro Kartı */}
@@ -256,36 +256,36 @@ export function AdminDashboardView() {
                   <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-x-3 gap-y-1.5">
                     {/* Header */}
                     <div></div>
-                    <div className="text-[8px] font-semibold text-white/80 text-right">Haziran</div>
-                    <div className="text-[8px] font-semibold text-white/80 text-right">2026</div>
-                    <div className="text-[8px] font-semibold text-white/80 text-right">Payı</div>
+                    <div className="text-[10px] font-semibold text-white/80 text-right">Haziran</div>
+                    <div className="text-[10px] font-semibold text-white/80 text-right">2026</div>
+                    <div className="text-[10px] font-semibold text-white/80 text-right">Payı</div>
 
                     {/* RELUX */}
-                    <div className="text-white font-medium text-[9px]">RELUX</div>
-                    <div className="font-bold text-white text-[11px] text-right">{fmtTL(sales.aylikCiroGrup.relux)}</div>
-                    <div className="font-bold text-white text-[11px] text-right">{fmtTL(sales.yillikCiroGrup.relux)}</div>
-                    <div className="font-bold text-white text-[11px] text-right">{((sales.yillikCiroGrup.relux / (sales.yillikCiroGrup.relux + sales.yillikCiroGrup.ekea + sales.yillikCiroGrup.ebe)) * 100).toFixed(2)}%</div>
+                    <div className="text-white font-medium text-[13px]">RELUX</div>
+                    <div className="font-bold text-white text-[13px] text-right">{fmtTL(sales.aylikCiroGrup.relux)}</div>
+                    <div className="font-bold text-white text-[13px] text-right">{fmtTL(sales.yillikCiroGrup.relux)}</div>
+                    <div className="font-bold text-white text-[13px] text-right">{((sales.yillikCiroGrup.relux / (sales.yillikCiroGrup.relux + sales.yillikCiroGrup.ekea + sales.yillikCiroGrup.ebe)) * 100).toFixed(2)}%</div>
 
                     {/* EKEA */}
-                    <div className="text-white font-medium text-[9px]">EKEA</div>
-                    <div className="font-bold text-white text-[11px] text-right">{fmtTL(sales.aylikCiroGrup.ekea)}</div>
-                    <div className="font-bold text-white text-[11px] text-right">{fmtTL(sales.yillikCiroGrup.ekea)}</div>
-                    <div className="font-bold text-white text-[11px] text-right">{((sales.yillikCiroGrup.ekea / (sales.yillikCiroGrup.relux + sales.yillikCiroGrup.ekea + sales.yillikCiroGrup.ebe)) * 100).toFixed(2)}%</div>
+                    <div className="text-white font-medium text-[13px]">EKEA</div>
+                    <div className="font-bold text-white text-[13px] text-right">{fmtTL(sales.aylikCiroGrup.ekea)}</div>
+                    <div className="font-bold text-white text-[13px] text-right">{fmtTL(sales.yillikCiroGrup.ekea)}</div>
+                    <div className="font-bold text-white text-[13px] text-right">{((sales.yillikCiroGrup.ekea / (sales.yillikCiroGrup.relux + sales.yillikCiroGrup.ekea + sales.yillikCiroGrup.ebe)) * 100).toFixed(2)}%</div>
 
                     {/* EBE */}
-                    <div className="text-white font-medium text-[9px]">EBE</div>
-                    <div className="font-bold text-white text-[11px] text-right">{fmtTL(sales.aylikCiroGrup.ebe)}</div>
-                    <div className="font-bold text-white text-[11px] text-right">{fmtTL(sales.yillikCiroGrup.ebe)}</div>
-                    <div className="font-bold text-white text-[11px] text-right">{((sales.yillikCiroGrup.ebe / (sales.yillikCiroGrup.relux + sales.yillikCiroGrup.ekea + sales.yillikCiroGrup.ebe)) * 100).toFixed(2)}%</div>
+                    <div className="text-white font-medium text-[13px]">EBE</div>
+                    <div className="font-bold text-white text-[13px] text-right">{fmtTL(sales.aylikCiroGrup.ebe)}</div>
+                    <div className="font-bold text-white text-[13px] text-right">{fmtTL(sales.yillikCiroGrup.ebe)}</div>
+                    <div className="font-bold text-white text-[13px] text-right">{((sales.yillikCiroGrup.ebe / (sales.yillikCiroGrup.relux + sales.yillikCiroGrup.ekea + sales.yillikCiroGrup.ebe)) * 100).toFixed(2)}%</div>
 
                     {/* Toplam - Border üstü */}
                     <div className="col-span-4 border-t border-white/30 mt-1 pt-1"></div>
 
                     {/* Toplam */}
                     <div></div>
-                    <div className="font-bold text-white text-[11px] text-right">{fmtTL(sales.aylikCiroGrup.relux + sales.aylikCiroGrup.ekea + sales.aylikCiroGrup.ebe)}</div>
-                    <div className="font-bold text-white text-[11px] text-right">{fmtTL(sales.yillikCiroGrup.relux + sales.yillikCiroGrup.ekea + sales.yillikCiroGrup.ebe)}</div>
-                    <div className="font-bold text-white text-[11px] text-right">100,00%</div>
+                    <div className="font-bold text-white text-[13px] text-right">{fmtTL(sales.aylikCiroGrup.relux + sales.aylikCiroGrup.ekea + sales.aylikCiroGrup.ebe)}</div>
+                    <div className="font-bold text-white text-[13px] text-right">{fmtTL(sales.yillikCiroGrup.relux + sales.yillikCiroGrup.ekea + sales.yillikCiroGrup.ebe)}</div>
+                    <div className="font-bold text-white text-[13px] text-right">100,00%</div>
                   </div>
                 </div>
 
@@ -297,23 +297,23 @@ export function AdminDashboardView() {
                     </div>
                     <div>
                       <div className="text-[10px] font-semibold">Müşteri</div>
-                      <div className="text-[9px] text-white/80">Group</div>
+                      <div className="text-[13px] text-white/80">Group</div>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="bg-white/10 backdrop-blur rounded p-1.5">
-                      <div className="text-[9px] text-white font-semibold mb-0.5">RELUX</div>
+                      <div className="text-[13px] text-white font-semibold mb-0.5">RELUX</div>
                       <div className="flex items-baseline gap-1">
                         <span className="text-[14px] font-bold">{fmtN(dashboardYillik.musteriSayisi.relux)}</span>
-                        <span className="text-[9px] text-white/90">Yıllık</span>
+                        <span className="text-[13px] text-white/90">Yıllık</span>
                       </div>
                       <div className="text-[10px] text-white/95 font-medium">{fmtN(dashboardAylik.musteriSayisi.relux)} {MONTHS_TR[ay - 1]}</div>
                     </div>
                     <div className="bg-white/10 backdrop-blur rounded p-1.5">
-                      <div className="text-[9px] text-white font-semibold mb-0.5">ELECTROLUX</div>
+                      <div className="text-[13px] text-white font-semibold mb-0.5">ELECTROLUX</div>
                       <div className="flex items-baseline gap-1">
                         <span className="text-[14px] font-bold">{fmtN(dashboardYillik.musteriSayisi.elux)}</span>
-                        <span className="text-[9px] text-white/90">Yıllık</span>
+                        <span className="text-[13px] text-white/90">Yıllık</span>
                       </div>
                       <div className="text-[10px] text-white/95 font-medium">{fmtN(dashboardAylik.musteriSayisi.elux)} {MONTHS_TR[ay - 1]}</div>
                     </div>
@@ -333,7 +333,7 @@ export function AdminDashboardView() {
           <div className="flex gap-1 flex-1">
             <div className="w-4 bg-gradient-to-b from-teal-500 to-teal-600 rounded flex items-center justify-center">
               <div className="transform -rotate-90 whitespace-nowrap">
-                <span className="text-[8px] font-bold text-white tracking-wider">TAHSİLAT</span>
+                <span className="text-[10px] font-bold text-white tracking-wider">TAHSİLAT</span>
               </div>
             </div>
             <div className="flex-1 bg-white rounded shadow border border-gray-200 p-1 flex flex-col">
@@ -342,7 +342,7 @@ export function AdminDashboardView() {
                 <div
                   onClick={handleAcikHesapClick}
                   className="bg-gradient-to-br from-red-500 to-red-600 rounded-lg p-3 text-white shadow-lg cursor-pointer hover:from-red-400 hover:to-red-500 transition-all">
-                  <div className="text-[8px] mb-1 flex items-center gap-1">
+                  <div className="text-[10px] mb-1 flex items-center gap-1">
                     <span>🔴</span>
                     <span className="font-semibold">Açık Hesap</span>
                   </div>
@@ -353,7 +353,7 @@ export function AdminDashboardView() {
                 <div
                   onClick={handleTahsilatHedefClick}
                   className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-3 text-white shadow-lg cursor-pointer hover:from-orange-400 hover:to-orange-500 transition-all">
-                  <div className="text-[8px] mb-1 flex items-center gap-1">
+                  <div className="text-[10px] mb-1 flex items-center gap-1">
                     <span>🎯</span>
                     <span className="font-semibold">Tahsilat Hedef</span>
                   </div>
@@ -381,10 +381,10 @@ export function AdminDashboardView() {
                       />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-[9px] font-bold">{fmtPct(tahsilat.gerceklesenTahsilat / tahsilat.tahsilatHedef)}</span>
+                      <span className="text-[13px] font-bold">{fmtPct(tahsilat.gerceklesenTahsilat / tahsilat.tahsilatHedef)}</span>
                     </div>
                   </div>
-                  <div className="text-[8px] mb-1 flex items-center gap-1">
+                  <div className="text-[10px] mb-1 flex items-center gap-1">
                     <span>✅</span>
                     <span className="font-semibold">Gerçekleşen</span>
                   </div>
@@ -399,8 +399,8 @@ export function AdminDashboardView() {
                   <div className="space-y-1.5">
                     {tahsilat.tahsilatTurleri.map(t => (
                       <div key={t.tur} className="flex justify-between items-center">
-                        <span className="text-white font-medium text-[9px]">{t.tur}</span>
-                        <span className="font-bold text-white text-[11px]">{fmtTL(t.tutar)}</span>
+                        <span className="text-white font-medium text-[13px]">{t.tur}</span>
+                        <span className="font-bold text-white text-[13px]">{fmtTL(t.tutar)}</span>
                       </div>
                     ))}
                   </div>
@@ -413,13 +413,13 @@ export function AdminDashboardView() {
           <div className="flex gap-1 flex-[2]">
             <div className="w-4 bg-gradient-to-b from-green-500 to-green-600 rounded flex items-center justify-center">
               <div className="transform -rotate-90 whitespace-nowrap">
-                <span className="text-[8px] font-bold text-white tracking-wider">SELLOUT</span>
+                <span className="text-[10px] font-bold text-white tracking-wider">SELLOUT</span>
               </div>
             </div>
 
             <div className="flex-1 bg-white rounded shadow border border-gray-200 p-1 flex flex-col">
               <div className="flex-1 flex flex-col">
-                <p className="text-[8px] font-bold text-gray-600 mb-0.5">2026 ({MONTHS_TR[ay - 1]} / Yıl)</p>
+                <p className="text-[10px] font-bold text-gray-600 mb-0.5">2026 ({MONTHS_TR[ay - 1]} / Yıl)</p>
                 <div className="grid grid-cols-5 gap-1 flex-1">
                   <TopCard
                     title="Cari"
@@ -581,13 +581,13 @@ function TopCard({ title, yillikData, aylikData, nameKey, color, withCari }: {
   }
 
   return (
-    <div className={`${colors[color as keyof typeof colors]} border rounded p-1.5 flex flex-col h-full`}>
-      <h5 className="text-[9px] font-bold mb-1">{title}</h5>
-      <div className="space-y-1 text-[8px] flex-1 overflow-y-auto">
+    <div className={`${colors[color as keyof typeof colors]} border rounded p-2 flex flex-col h-full`}>
+      <h5 className="text-[15px] font-bold mb-2">{title}</h5>
+      <div className="space-y-1.5 text-[12px] flex-1 overflow-y-auto">
         {yillikData && yillikData.length > 0 ? (
           <>
             {/* Header */}
-            <div className="flex items-center justify-end gap-1 text-[7px] font-bold text-gray-600 pb-0.5 border-b border-gray-300">
+            <div className="flex items-center justify-end gap-1.5 text-[10px] font-bold text-gray-600 pb-1 border-b border-gray-300">
               <span>Haziran</span>
               <span className="text-gray-400">/</span>
               <span>2026</span>
@@ -605,27 +605,27 @@ function TopCard({ title, yillikData, aylikData, nameKey, color, withCari }: {
             const aylikAdet = yillikItem.aylikAdet || 0
 
               return (
-                <div key={i} className="bg-white/60 rounded px-1.5 py-1 flex items-center justify-between gap-1 text-[8px]">
+                <div key={i} className="bg-white/60 rounded px-2 py-1.5 flex items-center justify-between gap-2 text-[12px]">
                   <div className="flex-1 truncate">
                     <span className="font-medium">
                       {i + 1}. {shortName}
                     </span>
                     {withCari && yillikItem.topCari && (
-                      <span className="text-[7px] text-gray-500 ml-0.5">({yillikItem.topCari})</span>
+                      <span className="text-[10px] text-gray-500 ml-1">({yillikItem.topCari})</span>
                     )}
                   </div>
-                  <div className="flex gap-1 items-center whitespace-nowrap">
+                  <div className="flex gap-1.5 items-center whitespace-nowrap">
                     <span className="text-purple-600 font-semibold">{fmtN(aylikAdet)}</span>
                     <span className="text-gray-400">/</span>
                     <span className="text-blue-600 font-semibold">{fmtN(yillikItem.adet)}</span>
-                    <span className="text-green-600 font-semibold ml-0.5">{(yillikItem.pay * 100).toFixed(1)}%</span>
+                    <span className="text-green-600 font-semibold ml-1">{(yillikItem.pay * 100).toFixed(1)}%</span>
                   </div>
                 </div>
               )
             })}
           </>
         ) : (
-          <p className="text-center text-gray-400 py-1 text-[8px]">—</p>
+          <p className="text-center text-gray-400 py-2 text-[12px]">—</p>
         )}
       </div>
     </div>
