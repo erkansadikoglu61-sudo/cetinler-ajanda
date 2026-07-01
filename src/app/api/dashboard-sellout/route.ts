@@ -238,7 +238,7 @@ function calculateTop10(
 
   const toplamAdet = Array.from(map.values()).reduce((sum, val) => sum + val, 0)
 
-  return Array.from(map.entries())
+  const result = Array.from(map.entries())
     .map(([name, adet]) => {
       // Şube için "şube|cariKod" formatını parse et
       let displayName = name
