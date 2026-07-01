@@ -134,6 +134,8 @@ export async function GET(req: Request) {
       yillikCiroHedef: 610_000_000,
       aylikCiro: 0,
       aylikCiroHedef,
+      aylikCariDetay: [],
+      yillikCariDetay: [],
       yillikCiroGrup: { relux: 0, ekea: 0, ebe: 0 },
       aylikCiroGrup: { relux: 0, ekea: 0, ebe: 0 },
       yillikCariSayisi: { relux: 0, electrolux: 0, toplam: 0 },
