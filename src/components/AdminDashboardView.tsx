@@ -185,11 +185,11 @@ export function AdminDashboardView() {
 
             {/* Content */}
             <div className="flex-1 bg-white rounded shadow border border-gray-200 p-1 flex flex-col">
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-2 h-full">
                 {/* Aylık Ciro Kartı */}
                 <div
                   onClick={handleAylikCiroClick}
-                  className="relative bg-gradient-to-br from-slate-700 to-slate-900 rounded-lg p-3 text-white overflow-hidden shadow-lg cursor-pointer hover:from-slate-600 hover:to-slate-800 transition-all">
+                  className="relative bg-gradient-to-br from-slate-700 to-slate-900 rounded-lg p-3 text-white overflow-hidden shadow-lg cursor-pointer hover:from-slate-600 hover:to-slate-800 transition-all flex flex-col">
                   <div className="absolute top-2 right-2">
                     <svg className="w-16 h-16 transform rotate-180" viewBox="0 0 36 36">
                       <path
@@ -210,7 +210,7 @@ export function AdminDashboardView() {
                       <span className="text-[13px] font-bold text-blue-400">{fmtPct(sales.aylikCiro / sales.aylikCiroHedef)}</span>
                     </div>
                   </div>
-                  <div className="text-[10px] text-gray-400 mb-1">Aylık Ciro</div>
+                  <div className="text-[10px] text-gray-300 mb-1">Aylık Ciro</div>
                   <div className="text-[22px] font-bold mb-1">{fmtTL(sales.aylikCiro)}</div>
                   <div className="text-[13px] text-blue-200">
                     <span>{MONTHS_TR[ay - 1]} Gerçekleşen</span>
@@ -221,7 +221,7 @@ export function AdminDashboardView() {
                 {/* Yıllık Ciro Kartı */}
                 <div
                   onClick={handleYillikCiroClick}
-                  className="relative bg-gradient-to-br from-teal-700 to-teal-900 rounded-lg p-3 text-white overflow-hidden shadow-lg cursor-pointer hover:from-teal-600 hover:to-teal-800 transition-all">
+                  className="relative bg-gradient-to-br from-teal-700 to-teal-900 rounded-lg p-3 text-white overflow-hidden shadow-lg cursor-pointer hover:from-teal-600 hover:to-teal-800 transition-all flex flex-col">
                   <div className="absolute top-2 right-2">
                     <svg className="w-16 h-16 transform rotate-180" viewBox="0 0 36 36">
                       <path
@@ -242,7 +242,7 @@ export function AdminDashboardView() {
                       <span className="text-[13px] font-bold text-teal-400">{fmtPct(sales.yillikCiro / sales.yillikCiroHedef)}</span>
                     </div>
                   </div>
-                  <div className="text-[13px] text-gray-400 mb-1">2026 Toplam Ciro</div>
+                  <div className="text-[13px] text-gray-300 mb-1">2026 Toplam Ciro</div>
                   <div className="text-[20px] font-bold mb-1">{fmtTL(sales.yillikCiro)}</div>
                   <div className="text-[10px] text-teal-200">
                     <span>Yıl İçi Gerçekleşen</span>
@@ -251,7 +251,7 @@ export function AdminDashboardView() {
                 </div>
 
                 {/* Grup Bazında Ciro Kartı */}
-                <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg p-3 text-white shadow-lg">
+                <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg p-3 text-white shadow-lg flex flex-col">
                   <div className="text-[10px] font-bold mb-2">Grup Bazında Ciro</div>
                   <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-x-3 gap-y-1.5">
                     {/* Header */}
@@ -290,7 +290,7 @@ export function AdminDashboardView() {
                 </div>
 
                 {/* Müşteri Grup Kartı */}
-                <div className="bg-gradient-to-br from-green-400 to-emerald-500 rounded-lg p-3 text-white shadow-lg">
+                <div className="bg-gradient-to-br from-green-400 to-emerald-500 rounded-lg p-3 text-white shadow-lg flex flex-col">
                   <div className="flex items-center gap-1.5 mb-2">
                     <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
                       <span className="text-xl">💰</span>
@@ -341,7 +341,7 @@ export function AdminDashboardView() {
                 {/* Açık Hesap Kartı */}
                 <div
                   onClick={handleAcikHesapClick}
-                  className="bg-gradient-to-br from-red-500 to-red-600 rounded-lg p-3 text-white shadow-lg cursor-pointer hover:from-red-400 hover:to-red-500 transition-all">
+                  className="bg-gradient-to-br from-red-500 to-red-600 rounded-lg p-3 text-white shadow-lg cursor-pointer flex flex-col hover:from-red-400 hover:to-red-500 transition-all">
                   <div className="text-[10px] mb-1 flex items-center gap-1">
                     <span>🔴</span>
                     <span className="font-semibold">Açık Hesap</span>
@@ -352,7 +352,7 @@ export function AdminDashboardView() {
                 {/* Tahsilat Hedef Kartı */}
                 <div
                   onClick={handleTahsilatHedefClick}
-                  className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-3 text-white shadow-lg cursor-pointer hover:from-orange-400 hover:to-orange-500 transition-all">
+                  className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-3 text-white shadow-lg cursor-pointer flex flex-col hover:from-orange-400 hover:to-orange-500 transition-all">
                   <div className="text-[10px] mb-1 flex items-center gap-1">
                     <span>🎯</span>
                     <span className="font-semibold">Tahsilat Hedef</span>
@@ -394,7 +394,7 @@ export function AdminDashboardView() {
                 {/* Tahsilat Türleri Kartı */}
                 <div
                   onClick={handleTahsilatTurleriClick}
-                  className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white shadow-lg cursor-pointer hover:from-purple-400 hover:to-purple-500 transition-all">
+                  className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white shadow-lg cursor-pointer flex flex-col hover:from-purple-400 hover:to-purple-500 transition-all">
                   <div className="text-[10px] font-bold mb-2">Tahsilat Türleri</div>
                   <div className="space-y-1.5">
                     {tahsilat.tahsilatTurleri.map(t => (
@@ -589,9 +589,9 @@ function TopCard({ title, yillikData, aylikData, nameKey, color, withCari }: {
             {/* Header */}
             <div className="flex items-center justify-end gap-1.5 text-[10px] font-bold text-gray-600 pb-1 border-b border-gray-300">
               <span>Haziran</span>
-              <span className="text-gray-400">/</span>
+              <span className="text-gray-300">/</span>
               <span>2026</span>
-              <span className="text-gray-400 ml-0.5">/</span>
+              <span className="text-gray-300 ml-0.5">/</span>
               <span>Payı</span>
             </div>
             {yillikData.map((yillikItem, i) => {
@@ -616,7 +616,7 @@ function TopCard({ title, yillikData, aylikData, nameKey, color, withCari }: {
                   </div>
                   <div className="flex gap-1.5 items-center whitespace-nowrap">
                     <span className="text-purple-600 font-semibold">{fmtN(aylikAdet)}</span>
-                    <span className="text-gray-400">/</span>
+                    <span className="text-gray-300">/</span>
                     <span className="text-blue-600 font-semibold">{fmtN(yillikItem.adet)}</span>
                     <span className="text-green-600 font-semibold ml-1">{(yillikItem.pay * 100).toFixed(1)}%</span>
                   </div>
@@ -625,7 +625,7 @@ function TopCard({ title, yillikData, aylikData, nameKey, color, withCari }: {
             })}
           </>
         ) : (
-          <p className="text-center text-gray-400 py-2 text-[12px]">—</p>
+          <p className="text-center text-gray-300 py-2 text-[12px]">—</p>
         )}
       </div>
     </div>
