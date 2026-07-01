@@ -177,9 +177,9 @@ export function AdminDashboardView() {
           {/* ============ SATIŞ ROW ============ */}
           <div className="flex gap-1 flex-1">
             {/* Vertical Label */}
-            <div className="w-4 bg-gradient-to-b from-blue-500 to-blue-600 rounded flex items-center justify-center">
+            <div className="w-6 bg-gradient-to-b from-blue-500 to-blue-600 rounded flex items-center justify-center">
               <div className="transform -rotate-90 whitespace-nowrap">
-                <span className="text-[10px] font-bold text-white tracking-wider">SATIŞ</span>
+                <span className="text-[11px] font-bold text-white tracking-wider">SATIŞ</span>
               </div>
             </div>
 
@@ -331,7 +331,7 @@ export function AdminDashboardView() {
 
           {/* ============ TAHSİLAT ROW ============ */}
           <div className="flex gap-1 flex-1">
-            <div className="w-4 bg-gradient-to-b from-teal-500 to-teal-600 rounded flex items-center justify-center">
+            <div className="w-6 bg-gradient-to-b from-teal-500 to-teal-600 rounded flex items-center justify-center">
               <div className="transform -rotate-90 whitespace-nowrap">
                 <span className="text-[10px] font-bold text-white tracking-wider">TAHSİLAT</span>
               </div>
@@ -411,7 +411,7 @@ export function AdminDashboardView() {
 
           {/* ============ SELLOUT ROW ============ */}
           <div className="flex gap-1 flex-[2]">
-            <div className="w-4 bg-gradient-to-b from-green-500 to-green-600 rounded flex items-center justify-center">
+            <div className="w-6 bg-gradient-to-b from-green-500 to-green-600 rounded flex items-center justify-center">
               <div className="transform -rotate-90 whitespace-nowrap">
                 <span className="text-[10px] font-bold text-white tracking-wider">SELLOUT</span>
               </div>
