@@ -499,7 +499,7 @@ interface SidebarProps {
   onSelect: (pid: string | null) => void
 }
 
-function Sidebar({ currentProfile, team, visibleIds, bsyLinks, filterPid, taskCounts, onSelect }: SidebarProps) {
+function Sidebar({ currentProfile, team, visibleIds, bsyLinks, filterPid, taskCounts, onSelect, tab }: SidebarProps & { tab: TabType }) {
   const [search, setSearch] = useState('')
 
   const visible = team.filter(p => visibleIds.includes(p.id))
@@ -511,6 +511,9 @@ function Sidebar({ currentProfile, team, visibleIds, bsyLinks, filterPid, taskCo
   const sups = filtered.filter(p => p.role === 'sup')
   const jrs = filtered.filter(p => p.role === 'jr')
   const admins = filtered.filter(p => p.role === 'admin')
+
+  // Sadece Takvim sekmelerinde (month, week, day, visits) listeleri göster
+  const isCalendarTab = ['month', 'week', 'day', 'visits'].includes(tab)
 
   const renderRow = (p: Profile, indent = false) => (
     <button
@@ -567,7 +570,7 @@ function Sidebar({ currentProfile, team, visibleIds, bsyLinks, filterPid, taskCo
         </button>
 
         {/* Admin rolündeyse 2 grup: 1-BSY, 2-SUP+Jr */}
-        {currentProfile.role === 'admin' && (
+        {currentProfile.role === 'admin' && isCalendarTab && (
           <>
             {/* GRUP 1: BSY'ler */}
             {bsys.length > 0 && (
@@ -608,7 +611,7 @@ function Sidebar({ currentProfile, team, visibleIds, bsyLinks, filterPid, taskCo
         )}
 
         {/* BSY rolündeyse: kendisi → bağlı SUP'lar → onların Jr'ları */}
-        {currentProfile.role === 'bsy' && (
+        {currentProfile.role === 'bsy' && isCalendarTab && (
           <div className="pt-1">
             {renderRow(currentProfile)}
             {(() => {
@@ -635,7 +638,7 @@ function Sidebar({ currentProfile, team, visibleIds, bsyLinks, filterPid, taskCo
         )}
 
         {/* Süpervizör rolündeyse */}
-        {currentProfile.role === 'sup' && (
+        {currentProfile.role === 'sup' && isCalendarTab && (
           <div className="pt-1">
             {renderRow(currentProfile)}
             {jrs.filter(jr => jr.manager_id === currentProfile.id).length > 0 && (
@@ -648,7 +651,7 @@ function Sidebar({ currentProfile, team, visibleIds, bsyLinks, filterPid, taskCo
         )}
 
         {/* Jr. Süpervizör */}
-        {currentProfile.role === 'jr' && renderRow(currentProfile)}
+        {currentProfile.role === 'jr' && isCalendarTab && renderRow(currentProfile)}
       </div>
     </div>
   )
@@ -1643,6 +1646,9 @@ export default function AppPage() {
   const [showStats, setShowStats] = useState(false)
   const [taskSheet, setTaskSheet] = useState<{ task: Task | null; isNew: boolean } | null>(null)
 
+  // Manager: sadece Dashboard
+  const isManager = currentProfile?.role === 'manager'
+
   // BSY Hedef Takip sekmesi sadece admin/bsy rollerine görünür
   const isBsyOrAdmin = currentProfile?.role === 'admin'
     || currentProfile?.role === 'bsy'
@@ -1676,11 +1682,12 @@ export default function AppPage() {
     }
   }, [authLoading, currentProfile, router])
 
-  // Varsayılan sekme: takvim erişimi varsa month, sup/jr için sellout, bsy için bsy
+  // Varsayılan sekme: manager için dashboard, takvim erişimi varsa month, sup/jr için sellout, bsy için bsy
   useEffect(() => {
     if (!currentProfile || tab !== null) return
 
-    if (hasCalendarAccess) setTab('month')
+    if (currentProfile.role === 'manager') setTab('dashboard')
+    else if (hasCalendarAccess) setTab('month')
     else if (isSupOrJr) setTab('sellout')
     else if (isBsy) setTab('bsy')
     else setTab('month') // Fallback
@@ -1745,18 +1752,9 @@ export default function AppPage() {
   return (
     <div className="flex h-screen bg-white safe-top">
 
-      {/* Sol Sidebar – sadece masaüstü */}
+      {/* Sol Sidebar – sadece masaüstü ve dashboard dışındaki sekmelerde, manager görmesin */}
+      {!isManager && tab !== 'dashboard' && (
       <aside className="hidden md:flex flex-col w-56 border-r border-gray-200 bg-gray-50 shrink-0">
-        <div className="px-3 py-3 border-b border-gray-200 flex items-center gap-2">
-          <Avatar profile={currentProfile} size={28} />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-gray-800 truncate">{currentProfile.full_name}</p>
-            <p className="text-[10px] text-gray-400">{ROLE_LABELS[currentProfile.role]}</p>
-          </div>
-          <button onClick={async () => { await signOut(); router.replace('/login') }} className="p-1 text-gray-400 hover:text-gray-600" title="Çıkış">
-            <LogOut size={14} />
-          </button>
-        </div>
         <Sidebar
           currentProfile={currentProfile}
           team={team}
@@ -1765,8 +1763,10 @@ export default function AppPage() {
           filterPid={filterPid}
           taskCounts={taskCounts}
           onSelect={setFilterPid}
+          tab={tab}
         />
       </aside>
+      )}
 
       {/* Sağ: Ana içerik */}
       <div className="flex flex-col flex-1 min-w-0">
@@ -1774,21 +1774,26 @@ export default function AppPage() {
         <div className="border-b bg-white sticky top-0 z-20">
           {/* Ana satır */}
           <div className="flex items-center gap-2 px-3 py-2">
-            {/* Mobil: hamburger + filtre adı */}
-            <button
-              onClick={() => setShowPersonSheet(true)}
-              className="p-2 text-gray-600 min-h-[44px] min-w-[44px] flex items-center justify-center md:hidden"
-            >
-              <Menu size={20} />
-            </button>
-            <button
-              onClick={() => setShowPersonSheet(true)}
-              className="text-left text-sm font-medium text-gray-700 truncate md:hidden flex-1"
-            >
-              {filterPid ? profileById(filterPid)?.full_name : 'Tüm Ekip'}
-            </button>
+            {/* Mobil: hamburger + filtre adı - Manager görmesin */}
+            {!isManager && (
+              <>
+                <button
+                  onClick={() => setShowPersonSheet(true)}
+                  className="p-2 text-gray-600 min-h-[44px] min-w-[44px] flex items-center justify-center md:hidden"
+                >
+                  <Menu size={20} />
+                </button>
+                <button
+                  onClick={() => setShowPersonSheet(true)}
+                  className="text-left text-sm font-medium text-gray-700 truncate md:hidden flex-1"
+                >
+                  {filterPid ? profileById(filterPid)?.full_name : 'Tüm Ekip'}
+                </button>
+              </>
+            )}
 
-            {/* Masaüstü: Gruplu Tab sekmeleri */}
+            {/* Masaüstü: Gruplu Tab sekmeleri - Manager görmesin */}
+            {!isManager && (
             <div className="hidden md:flex items-center gap-1 mr-2">
               {/* Takvim grubu (admin veya Sinem) */}
               {hasCalendarAccess && (
@@ -1814,8 +1819,8 @@ export default function AppPage() {
                   <FileText size={15} /> Rapor
                 </button>
               )}
-              {/* Dashboard (admin) */}
-              {currentProfile?.role === 'admin' && (
+              {/* Dashboard (admin + manager) */}
+              {(currentProfile?.role === 'admin' || currentProfile?.role === 'manager') && (
                 <button
                   onClick={() => setTab('dashboard')}
                   className={clsx(
@@ -1896,6 +1901,7 @@ export default function AppPage() {
                 </button>
               )}
             </div>
+            )}
 
             {/* Ay navigasyon */}
             {['month','week','day'].includes(tab) && (
@@ -1920,6 +1926,24 @@ export default function AppPage() {
                 <BarChart2 size={20} />
               </button>
             )}
+
+            {/* Kullanıcı adı ve çıkış - sağ üst köşe */}
+            <div className="ml-auto flex items-center gap-2 pl-3 border-l">
+              <div className="hidden sm:flex items-center gap-2">
+                <Avatar profile={currentProfile} size={32} />
+                <div className="hidden md:block">
+                  <p className="text-xs font-semibold text-gray-800">{currentProfile.full_name}</p>
+                  <p className="text-[10px] text-gray-500">{ROLE_LABELS[currentProfile.role]}</p>
+                </div>
+              </div>
+              <button
+                onClick={async () => { await signOut(); router.replace('/login') }}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                title="Çıkış"
+              >
+                <LogOut size={18} />
+              </button>
+            </div>
           </div>
 
           {/* Alt sekmeler satırı (gruplu sekmelerde gösterilir) */}
@@ -2081,7 +2105,7 @@ export default function AppPage() {
               />
             </div>
           )}
-          {tab === 'dashboard' && currentProfile?.role === 'admin' && (
+          {tab === 'dashboard' && (currentProfile?.role === 'admin' || currentProfile?.role === 'manager') && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
               <AdminDashboardView />
             </div>
@@ -2134,7 +2158,7 @@ export default function AppPage() {
       )}
 
       {/* FAB — sadece takvim erişimi olan kullanıcılar takvim sekmelerinde görünür */}
-      {hasCalendarAccess && tab !== 'report' && tab !== 'visits' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && tab !== 'tahsilat-planim' && (
+      {hasCalendarAccess && tab !== 'report' && tab !== 'visits' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && tab !== 'tahsilat-planim' && tab !== 'dashboard' && tab !== 'destek-personel' && (
         <button
           onClick={handleAddTask}
           className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
@@ -2143,7 +2167,8 @@ export default function AppPage() {
         </button>
       )}
 
-      {/* Bottom Nav */}
+      {/* Bottom Nav - Manager görmesin */}
+      {!isManager && (
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-20 safe-bottom">
         <div className={clsx(
           'grid h-16',
@@ -2192,6 +2217,7 @@ export default function AppPage() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Sheets */}
       {showPersonSheet && currentProfile && (

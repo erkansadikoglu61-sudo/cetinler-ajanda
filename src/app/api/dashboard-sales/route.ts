@@ -45,6 +45,10 @@ export interface DashboardSalesMetrics {
   aylikCiro: number
   aylikCiroHedef: number // Aylık hedef
 
+  // Cari bazında detaylar
+  aylikCariDetay: Array<{ cariIsim: string; ciro: number; pay: number }>
+  yillikCariDetay: Array<{ cariIsim: string; ciro: number; pay: number }>
+
   // Grup bazında cirolar
   yillikCiroGrup: {
     relux: number
@@ -381,6 +385,46 @@ export async function GET(req: Request) {
   const yillikCiroHedef = 610_000_000
   // aylikCiroHedef yukarıda Supabase'den çekildi
 
+  // Aylık cari bazında ciro dağılımı
+  const aylikCariDetay = (() => {
+    const cariMap = new Map<string, number>()
+    aylikData.forEach(row => {
+      const cari = row.cariIsim || 'Bilinmeyen'
+      const tutar = row.netTutar
+      cariMap.set(cari, (cariMap.get(cari) || 0) + tutar)
+    })
+
+    const toplamCiro = Array.from(cariMap.values()).reduce((sum, val) => sum + val, 0)
+
+    return Array.from(cariMap.entries())
+      .map(([cariIsim, ciro]) => ({
+        cariIsim,
+        ciro,
+        pay: toplamCiro > 0 ? ciro / toplamCiro : 0
+      }))
+      .sort((a, b) => b.ciro - a.ciro)
+  })()
+
+  // Yıllık cari bazında ciro dağılımı
+  const yillikCariDetay = (() => {
+    const cariMap = new Map<string, number>()
+    yillikData.forEach(row => {
+      const cari = row.cariIsim || 'Bilinmeyen'
+      const tutar = row.netTutar
+      cariMap.set(cari, (cariMap.get(cari) || 0) + tutar)
+    })
+
+    const toplamCiro = Array.from(cariMap.values()).reduce((sum, val) => sum + val, 0)
+
+    return Array.from(cariMap.entries())
+      .map(([cariIsim, ciro]) => ({
+        cariIsim,
+        ciro,
+        pay: toplamCiro > 0 ? ciro / toplamCiro : 0
+      }))
+      .sort((a, b) => b.ciro - a.ciro)
+  })()
+
   const result: DashboardSalesMetrics = {
     excelGuncellemeZamani: excelMtime.toISOString(),
     yillikCiro,
@@ -402,6 +446,9 @@ export async function GET(req: Request) {
     aylikCariReluxTop10: calculateCariTop10(aylikData, 'RELUX'),
     aylikCariEkeaTop10: calculateCariTop10(aylikData, 'EKEA'),
     aylikCariToplamTop10: calculateCariTop10(aylikData),
+
+    aylikCariDetay,
+    yillikCariDetay,
   }
 
   return NextResponse.json(result)

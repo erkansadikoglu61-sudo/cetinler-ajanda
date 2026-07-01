@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { RefreshCw, Wallet } from 'lucide-react'
+import { RefreshCw, Wallet, Award } from 'lucide-react'
 import type { DashboardResponse, DashboardCiroRow, DashboardTahsilat, DashboardCariRow } from '@/app/api/dashboard/route'
 import type { SelloutRow } from '@/app/api/sellout/route'
+import type { DashboardSelloutMetrics } from '@/app/api/dashboard-sellout/route'
 import { GRUP_NORMALIZE, SELLOUT_GROUPS } from '@/lib/sellout'
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -92,6 +93,7 @@ export default function DashboardView() {
   const [ay,  setAy]  = useState(now.getMonth() + 1)
   const [data, setData]         = useState<DashboardResponse | null>(null)
   const [selloutRows, setSelloutRows] = useState<SelloutRow[]>([])
+  const [selloutMetrics, setSelloutMetrics] = useState<DashboardSelloutMetrics | null>(null)
   const [loading, setLoading]   = useState(false)
 
   const donem = `${yil}-${String(ay).padStart(2, '0')}`
@@ -99,14 +101,17 @@ export default function DashboardView() {
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [dashRes, soRes] = await Promise.all([
+      const [dashRes, soRes, metricsRes] = await Promise.all([
         fetch(`/api/dashboard?yil=${yil}&ay=${ay}`),
         fetch('/api/sellout'),
+        fetch(`/api/dashboard-sellout?yil=${yil}&ay=${ay}`),
       ])
       const dashJson = await dashRes.json() as DashboardResponse
       const soJson   = await soRes.json() as { rows: SelloutRow[] }
+      const metricsJson = await metricsRes.json() as DashboardSelloutMetrics
       setData(dashJson)
       setSelloutRows(soJson.rows ?? [])
+      setSelloutMetrics(metricsJson)
     } catch (err) {
       console.error('[DashboardView] fetch hatası:', err)
     } finally {
@@ -414,6 +419,250 @@ export default function DashboardView() {
           </div>
 
         </div>
+
+        {/* ═══════ SELLOUT ═══════ */}
+        <div className="col-span-1 md:col-span-4">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-3 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 flex items-center gap-2">
+              <Award size={14} className="text-white/90" />
+              <p className="text-xs font-semibold text-white uppercase tracking-wide">Sellout</p>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-5 h-5 border-2 border-gray-300 border-t-emerald-500 rounded-full animate-spin" />
+              </div>
+            ) : (
+              <div className="p-3">
+                {/* 2 Satır: Yıllık (2026) + Aylık (Haziran) */}
+                <div className="space-y-3">
+                  {/* Yıllık Row */}
+                  <div>
+                    <div className="flex items-baseline gap-2 mb-1.5">
+                      <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
+                        {yil} Yılı
+                      </span>
+                      <div className="flex-1 border-b border-gray-200" />
+                    </div>
+                    <div className="grid grid-cols-5 gap-2">
+                      {/* Cari */}
+                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
+                        <div className="text-[10px] font-semibold text-purple-800 mb-1">
+                          Cari ({yil})
+                        </div>
+                        <div className="space-y-0.5">
+                          {selloutMetrics?.yillikCariTop10.slice(0, 5).map((r, i) => (
+                            <div key={i} className="flex items-baseline gap-1 text-[9px]">
+                              <span className="text-gray-400 font-medium w-3">{i + 1}.</span>
+                              <span className="flex-1 truncate text-gray-700">{r.cariAdi}</span>
+                              <span className="font-semibold text-gray-800 tabular-nums">{fmtN(r.adet)}</span>
+                              <span className="text-purple-600 tabular-nums">%{(r.pay * 100).toFixed(0)}</span>
+                            </div>
+                          ))}
+                          {(!selloutMetrics?.yillikCariTop10.length) && (
+                            <p className="text-[9px] text-gray-400 text-center py-2">Veri yok</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Şube */}
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                        <div className="text-[10px] font-semibold text-blue-800 mb-1">
+                          Şube ({yil})
+                        </div>
+                        <div className="space-y-0.5">
+                          {selloutMetrics?.yillikSubeTop10.slice(0, 5).map((r, i) => (
+                            <div key={i} className="flex items-baseline gap-1 text-[9px]">
+                              <span className="text-gray-400 font-medium w-3">{i + 1}.</span>
+                              <span className="flex-1 truncate text-gray-700">{r.subeAdi}</span>
+                              <span className="font-semibold text-gray-800 tabular-nums">{fmtN(r.adet)}</span>
+                              <span className="text-blue-600 tabular-nums">%{(r.pay * 100).toFixed(0)}</span>
+                            </div>
+                          ))}
+                          {(!selloutMetrics?.yillikSubeTop10.length) && (
+                            <p className="text-[9px] text-gray-400 text-center py-2">Veri yok</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Süpervizör */}
+                      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2">
+                        <div className="text-[10px] font-semibold text-indigo-800 mb-1">
+                          Süpervizör ({yil})
+                        </div>
+                        <div className="space-y-0.5">
+                          {selloutMetrics?.yillikSupervizorler.slice(0, 5).map((r, i) => (
+                            <div key={i} className="flex items-baseline gap-1 text-[9px]">
+                              <span className="text-gray-400 font-medium w-3">{i + 1}.</span>
+                              <span className="flex-1 truncate text-gray-700">{r.supervizorAdi}</span>
+                              <span className="font-semibold text-gray-800 tabular-nums">{fmtN(r.adet)}</span>
+                              <span className="text-indigo-600 tabular-nums">%{(r.pay * 100).toFixed(0)}</span>
+                            </div>
+                          ))}
+                          {(!selloutMetrics?.yillikSupervizorler.length) && (
+                            <p className="text-[9px] text-gray-400 text-center py-2">Veri yok</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Çetinler Merch */}
+                      <div className="bg-pink-50 border border-pink-200 rounded-lg p-2">
+                        <div className="text-[10px] font-semibold text-pink-800 mb-1">
+                          Çetinler Merch ({yil})
+                        </div>
+                        <div className="space-y-0.5">
+                          {selloutMetrics?.yillikCetinlerMerchTop10.slice(0, 5).map((r, i) => (
+                            <div key={i} className="flex items-baseline gap-1 text-[9px]">
+                              <span className="text-gray-400 font-medium w-3">{i + 1}.</span>
+                              <span className="flex-1 truncate text-gray-700">{r.merchAdi}</span>
+                              <span className="font-semibold text-gray-800 tabular-nums">{fmtN(r.adet)}</span>
+                              <span className="text-pink-600 tabular-nums">%{(r.pay * 100).toFixed(0)}</span>
+                            </div>
+                          ))}
+                          {(!selloutMetrics?.yillikCetinlerMerchTop10.length) && (
+                            <p className="text-[9px] text-gray-400 text-center py-2">Veri yok</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Bayi Merch */}
+                      <div className="bg-teal-50 border border-teal-200 rounded-lg p-2">
+                        <div className="text-[10px] font-semibold text-teal-800 mb-1">
+                          Bayi Merch ({yil})
+                        </div>
+                        <div className="space-y-0.5">
+                          {selloutMetrics?.yillikBayiMerchTop10.slice(0, 5).map((r, i) => (
+                            <div key={i} className="flex items-baseline gap-1 text-[9px]">
+                              <span className="text-gray-400 font-medium w-3">{i + 1}.</span>
+                              <span className="flex-1 truncate text-gray-700">{r.merchAdi}</span>
+                              <span className="font-semibold text-gray-800 tabular-nums">{fmtN(r.adet)}</span>
+                              <span className="text-teal-600 tabular-nums">%{(r.pay * 100).toFixed(0)}</span>
+                            </div>
+                          ))}
+                          {(!selloutMetrics?.yillikBayiMerchTop10.length) && (
+                            <p className="text-[9px] text-gray-400 text-center py-2">Veri yok</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Aylık Row */}
+                  <div>
+                    <div className="flex items-baseline gap-2 mb-1.5">
+                      <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
+                        {MONTHS_TR[ay - 1]} {yil}
+                      </span>
+                      <div className="flex-1 border-b border-gray-200" />
+                    </div>
+                    <div className="grid grid-cols-5 gap-2">
+                      {/* Cari */}
+                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
+                        <div className="text-[10px] font-semibold text-purple-800 mb-1">
+                          Cari ({MONTHS_TR[ay - 1]})
+                        </div>
+                        <div className="space-y-0.5">
+                          {selloutMetrics?.aylikCariTop10.slice(0, 5).map((r, i) => (
+                            <div key={i} className="flex items-baseline gap-1 text-[9px]">
+                              <span className="text-gray-400 font-medium w-3">{i + 1}.</span>
+                              <span className="flex-1 truncate text-gray-700">{r.cariAdi}</span>
+                              <span className="font-semibold text-gray-800 tabular-nums">{fmtN(r.adet)}</span>
+                              <span className="text-purple-600 tabular-nums">%{(r.pay * 100).toFixed(0)}</span>
+                            </div>
+                          ))}
+                          {(!selloutMetrics?.aylikCariTop10.length) && (
+                            <p className="text-[9px] text-gray-400 text-center py-2">Veri yok</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Şube */}
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                        <div className="text-[10px] font-semibold text-blue-800 mb-1">
+                          Şube ({MONTHS_TR[ay - 1]})
+                        </div>
+                        <div className="space-y-0.5">
+                          {selloutMetrics?.aylikSubeTop10.slice(0, 5).map((r, i) => (
+                            <div key={i} className="flex items-baseline gap-1 text-[9px]">
+                              <span className="text-gray-400 font-medium w-3">{i + 1}.</span>
+                              <span className="flex-1 truncate text-gray-700">{r.subeAdi}</span>
+                              <span className="font-semibold text-gray-800 tabular-nums">{fmtN(r.adet)}</span>
+                              <span className="text-blue-600 tabular-nums">%{(r.pay * 100).toFixed(0)}</span>
+                            </div>
+                          ))}
+                          {(!selloutMetrics?.aylikSubeTop10.length) && (
+                            <p className="text-[9px] text-gray-400 text-center py-2">Veri yok</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Süpervizör */}
+                      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2">
+                        <div className="text-[10px] font-semibold text-indigo-800 mb-1">
+                          Süpervizör ({MONTHS_TR[ay - 1]})
+                        </div>
+                        <div className="space-y-0.5">
+                          {selloutMetrics?.aylikSupervizorler.slice(0, 5).map((r, i) => (
+                            <div key={i} className="flex items-baseline gap-1 text-[9px]">
+                              <span className="text-gray-400 font-medium w-3">{i + 1}.</span>
+                              <span className="flex-1 truncate text-gray-700">{r.supervizorAdi}</span>
+                              <span className="font-semibold text-gray-800 tabular-nums">{fmtN(r.adet)}</span>
+                              <span className="text-indigo-600 tabular-nums">%{(r.pay * 100).toFixed(0)}</span>
+                            </div>
+                          ))}
+                          {(!selloutMetrics?.aylikSupervizorler.length) && (
+                            <p className="text-[9px] text-gray-400 text-center py-2">Veri yok</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Çetinler Merch */}
+                      <div className="bg-pink-50 border border-pink-200 rounded-lg p-2">
+                        <div className="text-[10px] font-semibold text-pink-800 mb-1">
+                          Çetinler Merch ({MONTHS_TR[ay - 1]})
+                        </div>
+                        <div className="space-y-0.5">
+                          {selloutMetrics?.aylikCetinlerMerchTop10.slice(0, 5).map((r, i) => (
+                            <div key={i} className="flex items-baseline gap-1 text-[9px]">
+                              <span className="text-gray-400 font-medium w-3">{i + 1}.</span>
+                              <span className="flex-1 truncate text-gray-700">{r.merchAdi}</span>
+                              <span className="font-semibold text-gray-800 tabular-nums">{fmtN(r.adet)}</span>
+                              <span className="text-pink-600 tabular-nums">%{(r.pay * 100).toFixed(0)}</span>
+                            </div>
+                          ))}
+                          {(!selloutMetrics?.aylikCetinlerMerchTop10.length) && (
+                            <p className="text-[9px] text-gray-400 text-center py-2">Veri yok</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Bayi Merch */}
+                      <div className="bg-teal-50 border border-teal-200 rounded-lg p-2">
+                        <div className="text-[10px] font-semibold text-teal-800 mb-1">
+                          Bayi Merch ({MONTHS_TR[ay - 1]})
+                        </div>
+                        <div className="space-y-0.5">
+                          {selloutMetrics?.aylikBayiMerchTop10.slice(0, 5).map((r, i) => (
+                            <div key={i} className="flex items-baseline gap-1 text-[9px]">
+                              <span className="text-gray-400 font-medium w-3">{i + 1}.</span>
+                              <span className="flex-1 truncate text-gray-700">{r.merchAdi}</span>
+                              <span className="font-semibold text-gray-800 tabular-nums">{fmtN(r.adet)}</span>
+                              <span className="text-teal-600 tabular-nums">%{(r.pay * 100).toFixed(0)}</span>
+                            </div>
+                          ))}
+                          {(!selloutMetrics?.aylikBayiMerchTop10.length) && (
+                            <p className="text-[9px] text-gray-400 text-center py-2">Veri yok</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
     </div>
   )

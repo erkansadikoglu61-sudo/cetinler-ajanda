@@ -59,6 +59,8 @@ export interface DashboardTahsilatMetrics {
   tahsilatHedef: number // Tahsilat Hedef datasından
   gerceklesenTahsilat: number // Gerçekleşen Tahsilat sayfasından
   tahsilatTurleri: Array<{ tur: string; tutar: number; oran: number }> // Türlere göre dağılım
+  acikHesapCariDetay: Array<{ cariIsim: string; tutar: number; pay: number }> // Açık hesap cari detayı
+  gerceklesenCariDetay: Array<{ cariIsim: string; tutar: number; pay: number }> // Gerçekleşen cari detayı
 }
 
 export async function GET(req: Request) {
@@ -73,6 +75,8 @@ export async function GET(req: Request) {
       tahsilatHedef: 0,
       gerceklesenTahsilat: 0,
       tahsilatTurleri: [],
+      acikHesapCariDetay: [],
+      gerceklesenCariDetay: [],
     })
   }
 
@@ -81,15 +85,10 @@ export async function GET(req: Request) {
   // === AÇIK HESAP ve TAHSİLAT HEDEF (Tahsilat_hedef_datası sayfasından) ===
   let acikHesap = 0
   let tahsilatHedef = 0
+  const acikHesapCariMap = new Map<string, number>()
 
   // Excel'deki tam isim: "Tahsilat_Hedef_Datası" (büyük T, H, D)
   const hedefDatasiSheet = wb.Sheets['Tahsilat_Hedef_Datası']
-
-  if (!hedefDatasiSheet) {
-    console.warn('⚠️ Tahsilat_Hedef_Datası sayfası bulunamadı! Mevcut sayfalar:', Object.keys(wb.Sheets))
-  } else {
-    console.log('✅ Tahsilat_Hedef_Datası sayfası bulundu!')
-  }
 
   if (hedefDatasiSheet) {
     const rows: unknown[][] = XLSX.utils.sheet_to_json(hedefDatasiSheet, { header: 1, defval: null })
@@ -98,54 +97,41 @@ export async function GET(req: Request) {
       let yilCol = -1
       let ayCol = -1
       let acikHesapCol = -1
+      let cariIsimCol = -1
 
       for (let c = 0; c < header.length; c++) {
         const h = normalizeText(String(header[c] ?? ''))
         if (h === 'yıl' || h === 'yil') yilCol = c
         if (h === 'ay') ayCol = c
-        // Açık Hesap = Toplam kolonu (H kolonu)
         if (h === 'toplam') acikHesapCol = c
+        if (h === 'cari isim' || h === 'cariisim') cariIsimCol = c
       }
 
-      console.log('📊 Tahsilat_hedef_datası - Kolonlar:', { yilCol, ayCol, acikHesapCol })
-      console.log('📊 Tahsilat_hedef_datası - Header örneği:', header.slice(0, 10))
-
       if (acikHesapCol >= 0) {
-        let matchCount = 0
         for (let i = 1; i < rows.length; i++) {
           const r = rows[i]
           if (!r) continue
 
           const rowYil = yilCol >= 0 ? toNum(r[yilCol]) : 0
           const rowAy = ayCol >= 0 ? toNum(r[ayCol]) : 0
+          const tutar = toNum(r[acikHesapCol])
+          const cariIsim = cariIsimCol >= 0 ? String(r[cariIsimCol] ?? '').trim() : 'Bilinmeyen'
 
-          // Sadece mevcut yıl ve ay için topla
-          if (rowYil === yil && rowAy === ay && acikHesapCol < r.length) {
-            const tutar = toNum(r[acikHesapCol])
+          if (rowYil === yil && rowAy === ay && tutar > 0) {
             acikHesap += tutar
-            matchCount++
-            if (matchCount <= 3) {
-              console.log(`  ✓ Satır ${i}: Yıl=${rowYil}, Ay=${rowAy}, Tutar=${tutar}`)
-            }
+            acikHesapCariMap.set(cariIsim, (acikHesapCariMap.get(cariIsim) || 0) + tutar)
           }
         }
 
-        // Tahsilat Hedef = Açık Hesap'ın %90'ı
         tahsilatHedef = acikHesap * 0.90
-
-        console.log(`📊 Açık Hesap: ${acikHesap} (${matchCount} satır toplandı, %100)`)
-        console.log(`📊 Tahsilat Hedef: ${tahsilatHedef} (Açık Hesap'ın %90'ı)`)
-      } else {
-        console.warn('⚠️ Açık Hesap/Hedef kolonu bulunamadı!')
       }
     }
-  } else {
-    console.warn('⚠️ Tahsilat_hedef_datası sayfası bulunamadı!')
   }
 
   // === GERÇEKLEŞEN TAHSİLAT ===
   let gerceklesenTahsilat = 0
   const turMap = new Map<string, number>()
+  const gerceklesenCariMap = new Map<string, number>()
 
   const gerceklesenSheet = wb.Sheets['Gerçekleşen Tahsilat'] || wb.Sheets['gerceklesen_tahsilat']
   if (gerceklesenSheet) {
@@ -156,6 +142,7 @@ export async function GET(req: Request) {
       let ayCol = -1
       let tutarCol = -1
       let turCol = -1
+      let cariIsimCol = -1
 
       for (let c = 0; c < header.length; c++) {
         const h = normalizeText(String(header[c] ?? ''))
@@ -163,6 +150,7 @@ export async function GET(req: Request) {
         if (h === 'ay') ayCol = c
         if (h.includes('tutar') || h.includes('tahsilat')) tutarCol = c
         if (h.includes('tür') || h.includes('tur') || h.includes('tip')) turCol = c
+        if (h === 'cari isim' || h === 'cariisim') cariIsimCol = c
       }
 
       for (let i = 1; i < rows.length; i++) {
@@ -173,10 +161,12 @@ export async function GET(req: Request) {
         const rowAy = ayCol >= 0 ? toNum(r[ayCol]) : 0
         const tutar = tutarCol >= 0 ? toNum(r[tutarCol]) : 0
         const tur = turCol >= 0 ? String(r[turCol] ?? '').trim() : 'Diğer'
+        const cariIsim = cariIsimCol >= 0 ? String(r[cariIsimCol] ?? '').trim() : 'Bilinmeyen'
 
         if (rowYil === yil && rowAy === ay && tutar > 0) {
           gerceklesenTahsilat += tutar
           turMap.set(tur || 'Diğer', (turMap.get(tur || 'Diğer') || 0) + tutar)
+          gerceklesenCariMap.set(cariIsim, (gerceklesenCariMap.get(cariIsim) || 0) + tutar)
         }
       }
     }
@@ -191,11 +181,30 @@ export async function GET(req: Request) {
     }))
     .sort((a, b) => b.tutar - a.tutar)
 
+  // Cari bazında detaylar
+  const acikHesapCariDetay = Array.from(acikHesapCariMap.entries())
+    .map(([cariIsim, tutar]) => ({
+      cariIsim,
+      tutar,
+      pay: acikHesap > 0 ? tutar / acikHesap : 0
+    }))
+    .sort((a, b) => b.tutar - a.tutar)
+
+  const gerceklesenCariDetay = Array.from(gerceklesenCariMap.entries())
+    .map(([cariIsim, tutar]) => ({
+      cariIsim,
+      tutar,
+      pay: gerceklesenTahsilat > 0 ? tutar / gerceklesenTahsilat : 0
+    }))
+    .sort((a, b) => b.tutar - a.tutar)
+
   const result: DashboardTahsilatMetrics = {
     acikHesap,
     tahsilatHedef,
     gerceklesenTahsilat,
     tahsilatTurleri,
+    acikHesapCariDetay,
+    gerceklesenCariDetay,
   }
 
   return NextResponse.json(result)

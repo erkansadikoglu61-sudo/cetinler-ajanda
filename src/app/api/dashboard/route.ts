@@ -53,10 +53,17 @@ export interface DashboardTahsilat {
   toplam: number                         // byTur toplamı
 }
 
+export interface DashboardMusteriSayisi {
+  relux: number
+  elux: number
+  toplam: number
+}
+
 export interface DashboardResponse {
   gercCiro: DashboardCiroRow[]
   allCari: DashboardCariRow[]
   fatKesilenSayi: number
+  musteriSayisi: DashboardMusteriSayisi  // Grup bazlı müşteri sayısı
   sellinByBrand: DashboardSellinBrand
   tahsilat: DashboardTahsilat
 }
@@ -75,6 +82,7 @@ export async function GET(req: Request) {
       gercCiro: [],
       allCari: [],
       fatKesilenSayi: 0,
+      musteriSayisi: { relux: 0, elux: 0, toplam: 0 },
       sellinByBrand: { elux: 0, relux: 0 },
       tahsilat: emptyTahsilat,
     })
@@ -94,6 +102,8 @@ export async function GET(req: Request) {
     const gercMap    = new Map<string, { elux: number; relux: number }>()
     const cariMap    = new Map<string, number>()
     const fatCariSet = new Set<string>()
+    const musteriRelux = new Map<string, number>()  // cariKod → net tutar
+    const musteriElux  = new Map<string, number>()  // cariKod → net tutar
     let sellinElux   = 0
     let sellinRelux  = 0
 
@@ -119,7 +129,7 @@ export async function GET(req: Request) {
       if (ay  && rowAy  !== ay)  continue
       if (!BSY_NAMES.has(bsyAdi)) continue
 
-      const isElux  = grupKodu === 'EKEA'
+      const isElux  = grupKodu === 'EKEA' || grupKodu === 'ELECTROLUX'
       const isRelux = grupKodu === 'RELUX'
       if (!isElux && !isRelux) continue
 
@@ -141,7 +151,17 @@ export async function GET(req: Request) {
 
       if (isGc && !isIade) {
         cariMap.set(cariIsim, (cariMap.get(cariIsim) ?? 0) + rawNetTutar)
-        if (cariKod) fatCariSet.add(cariKod)
+        if (cariKod) {
+          fatCariSet.add(cariKod)
+
+          // Grup bazlı müşteri sayısı için net tutar topla
+          if (isRelux) {
+            musteriRelux.set(cariKod, (musteriRelux.get(cariKod) ?? 0) + netTutar)
+          }
+          if (isElux) {
+            musteriElux.set(cariKod, (musteriElux.get(cariKod) ?? 0) + netTutar)
+          }
+        }
       }
     }
 
@@ -208,10 +228,18 @@ export async function GET(req: Request) {
       .map(([tur, tutar]) => ({ tur, tutar }))
     const tahsilToplam = byTur.reduce((s, r) => s + r.tutar, 0)
 
+    // Müşteri sayısı hesapla (net tutar > 0 olan unique cari sayısı)
+    const musteriSayisi: DashboardMusteriSayisi = {
+      relux: Array.from(musteriRelux.values()).filter(t => t > 0).length,
+      elux: Array.from(musteriElux.values()).filter(t => t > 0).length,
+      toplam: fatCariSet.size,
+    }
+
     return NextResponse.json<DashboardResponse>({
       gercCiro:      buildRows(gercMap),
       allCari,
       fatKesilenSayi: fatCariSet.size,
+      musteriSayisi,
       sellinByBrand: { elux: sellinElux, relux: sellinRelux },
       tahsilat: { hedef: tahsilHedef, byTur, toplam: tahsilToplam },
     })
