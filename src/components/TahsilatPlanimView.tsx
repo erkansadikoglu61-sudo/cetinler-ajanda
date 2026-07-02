@@ -233,7 +233,7 @@ export function TahsilatPlanimView({
         { baslik: 'Haziran', field: 'haziran' as const },
       ]
     } else if (ay === 7) {
-      // Temmuz için - bir ay kaydır
+      // Temmuz için - Excel'de sadece Haziran'a kadar var, Temmuz verisi yok
       return [
         { baslik: 'Önceki', field: 'onceki' as const },
         { baslik: 'Aralık', field: 'aralik' as const },
@@ -243,7 +243,6 @@ export function TahsilatPlanimView({
         { baslik: 'Nisan', field: 'nisan' as const },
         { baslik: 'Mayıs', field: 'mayis' as const },
         { baslik: 'Haziran', field: 'haziran' as const },
-        { baslik: 'Temmuz', field: 'haziran' as const }, // Temmuz verisi haziran field'ına map'lenir
       ]
     }
     // Diğer aylar için varsayılan
