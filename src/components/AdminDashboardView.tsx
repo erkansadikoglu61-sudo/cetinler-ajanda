@@ -256,8 +256,8 @@ export function AdminDashboardView() {
                   <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-x-3 gap-y-1.5">
                     {/* Header */}
                     <div></div>
-                    <div className="text-[10px] font-semibold text-white/80 text-right">Haziran</div>
-                    <div className="text-[10px] font-semibold text-white/80 text-right">2026</div>
+                    <div className="text-[10px] font-semibold text-white/80 text-right">{MONTHS_TR[ay - 1]}</div>
+                    <div className="text-[10px] font-semibold text-white/80 text-right">{yil}</div>
                     <div className="text-[10px] font-semibold text-white/80 text-right">Payı</div>
 
                     {/* RELUX */}
