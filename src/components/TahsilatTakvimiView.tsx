@@ -82,9 +82,11 @@ export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) 
       const res = await fetch('/api/tahsilat-planim')
       if (!res.ok) throw new Error('API hatası')
       const jsonData = await res.json()
-      setData(jsonData)
+      // API { rows: [] } formatında dönüyor
+      setData(jsonData.rows || [])
     } catch (error) {
       console.error('Tahsilat takvimi yükleme hatası:', error)
+      setData([])
     } finally {
       setLoading(false)
     }
