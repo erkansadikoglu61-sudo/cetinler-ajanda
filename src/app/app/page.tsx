@@ -1793,8 +1793,7 @@ export default function AppPage() {
               </>
             )}
 
-            {/* Masaüstü: Gruplu Tab sekmeleri - Manager görmesin */}
-            {!isManager && (
+            {/* Masaüstü: Gruplu Tab sekmeleri */}
             <div className="hidden md:flex items-center gap-1 mr-2">
               {/* Takvim grubu (admin veya Sinem) */}
               {hasCalendarAccess && (
@@ -1844,6 +1843,8 @@ export default function AppPage() {
                   <Calendar size={15} /> Tahsilat Takvimi
                 </button>
               )}
+              {!isManager && (
+                <>
               {/* BSY grubu */}
               {isBsyOrAdmin && (
                 <button
@@ -1913,8 +1914,9 @@ export default function AppPage() {
                   <Activity size={15} /> Primler
                 </button>
               )}
+              </>
+              )}
             </div>
-            )}
 
             {/* Ay navigasyon */}
             {['month','week','day'].includes(tab) && (
