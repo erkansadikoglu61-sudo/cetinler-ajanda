@@ -56,6 +56,16 @@ interface TahsilatData {
   cariKod: string
   cariIsim: string
   bsyAdi?: string
+  onceki: number
+  kasim: number
+  aralik: number
+  ocak: number
+  subat: number
+  mart: number
+  nisan: number
+  mayis: number
+  haziran: number
+  toplam: number
   tahsilatHaftasi?: string
   tutar?: number
   tahsilatTuru?: string
@@ -97,7 +107,13 @@ export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) 
 
   // Her hafta için tahsilatları grupla
   const tahsilatlarHaftaBasina = haftalar.map(hafta => {
-    const haftaninTahsilatlari = data.filter(d => d.tahsilatHaftasi === hafta.label)
+    // Sadece tahsilat bilgisi olan kayıtları al
+    const haftaninTahsilatlari = data.filter(d =>
+      d.tahsilatHaftasi === hafta.label &&
+      d.tutar &&
+      d.tutar > 0 &&
+      d.tahsilatTuru
+    )
 
     const cek = haftaninTahsilatlari
       .filter(t => t.tahsilatTuru === 'Çek')
