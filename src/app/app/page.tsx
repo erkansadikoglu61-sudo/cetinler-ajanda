@@ -1848,10 +1848,10 @@ export default function AppPage() {
               {/* BSY grubu */}
               {isBsyOrAdmin && (
                 <button
-                  onClick={() => { if (!['bsy','kpi','genel-raporlar','tahsilat-planim','tahsilat-takvimi'].includes(tab)) setTab('bsy') }}
+                  onClick={() => { if (!['bsy','kpi','genel-raporlar','tahsilat-planim'].includes(tab)) setTab('bsy') }}
                   className={clsx(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                    ['bsy','kpi','genel-raporlar','tahsilat-planim','tahsilat-takvimi'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                    ['bsy','kpi','genel-raporlar','tahsilat-planim'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
                   )}
                 >
                   <Target size={15} /> BSY
@@ -1983,14 +1983,13 @@ export default function AppPage() {
             </div>
           )}
           {/* BSY alt sekmeleri */}
-          {isBsyOrAdmin && ['bsy','kpi','genel-raporlar','tahsilat-planim','tahsilat-takvimi'].includes(tab) && (
+          {isBsyOrAdmin && ['bsy','kpi','genel-raporlar','tahsilat-planim'].includes(tab) && (
             <div className="flex overflow-x-auto items-center gap-1 px-3 pb-1.5 scrollbar-none">
               {([
                 { key: 'bsy'            as const, icon: Target,   label: 'Ciro ve Tahsilat Takip' },
                 { key: 'kpi'            as const, icon: Activity,  label: 'Özel Hedefler' },
                 { key: 'genel-raporlar' as const, icon: BarChart2, label: 'Genel Raporlar' },
                 { key: 'tahsilat-planim' as const, icon: CalendarRange, label: 'Tahsilat Planım' },
-                { key: 'tahsilat-takvimi' as const, icon: Calendar, label: 'Tahsilat Takvimi' },
               ] as const).map(({ key, icon: Icon, label }) => (
                 <button key={key} onClick={() => setTab(key)}
                   className={clsx(
@@ -2123,7 +2122,7 @@ export default function AppPage() {
           )}
           {tab === 'tahsilat-takvimi' && (currentProfile?.role === 'admin' || currentProfile?.role === 'manager') && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
-              <TahsilatTakvimiView isAdmin={currentProfile?.role === 'admin'} />
+              <TahsilatTakvimiView />
             </div>
           )}
           {tab === 'dashboard' && (currentProfile?.role === 'admin' || currentProfile?.role === 'manager') && (
