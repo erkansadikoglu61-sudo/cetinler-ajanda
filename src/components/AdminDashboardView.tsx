@@ -427,6 +427,8 @@ export function AdminDashboardView() {
                     aylikData={sellout.aylikCariTop10}
                     nameKey="cariAdi"
                     color="purple"
+                    ay={ay}
+                    yil={yil}
                   />
                   <TopCard
                     title="Şube"
@@ -435,6 +437,8 @@ export function AdminDashboardView() {
                     nameKey="subeAdi"
                     color="blue"
                     withCari
+                    ay={ay}
+                    yil={yil}
                   />
                   <TopCard
                     title="Süpervizör"
@@ -442,6 +446,8 @@ export function AdminDashboardView() {
                     aylikData={sellout.aylikSupervizorler}
                     nameKey="supervizorAdi"
                     color="indigo"
+                    ay={ay}
+                    yil={yil}
                   />
                   <TopCard
                     title="Çetinler Merch"
@@ -450,6 +456,8 @@ export function AdminDashboardView() {
                     nameKey="merchAdi"
                     color="pink"
                     withCari
+                    ay={ay}
+                    yil={yil}
                   />
                   <TopCard
                     title="Bayi Merch"
@@ -458,6 +466,8 @@ export function AdminDashboardView() {
                     nameKey="merchAdi"
                     color="teal"
                     withCari
+                    ay={ay}
+                    yil={yil}
                   />
                 </div>
               </div>
@@ -564,13 +574,15 @@ export function AdminDashboardView() {
 }
 
 // Top Card Component
-function TopCard({ title, yillikData, aylikData, nameKey, color, withCari }: {
+function TopCard({ title, yillikData, aylikData, nameKey, color, withCari, ay, yil }: {
   title: string
   yillikData: any[]
   aylikData: any[]
   nameKey: string
   color: string
   withCari?: boolean
+  ay: number
+  yil: number
 }) {
   const colors = {
     purple: 'bg-purple-50 border-purple-200 text-purple-700',
@@ -580,6 +592,8 @@ function TopCard({ title, yillikData, aylikData, nameKey, color, withCari }: {
     teal: 'bg-teal-50 border-teal-200 text-teal-700',
   }
 
+  const MONTHS_TR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
+
   return (
     <div className={`${colors[color as keyof typeof colors]} border rounded p-2 flex flex-col h-full`}>
       <h5 className="text-[15px] font-bold mb-2">{title}</h5>
@@ -588,9 +602,9 @@ function TopCard({ title, yillikData, aylikData, nameKey, color, withCari }: {
           <>
             {/* Header */}
             <div className="flex items-center justify-end gap-1.5 text-[10px] font-bold text-gray-600 pb-1 border-b border-gray-300">
-              <span>Haziran</span>
+              <span>{MONTHS_TR[ay - 1]}</span>
               <span className="text-gray-300">/</span>
-              <span>2026</span>
+              <span>{yil}</span>
               <span className="text-gray-300 ml-0.5">/</span>
               <span>Payı</span>
             </div>
