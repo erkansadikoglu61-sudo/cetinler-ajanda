@@ -183,7 +183,7 @@ export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) 
                 <th className="text-right px-6 py-4 text-white font-bold text-base border-r border-red-400">
                   Nakit
                 </th>
-                <th className="text-right px-6 py-4 text-white font-bold text-base">
+                <th className="text-right px-6 py-4 text-white font-bold text-lg">
                   Toplam
                 </th>
               </tr>
@@ -208,7 +208,7 @@ export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) 
                   <td className="px-6 py-4 text-sm text-right font-semibold text-gray-700 border-r border-gray-200">
                     {hafta.nakit > 0 ? fmtCur(hafta.nakit) : '—'}
                   </td>
-                  <td className="px-6 py-4 text-sm text-right font-bold text-purple-700">
+                  <td className="px-6 py-4 text-base text-right font-bold text-purple-700">
                     {hafta.toplam > 0 ? fmtCur(hafta.toplam) : '—'}
                   </td>
                 </tr>
@@ -216,19 +216,19 @@ export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) 
 
               {/* Genel Toplam */}
               <tr className="bg-gradient-to-r from-purple-100 to-indigo-100 font-bold">
-                <td className="px-6 py-4 text-base text-purple-900 border-r border-purple-200">
+                <td className="px-6 py-4 text-lg text-purple-900 border-r border-purple-200">
                   Toplam
                 </td>
-                <td className="px-6 py-4 text-base text-right text-purple-900 border-r border-purple-200">
+                <td className="px-6 py-4 text-lg text-right text-purple-900 border-r border-purple-200">
                   {genelToplam.cek > 0 ? fmtCur(genelToplam.cek) : '—'}
                 </td>
-                <td className="px-6 py-4 text-base text-right text-purple-900 border-r border-purple-200">
+                <td className="px-6 py-4 text-lg text-right text-purple-900 border-r border-purple-200">
                   {genelToplam.krediKarti > 0 ? fmtCur(genelToplam.krediKarti) : '—'}
                 </td>
-                <td className="px-6 py-4 text-base text-right text-purple-900 border-r border-purple-200">
+                <td className="px-6 py-4 text-lg text-right text-purple-900 border-r border-purple-200">
                   {genelToplam.nakit > 0 ? fmtCur(genelToplam.nakit) : '—'}
                 </td>
-                <td className="px-6 py-4 text-base text-right text-purple-900 font-bold">
+                <td className="px-6 py-4 text-xl text-right text-purple-900 font-bold">
                   {fmtCur(genelToplam.toplam)}
                 </td>
               </tr>

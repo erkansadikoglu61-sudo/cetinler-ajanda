@@ -1832,6 +1832,18 @@ export default function AppPage() {
                   <BarChart2 size={15} /> Dashboard
                 </button>
               )}
+              {/* Tahsilat Takvimi (admin + manager) */}
+              {(currentProfile?.role === 'admin' || currentProfile?.role === 'manager') && (
+                <button
+                  onClick={() => setTab('tahsilat-takvimi')}
+                  className={clsx(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                    tab === 'tahsilat-takvimi' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                  )}
+                >
+                  <Calendar size={15} /> Tahsilat Takvimi
+                </button>
+              )}
               {/* BSY grubu */}
               {isBsyOrAdmin && (
                 <button
@@ -2107,7 +2119,7 @@ export default function AppPage() {
               />
             </div>
           )}
-          {tab === 'tahsilat-takvimi' && isBsyOrAdmin && (
+          {tab === 'tahsilat-takvimi' && (currentProfile?.role === 'admin' || currentProfile?.role === 'manager') && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
               <TahsilatTakvimiView isAdmin={currentProfile?.role === 'admin'} />
             </div>
