@@ -74,8 +74,7 @@ function visibleSupNames(
 }
 
 // ─── Sellout satırlarından şube listesi üret ───────────────────
-// fpJrMap: normalize("sube||cari") → Set<jr_profile_id>
-// Jr. bilgisi artık scraping'den değil field_personnel'dan geliyor
+// Güncel strateji: Her şube için EN SON tarihli kaydı kullan
 function buildSubeList(
   rows:           SelloutRow[],
   currentProfile: Profile,
@@ -98,53 +97,116 @@ function buildSubeList(
   const findProfile = (name: string): Profile | undefined =>
     team.find(p => normalizeName(p.full_name) === normalizeName(name))
 
-  const map = new Map<string, {
-    subeAdi:  string
-    cariIsim: string
-    supIds:   Set<string>
-    supNames: Set<string>
-    cetinler: Set<string>
-    bayi:     Set<string>
-  }>()
+  // Tarihi parse et (DONEM veya TARIH)
+  const parseDate = (r: SelloutRow): Date => {
+    // Önce tarih kolonunu dene (DD.MM.YYYY, YYYY-MM-DD, etc.)
+    if (r.tarih) {
+      const tryParse = new Date(r.tarih)
+      if (!isNaN(tryParse.getTime())) return tryParse
+
+      // DD.MM.YYYY formatı
+      if (r.tarih.includes('.')) {
+        const parts = r.tarih.split('.')
+        if (parts.length === 3) {
+          const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]))
+          if (!isNaN(d.getTime())) return d
+        }
+      }
+    }
+
+    // Donem'den parse et (YYYY-MM, MM-YYYY gibi)
+    if (r.donem) {
+      if (r.donem.includes('-')) {
+        const parts = r.donem.split('-')
+        if (parts[0].length === 4) {
+          // YYYY-MM
+          return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1)
+        } else if (parts[1].length === 4) {
+          // MM-YYYY
+          return new Date(parseInt(parts[1]), parseInt(parts[0]) - 1, 1)
+        }
+      }
+    }
+
+    return new Date(0) // Fallback
+  }
+
+  // Her şube için tüm kayıtları grupla
+  const map = new Map<string, SelloutRow[]>()
 
   visible.forEach(r => {
     const key = r.sube_kod || `${r.sube_adi}||${r.cari_isim}`
-    if (!map.has(key)) {
-      map.set(key, {
-        subeAdi:  r.sube_adi,
-        cariIsim: r.cari_isim,
-        supIds:   new Set(),
-        supNames: new Set(),
-        cetinler: new Set(),
-        bayi:     new Set(),
-      })
-    }
-    const entry = map.get(key)!
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(r)
+  })
 
-    const supProfile = findProfile(r.supervisor_adi)
+  // Her şube için en son tarihli kaydı bul ve bilgileri topla
+  const subeData = new Map<string, {
+    subeAdi:       string
+    cariIsim:      string
+    latestRow:     SelloutRow
+    supIds:        Set<string>
+    supNames:      Set<string>
+    jrNames:       Set<string>
+    cetinlerMerch: Set<string>
+    bayiMerch:     Set<string>
+  }>()
+
+  map.forEach((subeRows, key) => {
+    // En son tarihli kaydı bul
+    const sorted = subeRows.sort((a, b) => parseDate(b).getTime() - parseDate(a).getTime())
+    const latestRow = sorted[0]
+
+    const entry = {
+      subeAdi:       latestRow.sube_adi,
+      cariIsim:      latestRow.cari_isim,
+      latestRow,
+      supIds:        new Set<string>(),
+      supNames:      new Set<string>(),
+      jrNames:       new Set<string>(),
+      cetinlerMerch: new Set<string>(),
+      bayiMerch:     new Set<string>(),
+    }
+
+    // Supervisor bilgisi (en son kayıttan)
+    const supProfile = findProfile(latestRow.supervisor_adi)
     if (supProfile) {
       if (supProfile.role === 'sup') {
         entry.supNames.add(supProfile.full_name)
         entry.supIds.add(supProfile.id)
       } else if (supProfile.role === 'jr') {
-        // Jr. supervisor_adi olarak görünüyorsa → yöneticisi Sup'u bul
+        // Jr. supervisor_adi olarak görünüyorsa → Jr. Supervisor
+        entry.jrNames.add(supProfile.full_name)
+        // Yöneticisi Sup'u da ekle
         const manager = team.find(p => p.id === supProfile.manager_id)
         if (manager) {
           entry.supNames.add(manager.full_name)
           entry.supIds.add(manager.id)
         }
       }
-    } else if (r.supervisor_adi) {
-      entry.supNames.add(r.supervisor_adi)
+    } else if (latestRow.supervisor_adi) {
+      // Profile bulunamadı ama isim var
+      // sv_tipi'ne göre karar ver
+      if (latestRow.sv_tipi && latestRow.sv_tipi.toLowerCase().includes('kıdemli')) {
+        entry.supNames.add(latestRow.supervisor_adi)
+      } else {
+        entry.jrNames.add(latestRow.supervisor_adi)
+      }
     }
 
-    if (r.merch_personel) {
-      if (r.merch_tipi === 'Çetinler Merch') entry.cetinler.add(r.merch_personel)
-      else                                    entry.bayi.add(r.merch_personel)
+    // Merch bilgisi (en son kayıttan)
+    if (latestRow.merch_personel) {
+      if (latestRow.merch_tipi === 'Çetinler Merch') {
+        entry.cetinlerMerch.add(latestRow.merch_personel)
+      } else if (latestRow.merch_tipi === 'Bayi Merch') {
+        entry.bayiMerch.add(latestRow.merch_personel)
+      }
     }
+
+    subeData.set(key, entry)
   })
 
-  return [...map.entries()]
+  return [...subeData.entries()]
     .map(([subeKod, e]) => {
       // BSY'leri bul
       const bsyIds: string[] = []
@@ -154,14 +216,12 @@ function buildSubeList(
         })
       })
 
-      // Jr. bilgisi → field_personnel tablosundan (scraping'den değil)
-      const fpKey = e.subeAdi.trim() + '||' + e.cariIsim.trim()
-      const jrIds = fpJrMap.get(fpKey) ?? new Set<string>()
-      const jrs   = [...jrIds]
-        .map(id => team.find(p => p.id === id))
-        .filter(Boolean) as Profile[]
+      // Jr. Supervisor'ler → PHP'den (en son kayıt)
+      const jrs = [...e.jrNames]
+        .map(name => team.find(p => p.full_name === name) ?? { id: '', full_name: name, role: 'jr', color: '#888', manager_id: null, email: null } as Profile)
 
-      // Destek personeli → field_personnel'dan
+      // Destek personeli → field_personnel'dan (bu veri ayrı yönetiliyor)
+      const fpKey = e.subeAdi.trim() + '||' + e.cariIsim.trim()
       const destekPersoneli = fpDestekMap.get(fpKey) ?? []
 
       return {
@@ -170,8 +230,8 @@ function buildSubeList(
         cariIsim:         e.cariIsim,
         sups:             [...e.supNames].map(n => team.find(p => p.full_name === n) ?? { id: '', full_name: n, role: 'sup', color: '#888', manager_id: null, email: null } as Profile),
         jrs,
-        cetinlerMerch:    [...e.cetinler].sort(),
-        bayiMerch:        [...e.bayi].sort(),
+        cetinlerMerch:    [...e.cetinlerMerch].sort(),
+        bayiMerch:        [...e.bayiMerch].sort(),
         destekPersoneli:  destekPersoneli.sort(),
         bsyIds,
       }
