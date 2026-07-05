@@ -81,6 +81,7 @@ function TaskSheet({
 
   const [pid, setPid] = useState(task?.pid ?? currentProfile.id)
   const [date, setDate] = useState(task?.date ?? format(selectedDate, 'yyyy-MM-dd'))
+  const [endDate, setEndDate] = useState(task?.date ?? format(selectedDate, 'yyyy-MM-dd'))
   const [time, setTime] = useState(task?.time?.substring(0, 5) ?? '09:00')
   const [type, setType] = useState(task?.type ?? TASK_TYPES[0])
   const [customer, setCustomer] = useState(task?.customer ?? '')
@@ -175,12 +176,28 @@ function TaskSheet({
     fetchCustomers()
   }, [pid, team])
 
+  // Type değiştiğinde endDate'i sıfırla
+  useEffect(() => {
+    if (type !== 'İzin') {
+      setEndDate(date)
+    }
+  }, [type, date])
+
   const handleSave = async () => {
     setSaving(true)
+
+    // İzin tipi için description'a tarih aralığını ekle
+    let finalDescription = description
+    if (type === 'İzin' && endDate && endDate !== date) {
+      const startFormatted = format(new Date(date + 'T12:00:00'), 'dd.MM.yyyy')
+      const endFormatted = format(new Date(endDate + 'T12:00:00'), 'dd.MM.yyyy')
+      finalDescription = `${startFormatted} - ${endFormatted}${description ? '\n' + description : ''}`
+    }
+
     if (isNew) {
-      await onSave({ pid, date, time: time || null, type, customer: customer || null, description: description || null, checkin_ts: null, checkin_lat: null, checkin_lng: null, checkin_by: null, checkin_address: null, created_by: currentProfile.id })
+      await onSave({ pid, date, time: type === 'İzin' ? null : (time || null), type, customer: customer || null, description: finalDescription || null, checkin_ts: null, checkin_lat: null, checkin_lng: null, checkin_by: null, checkin_address: null, created_by: currentProfile.id })
     } else if (task) {
-      await onUpdate(task.id, { pid, date, time: time || null, type, customer: customer || null, description: description || null })
+      await onUpdate(task.id, { pid, date, time: type === 'İzin' ? null : (time || null), type, customer: customer || null, description: finalDescription || null })
     }
     setSaving(false)
     onClose()
@@ -258,8 +275,12 @@ function TaskSheet({
           {/* Tarih + Saat – tek satır */}
           <div>
             <div className="flex justify-between mb-1">
-              <label className="text-sm font-medium text-gray-700">Tarih</label>
-              <label className="text-sm font-medium text-gray-700">Saat</label>
+              <label className="text-sm font-medium text-gray-700">
+                {type === 'İzin' ? 'Başlangıç Tarihi' : 'Tarih'}
+              </label>
+              {type !== 'İzin' && (
+                <label className="text-sm font-medium text-gray-700">Saat</label>
+              )}
             </div>
             <div className="flex gap-2 items-center">
               <input
@@ -269,26 +290,43 @@ function TaskSheet({
                 disabled={!canEdit}
                 className="border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
               />
-              {date && (
+              {date && type !== 'İzin' && (
                 <span className="text-sm text-brand-600 font-medium flex-1 truncate">
                   {format(new Date(date + 'T12:00:00'), 'EEEE', { locale: tr })}
                 </span>
               )}
-              <select
-                value={time}
-                onChange={e => setTime(e.target.value)}
-                disabled={!canEdit}
-                className="w-24 flex-shrink-0 border border-gray-300 rounded-lg px-2 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
-              >
-                {Array.from({ length: 17 }, (_, h) => h + 7).flatMap(h =>
-                  [0, 15, 30, 45].map(m => {
-                    const val = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-                    return <option key={val} value={val}>{val}</option>
-                  })
-                )}
-              </select>
+              {type !== 'İzin' && (
+                <select
+                  value={time}
+                  onChange={e => setTime(e.target.value)}
+                  disabled={!canEdit}
+                  className="w-24 flex-shrink-0 border border-gray-300 rounded-lg px-2 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
+                >
+                  {Array.from({ length: 17 }, (_, h) => h + 7).flatMap(h =>
+                    [0, 15, 30, 45].map(m => {
+                      const val = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+                      return <option key={val} value={val}>{val}</option>
+                    })
+                  )}
+                </select>
+              )}
             </div>
           </div>
+
+          {/* Bitiş Tarihi - Sadece İzin için */}
+          {type === 'İzin' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Bitiş Tarihi</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+                disabled={!canEdit}
+                min={date}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
+              />
+            </div>
+          )}
 
           {/* Ziyaret Tipi */}
           <div>
@@ -333,8 +371,8 @@ function TaskSheet({
             />
           </div>
 
-          {/* Check-in bölümü */}
-          {!isNew && isVisitType && (
+          {/* Check-in bölümü - İzin tipinde gösterme */}
+          {!isNew && isVisitType && type !== 'İzin' && (
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                 <MapPin size={14} /> Check-in

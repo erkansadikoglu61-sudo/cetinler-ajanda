@@ -1,6 +1,6 @@
 export const TASK_TYPES = [
   'Bayi Ziyareti', 'Şube Ziyareti', 'Toplantı',
-  'Eğitim', 'Teşhir Çalışması', 'Sipariş&Tahsilat', 'Etkinlik&Demo Çalışması', 'Diğer'
+  'Eğitim', 'Teşhir Çalışması', 'Sipariş&Tahsilat', 'Etkinlik&Demo Çalışması', 'İzin', 'Diğer'
 ] as const
 
 export type TaskType = typeof TASK_TYPES[number]
