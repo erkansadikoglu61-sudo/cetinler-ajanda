@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { ADET_PRIM_DEFAULTS, AdetPrimRow } from '@/lib/adet-prim-defaults'
+import * as XLSX from 'xlsx'
+import { AdetPrimRow } from '@/lib/adet-prim-defaults'
 
 function getSupabase() {
   return createClient(
@@ -10,95 +11,153 @@ function getSupabase() {
 }
 
 // GET /api/adet-prim?yil=2026&ay=5
-// Returns defaults merged with DB overrides for the given month
+// Returns data from SAHA.xlsx "Adet Primleri" sheet + kategoriler from PHP
 export async function GET(req: Request) {
   const sp  = new URL(req.url).searchParams
   const yil = parseInt(sp.get('yil') ?? String(new Date().getFullYear()))
   const ay  = parseInt(sp.get('ay')  ?? String(new Date().getMonth() + 1))
 
-  // Start with defaults (kategori = null)
-  const merged: Record<string, AdetPrimRow> = {}
-  for (const r of ADET_PRIM_DEFAULTS) {
-    merged[r.stokKodu] = { ...r, kategori: null }
-  }
+  try {
+    const sb = getSupabase()
 
-  // Fetch kategoriler from PHP API (HTML table formatında geliyor)
-  const phpUrl = process.env.PHP_API_URL
-  if (phpUrl) {
-    try {
-      const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
-      const response = await fetch(`${phpUrl}?${params}`, {
-        next: { revalidate: 900 }, // 15 dakika cache
-      })
+    // 1. SAHA.xlsx'den Adet Primleri sayfasını çek
+    const { data: excelData, error: excelError } = await sb.storage
+      .from('bsy-excel')
+      .download('SAHA.xlsx')
 
-      if (response.ok) {
-        const htmlText = await response.text()
+    if (excelError) {
+      console.error('Excel download error:', excelError)
+      return NextResponse.json({ rows: [] })
+    }
 
-        // HTML table'dan kategori parse et
-        // Format: <tr><td>...</td><td>...</td><td>...</td><td>STOK_ADI</td><td>STOK_KODU</td><td>GRUP_ACIKLAMA</td>...</tr>
-        const kategoriMap = new Map<string, string>()
-        const trMatches = htmlText.match(/<tr>[\s\S]*?<\/tr>/gi) || []
+    const buffer = Buffer.from(await excelData.arrayBuffer())
+    const wb = XLSX.read(buffer, { type: 'buffer' })
 
-        for (let i = 1; i < trMatches.length; i++) { // i=1 → header'ı atla
-          const tr = trMatches[i]
-          const tdMatches = tr.match(/<td>([\s\S]*?)<\/td>/gi) || []
+    if (!wb.SheetNames.includes('Adet Primleri')) {
+      console.error('Adet Primleri sheet not found. Available sheets:', wb.SheetNames)
+      return NextResponse.json({ rows: [] })
+    }
 
-          if (tdMatches.length >= 6) {
-            // Index 4: STOK_KODU (5. kolon)
-            // Index 5: GRUP_ACIKLAMA (6. kolon) = Kategori
-            const stokKodu = tdMatches[4]?.replace(/<\/?td>/gi, '').trim()
-            const grupAciklama = tdMatches[5]?.replace(/<\/?td>/gi, '').trim()
+    const ws = wb.Sheets['Adet Primleri']
+    const jsonData: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
 
-            if (stokKodu && grupAciklama && !kategoriMap.has(stokKodu)) {
-              kategoriMap.set(stokKodu, grupAciklama)
+    if (jsonData.length < 2) {
+      return NextResponse.json({ rows: [] })
+    }
+
+    // 2. Header mapping
+    // A: Marka, B: Kategori, C: Stok Kodu, D: Bayi Merch, E: Koşullu Destek Personeli
+    const headerRow = jsonData[0]
+    const cols: { [key: string]: number } = {}
+
+    headerRow.forEach((h: any, c: number) => {
+      const hs = String(h ?? '').toLowerCase().trim()
+      if (hs.includes('marka')) cols['marka'] = c
+      if (hs.includes('kategori')) cols['kategori'] = c
+      if (hs.includes('stok') && hs.includes('kod')) cols['stokKodu'] = c
+      if (hs.includes('bayi') && hs.includes('merch')) cols['bayiMerch'] = c
+      if (hs.includes('koşullu') || hs.includes('kosullu') || hs.includes('destek')) cols['kosulluDestek'] = c
+    })
+
+    console.log('📊 Column mapping:', cols)
+
+    // 3. Parse rows
+    const primData: Record<string, AdetPrimRow> = {}
+
+    for (let r = 1; r < jsonData.length; r++) {
+      const row = jsonData[r]
+      if (!row || row.length === 0) continue
+
+      const stokKodu = cols['stokKodu'] >= 0 ? String(row[cols['stokKodu']] ?? '').trim() : ''
+      const kategori = cols['kategori'] >= 0 ? String(row[cols['kategori']] ?? '').trim() : ''
+      const bayiMerch = cols['bayiMerch'] >= 0 ? parseFloat(String(row[cols['bayiMerch']] ?? '0')) || null : null
+      const kosulluDestek = cols['kosulluDestek'] >= 0 ? parseFloat(String(row[cols['kosulluDestek']] ?? '0')) || null : null
+
+      if (stokKodu) {
+        primData[stokKodu] = {
+          stokKodu,
+          kategori: kategori || null,
+          bayiMerch,
+          kosulluDestek
+        }
+      }
+    }
+
+    // 4. Fetch kategoriler from PHP API (eğer Excel'de yoksa)
+    const phpUrl = process.env.PHP_API_URL
+    if (phpUrl) {
+      try {
+        const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
+        const response = await fetch(`${phpUrl}?${params}`, {
+          next: { revalidate: 900 }, // 15 dakika cache
+        })
+
+        if (response.ok) {
+          const htmlText = await response.text()
+          const kategoriMap = new Map<string, string>()
+          const trMatches = htmlText.match(/<tr>[\s\S]*?<\/tr>/gi) || []
+
+          for (let i = 1; i < trMatches.length; i++) {
+            const tr = trMatches[i]
+            const tdMatches = tr.match(/<td>([\s\S]*?)<\/td>/gi) || []
+
+            if (tdMatches.length >= 6) {
+              const stokKodu = tdMatches[4]?.replace(/<\/?td>/gi, '').trim()
+              const grupAciklama = tdMatches[5]?.replace(/<\/?td>/gi, '').trim()
+
+              if (stokKodu && grupAciklama && !kategoriMap.has(stokKodu)) {
+                kategoriMap.set(stokKodu, grupAciklama)
+              }
+            }
+          }
+
+          // Kategori bilgisini merge et (sadece Excel'de yoksa)
+          for (const [stokKodu, kategori] of kategoriMap) {
+            if (primData[stokKodu] && !primData[stokKodu].kategori) {
+              primData[stokKodu].kategori = kategori
             }
           }
         }
+      } catch (e) {
+        console.error('PHP kategori fetch error:', e)
+      }
+    }
 
-        // Kategori bilgisini merge et
-        for (const [stokKodu, kategori] of kategoriMap) {
-          if (merged[stokKodu]) {
-            merged[stokKodu].kategori = kategori
+    // 5. Fetch DB overrides (kullanıcı düzenlemeleri)
+    try {
+      const { data: overrides } = await sb
+        .from('adet_prim_override')
+        .select('stok_kodu, bayi_merch, kosullu_destek')
+        .eq('yil', yil)
+        .eq('ay', ay)
+
+      if (overrides) {
+        for (const row of overrides) {
+          if (primData[row.stok_kodu]) {
+            primData[row.stok_kodu] = {
+              ...primData[row.stok_kodu],
+              bayiMerch:     row.bayi_merch,
+              kosulluDestek: row.kosullu_destek,
+            }
+          } else {
+            primData[row.stok_kodu] = {
+              stokKodu:      row.stok_kodu,
+              kategori:      null,
+              bayiMerch:     row.bayi_merch,
+              kosulluDestek: row.kosullu_destek,
+            }
           }
         }
       }
     } catch (e) {
-      console.error('Kategori fetch error:', e)
+      console.error('DB override fetch error:', e)
     }
+
+    return NextResponse.json({ rows: Object.values(primData) })
+  } catch (e) {
+    console.error('Adet prim API error:', e)
+    return NextResponse.json({ error: String(e) }, { status: 500 })
   }
-
-  // Fetch overrides from DB
-  try {
-    const sb = getSupabase()
-    const { data } = await sb
-      .from('adet_prim_override')
-      .select('stok_kodu, bayi_merch, kosullu_destek')
-      .eq('yil', yil)
-      .eq('ay', ay)
-
-    if (data) {
-      for (const row of data) {
-        if (merged[row.stok_kodu]) {
-          merged[row.stok_kodu] = {
-            ...merged[row.stok_kodu],
-            bayiMerch:    row.bayi_merch,
-            kosulluDestek: row.kosullu_destek,
-          }
-        } else {
-          merged[row.stok_kodu] = {
-            stokKodu:     row.stok_kodu,
-            kategori:     null,
-            bayiMerch:    row.bayi_merch,
-            kosulluDestek: row.kosullu_destek,
-          }
-        }
-      }
-    }
-  } catch {
-    // Table might not exist yet — use defaults
-  }
-
-  return NextResponse.json({ rows: Object.values(merged) })
 }
 
 // PUT /api/adet-prim
