@@ -1659,9 +1659,11 @@ export default function AppPage() {
   // Süpervizör ve Jr. Süpervizör → sadece Sellout + Noktalarımız
   const isSupOrJr = currentProfile?.role === 'sup' || currentProfile?.role === 'jr'
 
-  // Takvim erişimi olan kullanıcılar
-  const CALENDAR_USERS = ['Sinem Bektaş', 'Duygu Duman', 'Nagihan Erdönmez', 'Mustafa CETİNKAYA']
-  const hasCalendarAccess = currentProfile?.role === 'admin' || CALENDAR_USERS.includes(currentProfile?.full_name ?? '')
+  // Takvim erişimi: Admin, BSY, Supervisor, Jr. Supervisor
+  const hasCalendarAccess = currentProfile?.role === 'admin'
+    || currentProfile?.role === 'bsy'
+    || currentProfile?.role === 'sup'
+    || currentProfile?.role === 'jr'
 
   // Primler sayfası filtreleri
   const { primSupervisorFilter, primBsyKod } = useMemo(() => {
@@ -1832,7 +1834,7 @@ export default function AppPage() {
                 </button>
               )}
               {/* Tahsilat Takvimi (admin + manager) */}
-              {(currentProfile?.role === 'admin' || currentProfile?.role === 'manager' || currentProfile?.role === 'bsy' || currentProfile?.role === 'sup' || currentProfile?.role === 'jr') && (
+              {(currentProfile?.role === 'admin' || currentProfile?.role === 'manager') && (
                 <button
                   onClick={() => setTab('tahsilat-takvimi')}
                   className={clsx(
@@ -2120,7 +2122,7 @@ export default function AppPage() {
               />
             </div>
           )}
-          {tab === 'tahsilat-takvimi' && (currentProfile?.role === 'admin' || currentProfile?.role === 'manager' || currentProfile?.role === 'bsy' || currentProfile?.role === 'sup' || currentProfile?.role === 'jr') && (
+          {tab === 'tahsilat-takvimi' && (currentProfile?.role === 'admin' || currentProfile?.role === 'manager') && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
               <TahsilatTakvimiView />
             </div>
@@ -2192,14 +2194,16 @@ export default function AppPage() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-20 safe-bottom">
         <div className={clsx(
           'grid h-16',
-          currentProfile?.role === 'admin' ? 'grid-cols-10' :
+          currentProfile?.role === 'admin' ? 'grid-cols-9' :
           isBsy                            ? 'grid-cols-8'  :
           isSup                            ? 'grid-cols-5'  :
                                              'grid-cols-4'
         )}>
           {([
-            ...(currentProfile?.role === 'admin' ? [
+            ...(hasCalendarAccess ? [
               { key: 'month'  as const, icon: Calendar, label: 'Takvim' },
+            ] : []),
+            ...(currentProfile?.role === 'admin' ? [
               { key: 'report' as const, icon: FileText,  label: 'Rapor'  },
             ] : []),
             ...(currentProfile?.role === 'admin' ? [{ key: 'dashboard' as const, icon: BarChart2, label: 'Dashboard' }] : []),
@@ -2208,7 +2212,6 @@ export default function AppPage() {
             { key: 'sellout' as const, icon: TrendingUp, label: 'Sellout' },
             ...(isBsyOrAdmin ? [{ key: 'analiz'   as const, icon: BarChart2, label: 'Analiz'  }] : []),
             { key: 'noktalar' as const, icon: Store, label: 'Noktalar' },
-            { key: 'tahsilat-takvimi' as const, icon: CalendarDays, label: 'Tah.Takvim' },
             ...((currentProfile?.role === 'admin' || isBsy || isSup)
               ? [{ key: 'adet-prim' as const, icon: Activity, label: 'Primler' }] : []),
           ] as const).map(({ key, icon: Icon, label }) => (
