@@ -334,6 +334,15 @@ export async function GET(req: Request) {
 
     // 3. Merch performans verileri (hedef + satış → performans)
     const merchPerformanceMap = await fetchMerchPerformance(phpUrl, donem)
+    console.log(`📊 Toplam ${merchPerformanceMap.size} merch'in performans verisi yüklendi`)
+
+    // İlk 3 merch'i logla
+    let count = 0
+    for (const [merchName, data] of merchPerformanceMap) {
+      if (count++ < 3) {
+        console.log(`  ${merchName}:`, data.length, 'kategori')
+      }
+    }
 
     // 4. Koşullu destek prim değerleri (kategori bazında ortalama)
     const kosulluDestekPrimMap = await fetchKosulluDestekPrim(phpUrl, yil, ay)
@@ -389,7 +398,10 @@ export async function GET(req: Request) {
         // Çetinler merch bulundu - kategori bazında satırlar
         const kategoriData = merchPerformanceMap.get(cetinlerMerch.toLowerCase()) || []
 
+        console.log(`🔍 Çetinler Merch: ${cetinlerMerch}, Kategori Data:`, kategoriData.length, 'kategoriler')
+
         if (kategoriData.length === 0) {
+          console.warn(`⚠️ ${cetinlerMerch} için kategori verisi bulunamadı!`)
           rows.push({
             merch_adi: dp.merch_adi,
             sube_adi: dp.sube_adi,
