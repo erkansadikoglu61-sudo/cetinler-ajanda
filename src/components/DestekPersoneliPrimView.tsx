@@ -21,9 +21,11 @@ interface DestekPersonelRow {
 interface Props {
   currentUserRole: string
   currentUserId: string
+  currentUserName: string
+  bsyKod: string | null
 }
 
-export function DestekPersoneliPrimView({ currentUserRole, currentUserId }: Props) {
+export function DestekPersoneliPrimView({ currentUserRole, currentUserId, currentUserName, bsyKod }: Props) {
   const now = new Date()
   const [yil, setYil] = useState(now.getFullYear())
   const [ay, setAy] = useState(now.getMonth() + 1)
@@ -33,7 +35,19 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId }: Prop
   const loadData = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/destek-personel-prim?yil=${yil}&ay=${ay}`)
+      const params = new URLSearchParams({
+        yil: String(yil),
+        ay: String(ay),
+      })
+
+      // Role bazlı filtreleme parametreleri
+      if (currentUserRole === 'bsy' && bsyKod) {
+        params.append('bsyKod', bsyKod)
+      } else if (currentUserRole === 'sup') {
+        params.append('supAdi', currentUserName)
+      }
+
+      const res = await fetch(`/api/destek-personel-prim?${params}`)
       const data = await res.json()
       setRows(data.rows || [])
     } catch (e) {
@@ -46,7 +60,7 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId }: Prop
 
   useEffect(() => {
     loadData()
-  }, [yil, ay])
+  }, [yil, ay, currentUserRole, bsyKod, currentUserName])
 
   const toplamHakEdis = useMemo(() => {
     return rows.reduce((sum, r) => sum + r.hak_edis, 0)

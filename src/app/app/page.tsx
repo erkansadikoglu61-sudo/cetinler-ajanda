@@ -2211,6 +2211,8 @@ export default function AppPage() {
               <DestekPersoneliPrimView
                 currentUserRole={currentProfile.role}
                 currentUserId={currentProfile.id}
+                currentUserName={currentProfile.full_name}
+                bsyKod={primBsyKod}
               />
             </div>
           )}

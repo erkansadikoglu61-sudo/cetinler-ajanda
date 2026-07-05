@@ -212,6 +212,10 @@ export async function GET(req: Request) {
   const ay = sp.get('ay') ? parseInt(sp.get('ay')!) : new Date().getMonth() + 1
   const donem = `${yil}-${String(ay).padStart(2, '0')}`
 
+  // Filtreleme parametreleri
+  const bsyKod = sp.get('bsyKod') || null // BSY kullanıcısı için (KB1, MB1 vb.)
+  const supAdi = sp.get('supAdi') || null // Supervisor kullanıcısı için
+
   try {
     const sb = getAdmin()
 
@@ -271,6 +275,10 @@ export async function GET(req: Request) {
 
     // Şube + Cari → Çetinler Merch mapping (HTML'den parse)
     const subeCarimierchMap = new Map<string, string>()
+    // Şube + Cari → BSY mapping
+    const subeCariBsyMap = new Map<string, string>()
+    // Şube + Cari → Supervisor mapping
+    const subeCariSupMap = new Map<string, string>()
 
     // Türkçe karakterleri normalize et
     const normalize = (str: string) => {
@@ -293,21 +301,33 @@ export async function GET(req: Request) {
       const tr = trMatches[i]
       const tdMatches = tr.match(/<td>([\s\S]*?)<\/td>/gi) || []
 
-      if (tdMatches.length >= 15) {
+      if (tdMatches.length >= 17) {
         // Index 0: MERCH_PERSONEL
         // Index 1: CARI_ISIM
         // Index 2: SUBE_ADI
+        // Index 9: SUPERVISOR_ADI
         // Index 14: MERCH_TIPI
+        // Index 16: BSY
         const merchAdi = tdMatches[0]?.replace(/<\/?td>/gi, '').trim()
         const cariAdi = tdMatches[1]?.replace(/<\/?td>/gi, '').trim()
         const subeAdi = tdMatches[2]?.replace(/<\/?td>/gi, '').trim()
+        const supervisorAdi = tdMatches[9]?.replace(/<\/?td>/gi, '').trim()
         const merchTipi = tdMatches[14]?.replace(/<\/?td>/gi, '').trim()
+        const bsy = tdMatches[16]?.replace(/<\/?td>/gi, '').trim()
 
-        if (subeAdi && cariAdi && merchAdi && merchTipi === 'Çetinler Merch') {
+        if (subeAdi && cariAdi) {
           const key = `${normalize(subeAdi)}||${normalize(cariAdi)}`
-          if (!subeCarimierchMap.has(key)) {
-            subeCarimierchMap.set(key, merchAdi)
+
+          // Çetinler Merch mapping
+          if (merchAdi && merchTipi === 'Çetinler Merch') {
+            if (!subeCarimierchMap.has(key)) {
+              subeCarimierchMap.set(key, merchAdi)
+            }
           }
+
+          // BSY ve Supervisor mapping (en son kayıt kullanılacak)
+          if (bsy) subeCariBsyMap.set(key, bsy)
+          if (supervisorAdi) subeCariSupMap.set(key, supervisorAdi)
         }
       }
     }
@@ -338,6 +358,18 @@ export async function GET(req: Request) {
 
     destekPersonel.forEach(dp => {
       const subeKey = `${normalizeStr(dp.sube_adi)}||${normalizeStr(dp.cari_adi)}`
+
+      // Filtreleme: BSY veya Supervisor kontrolü
+      if (bsyKod) {
+        // BSY kullanıcısı - sadece kendi BSY kodundaki kayıtları göster
+        const recordBsy = subeCariBsyMap.get(subeKey)
+        if (recordBsy !== bsyKod) return // Bu kayıt bu BSY'ye ait değil
+      } else if (supAdi) {
+        // Supervisor kullanıcısı - sadece kendi adındaki kayıtları göster
+        const recordSup = subeCariSupMap.get(subeKey)
+        if (normalizeStr(recordSup || '') !== normalizeStr(supAdi)) return // Bu kayıt bu Supervisor'e ait değil
+      }
+
       const cetinlerMerch = subeCarimierchMap.get(subeKey) || '-'
 
       if (cetinlerMerch === '-') {
