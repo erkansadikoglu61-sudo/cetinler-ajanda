@@ -1832,7 +1832,7 @@ export default function AppPage() {
                 </button>
               )}
               {/* Tahsilat Takvimi (admin + manager) */}
-              {(currentProfile?.role === 'admin' || currentProfile?.role === 'manager') && (
+              {(currentProfile?.role === 'admin' || currentProfile?.role === 'manager' || currentProfile?.role === 'bsy' || currentProfile?.role === 'sup' || currentProfile?.role === 'jr') && (
                 <button
                   onClick={() => setTab('tahsilat-takvimi')}
                   className={clsx(
@@ -2120,7 +2120,7 @@ export default function AppPage() {
               />
             </div>
           )}
-          {tab === 'tahsilat-takvimi' && (currentProfile?.role === 'admin' || currentProfile?.role === 'manager') && (
+          {tab === 'tahsilat-takvimi' && (currentProfile?.role === 'admin' || currentProfile?.role === 'manager' || currentProfile?.role === 'bsy' || currentProfile?.role === 'sup' || currentProfile?.role === 'jr') && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
               <TahsilatTakvimiView />
             </div>
@@ -2192,10 +2192,10 @@ export default function AppPage() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-20 safe-bottom">
         <div className={clsx(
           'grid h-16',
-          currentProfile?.role === 'admin' ? 'grid-cols-9' :
-          isBsy                            ? 'grid-cols-7'  :
-          isSup                            ? 'grid-cols-4'  :
-                                             'grid-cols-3'
+          currentProfile?.role === 'admin' ? 'grid-cols-10' :
+          isBsy                            ? 'grid-cols-8'  :
+          isSup                            ? 'grid-cols-5'  :
+                                             'grid-cols-4'
         )}>
           {([
             ...(currentProfile?.role === 'admin' ? [
@@ -2208,6 +2208,7 @@ export default function AppPage() {
             { key: 'sellout' as const, icon: TrendingUp, label: 'Sellout' },
             ...(isBsyOrAdmin ? [{ key: 'analiz'   as const, icon: BarChart2, label: 'Analiz'  }] : []),
             { key: 'noktalar' as const, icon: Store, label: 'Noktalar' },
+            { key: 'tahsilat-takvimi' as const, icon: CalendarDays, label: 'Tah.Takvim' },
             ...((currentProfile?.role === 'admin' || isBsy || isSup)
               ? [{ key: 'adet-prim' as const, icon: Activity, label: 'Primler' }] : []),
           ] as const).map(({ key, icon: Icon, label }) => (
