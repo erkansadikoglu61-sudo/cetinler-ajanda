@@ -365,7 +365,11 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
 
     // Grup filtresi
     if (filterGrup) {
+      console.log(`🔍 GRUP FİLTRESİ: "${filterGrup}"`)
+      console.log(`📊 Filtrelemeden önce: ${res.length} kayıt`)
       res = res.filter(p => p.merch_grubu === filterGrup)
+      console.log(`📊 Filtrelemeden sonra: ${res.length} kayıt`)
+      console.log(`📊 İlk 3 sonuç:`, res.slice(0, 3).map(p => `${p.merch_adi} (${p.merch_grubu})`))
     }
 
     // Supervizör filtresi
