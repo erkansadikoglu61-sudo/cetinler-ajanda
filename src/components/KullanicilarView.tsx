@@ -330,9 +330,15 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
       console.log('📊 İlk 5 kaydın merch_grubu:', res.slice(0, 5).map(p => `"${p.merch_grubu}"`))
       res = res.filter(p => p.merch_grubu?.trim() === filterGrup.trim())
     }
-    if (filterSup)  res = res.filter(p => p.sup_adi === filterSup)
+    if (filterSup) {
+      console.log('🔍 Supervizör filtresi:', filterSup)
+      console.log('📊 İlk 5 kaydın sup_adi:', res.slice(0, 5).map(p => `"${p.sup_adi}"`))
+      console.log('📊 İlk 5 kaydın jr_adi:', res.slice(0, 5).map(p => `"${p.jr_adi}"`))
+      res = res.filter(p => p.sup_adi === filterSup)
+    }
     if (filterJr) {
-      // Jr Supervizör ismine göre filtrele (jr_adi)
+      console.log('🔍 Jr. Supervizör filtresi:', filterJr)
+      console.log('📊 İlk 5 kaydın jr_adi:', res.slice(0, 5).map(p => `"${p.jr_adi}"`))
       res = res.filter(p => p.jr_adi === filterJr)
     }
     if (filterCari) res = res.filter(p => p.cari_adi === filterCari)
@@ -346,7 +352,7 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
     }
     console.log('✅ Filtered sonuç:', res.length, 'kayıt')
     return res
-  }, [visiblePersonnel, filterGrup, filterSup, filterJr, filterCari, search, team])
+  }, [visiblePersonnel, filterGrup, filterSup, filterJr, filterCari, search])
 
   // ── Jr atama / kaldırma ───────────────────────────────────────────────────
   // Her değişiklik jr_assignment_history'e loglanır (effective_month = bu ayın 1'i).
