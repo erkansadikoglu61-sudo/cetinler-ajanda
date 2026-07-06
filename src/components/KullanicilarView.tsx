@@ -224,11 +224,33 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
   // ── Veri yükleme ──────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('field_personnel')
-      .select('*')
-      .order('merch_adi')
-    setPersonnel(data ?? [])
+    try {
+      // PHP'den güncel merch detaylarını çek
+      const res = await fetch('/api/merch-detay')
+      const json = await res.json()
+
+      if (res.ok && json.data) {
+        // PHP formatından field_personnel formatına dönüştür
+        const converted: FieldPerson[] = json.data.map((m: any) => ({
+          id: m.merch_id || `${m.merch_adi}-${m.cari_kod}`,
+          merch_adi: m.merch_adi,
+          merch_grubu: m.merch_grubu,
+          cari_adi: m.cari_adi,
+          sube_adi: m.sube_adi,
+          jr_adi: null,
+          sup_adi: m.sup_adi,
+          bsy_adi: m.bsy_adi || m.bsy_kod,
+          jr_profile_id: null,
+        }))
+        setPersonnel(converted)
+      } else {
+        console.error('Merch detay API error:', json.error)
+        setPersonnel([])
+      }
+    } catch (e) {
+      console.error('Load error:', e)
+      setPersonnel([])
+    }
     setLoading(false)
   }, [])
 
