@@ -244,13 +244,20 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
           jr_profile_id: null,
         }))
 
-        // Debug: API'den gelen sup_adi ve jr_adi unique değerleri
+        // Debug: API'den gelen unique değerler
+        const allGrups = new Set(converted.map(p => p.merch_grubu).filter(Boolean))
         const allSups = new Set(converted.map(p => p.sup_adi).filter(Boolean))
         const allJrs = new Set(converted.map(p => p.jr_adi).filter(Boolean))
-        console.log('📊 API\'den gelen toplam unique sup_adi sayısı:', allSups.size)
-        console.log('📊 API\'den gelen toplam unique jr_adi sayısı:', allJrs.size)
-        console.log('📊 sup_adi listesi (ilk 10):', [...allSups].slice(0, 10))
-        console.log('📊 jr_adi listesi (ilk 10):', [...allJrs].slice(0, 10))
+
+        console.log('📊 merch_grubu unique değerler:', [...allGrups])
+        console.log('📊 Çetinler Merch olan kayıt sayısı:', converted.filter(p => p.merch_grubu === 'Çetinler Merch').length)
+        console.log('📊 Bayi Merch olan kayıt sayısı:', converted.filter(p => p.merch_grubu === 'Bayi Merch').length)
+        console.log('📊 İlk 3 Çetinler Merch kaydı:',
+          converted
+            .filter(p => p.merch_grubu === 'Çetinler Merch')
+            .slice(0, 3)
+            .map(p => `${p.merch_adi} (grup="${p.merch_grubu}")`)
+        )
 
         setPersonnel(converted)
       } else {
@@ -355,45 +362,37 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
   // ── Uygulanan filtreler ───────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let res = visiblePersonnel
+
+    // Grup filtresi
     if (filterGrup) {
-      console.log('🔍 Grup filtresi:', `"${filterGrup}"`)
-      console.log('📊 Filtrelemeden ÖNCE ilk 5:', res.slice(0, 5).map(p => `merch="${p.merch_adi}" grup="${p.merch_grubu}"`))
-      const beforeCount = res.length
-      res = res.filter(p => {
-        const matches = p.merch_grubu?.trim() === filterGrup.trim()
-        if (!matches && res.indexOf(p) < 3) {
-          console.log(`  ❌ Eşleşmedi: "${p.merch_grubu}" !== "${filterGrup}" (${p.merch_adi})`)
-        }
-        return matches
-      })
-      console.log(`📊 Filtrelemeden SONRA ilk 5:`, res.slice(0, 5).map(p => `merch="${p.merch_adi}" grup="${p.merch_grubu}"`))
-      console.log(`  ${beforeCount} → ${res.length} kayıt`)
+      res = res.filter(p => p.merch_grubu === filterGrup)
     }
+
+    // Supervizör filtresi
     if (filterSup) {
-      console.log('🔍 Supervizör filtresi:', `"${filterSup}"`)
-      console.log('📊 İlk 10 kaydın sup_adi ve jr_adi:')
-      res.slice(0, 10).forEach((p, i) => {
-        console.log(`  ${i+1}. sup_adi="${p.sup_adi}" | jr_adi="${p.jr_adi}" | merch="${p.merch_adi}"`)
-      })
-      const before = res.length
       res = res.filter(p => p.sup_adi === filterSup)
-      console.log(`  Filtreleme: ${before} → ${res.length} kayıt`)
     }
+
+    // Jr. Supervizör filtresi
     if (filterJr) {
-      console.log('🔍 Jr. Supervizör filtresi:', filterJr)
-      console.log('📊 İlk 5 kaydın jr_adi:', res.slice(0, 5).map(p => `"${p.jr_adi}"`))
       res = res.filter(p => p.jr_adi === filterJr)
     }
-    if (filterCari) res = res.filter(p => p.cari_adi === filterCari)
+
+    // Cari filtresi
+    if (filterCari) {
+      res = res.filter(p => p.cari_adi === filterCari)
+    }
+
+    // Arama
     if (search) {
       const q = search.toLowerCase()
       res = res.filter(p =>
         p.merch_adi.toLowerCase().includes(q) ||
-        (p.cari_adi  ?? '').toLowerCase().includes(q) ||
-        (p.sube_adi  ?? '').toLowerCase().includes(q)
+        (p.cari_adi ?? '').toLowerCase().includes(q) ||
+        (p.sube_adi ?? '').toLowerCase().includes(q)
       )
     }
-    console.log('✅ Filtered sonuç:', res.length, 'kayıt')
+
     return res
   }, [visiblePersonnel, filterGrup, filterSup, filterJr, filterCari, search])
 
