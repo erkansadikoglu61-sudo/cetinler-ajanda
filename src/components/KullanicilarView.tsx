@@ -356,9 +356,18 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
   const filtered = useMemo(() => {
     let res = visiblePersonnel
     if (filterGrup) {
-      console.log('🔍 Grup filtresi:', filterGrup)
-      console.log('📊 İlk 5 kaydın merch_grubu:', res.slice(0, 5).map(p => `"${p.merch_grubu}"`))
-      res = res.filter(p => p.merch_grubu?.trim() === filterGrup.trim())
+      console.log('🔍 Grup filtresi:', `"${filterGrup}"`)
+      console.log('📊 Filtrelemeden ÖNCE ilk 5:', res.slice(0, 5).map(p => `merch="${p.merch_adi}" grup="${p.merch_grubu}"`))
+      const beforeCount = res.length
+      res = res.filter(p => {
+        const matches = p.merch_grubu?.trim() === filterGrup.trim()
+        if (!matches && res.indexOf(p) < 3) {
+          console.log(`  ❌ Eşleşmedi: "${p.merch_grubu}" !== "${filterGrup}" (${p.merch_adi})`)
+        }
+        return matches
+      })
+      console.log(`📊 Filtrelemeden SONRA ilk 5:`, res.slice(0, 5).map(p => `merch="${p.merch_adi}" grup="${p.merch_grubu}"`))
+      console.log(`  ${beforeCount} → ${res.length} kayıt`)
     }
     if (filterSup) {
       console.log('🔍 Supervizör filtresi:', `"${filterSup}"`)
