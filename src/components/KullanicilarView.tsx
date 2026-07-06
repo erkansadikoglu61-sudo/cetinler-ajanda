@@ -361,6 +361,7 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
 
   // ── Uygulanan filtreler ───────────────────────────────────────────────────
   const filtered = useMemo(() => {
+    console.log('⚙️ Filtered useMemo çalıştı')
     let res = visiblePersonnel
 
     // Grup filtresi
@@ -397,6 +398,7 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
       )
     }
 
+    console.log(`✅ FINAL FILTERED: ${res.length} kayıt`)
     return res
   }, [visiblePersonnel, filterGrup, filterSup, filterJr, filterCari, search])
 
@@ -591,7 +593,10 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
           </div>
         )}
 
-        {!loading && filtered.length > 0 && (
+        {!loading && filtered.length > 0 && (() => {
+          console.log(`🎨 RENDER: ${filtered.length} kayıt render ediliyor`)
+          console.log(`🎨 İlk 3 render edilecek:`, filtered.slice(0, 3).map(p => `${p.merch_adi} (${p.merch_grubu})`))
+          return (
           <div className="divide-y divide-gray-100">
             {filtered.map(person => {
               const assignedJr = person.jr_profile_id
@@ -639,7 +644,8 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
               )
             })}
           </div>
-        )}
+          )
+        })()}
       </div>
 
       {/* Detay / Atama Paneli */}
