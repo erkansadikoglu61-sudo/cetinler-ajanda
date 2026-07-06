@@ -244,21 +244,6 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
           jr_profile_id: null,
         }))
 
-        // Debug: API'den gelen unique değerler
-        const allGrups = new Set(converted.map(p => p.merch_grubu).filter(Boolean))
-        const allSups = new Set(converted.map(p => p.sup_adi).filter(Boolean))
-        const allJrs = new Set(converted.map(p => p.jr_adi).filter(Boolean))
-
-        console.log('📊 merch_grubu unique değerler:', [...allGrups])
-        console.log('📊 Çetinler Merch olan kayıt sayısı:', converted.filter(p => p.merch_grubu === 'Çetinler Merch').length)
-        console.log('📊 Bayi Merch olan kayıt sayısı:', converted.filter(p => p.merch_grubu === 'Bayi Merch').length)
-        console.log('📊 İlk 3 Çetinler Merch kaydı:',
-          converted
-            .filter(p => p.merch_grubu === 'Çetinler Merch')
-            .slice(0, 3)
-            .map(p => `${p.merch_adi} (grup="${p.merch_grubu}")`)
-        )
-
         setPersonnel(converted)
       } else {
         console.error('Merch detay API error:', json.error)
@@ -361,16 +346,11 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
 
   // ── Uygulanan filtreler ───────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    console.log('⚙️ Filtered useMemo çalıştı')
     let res = visiblePersonnel
 
     // Grup filtresi
     if (filterGrup) {
-      console.log(`🔍 GRUP FİLTRESİ: "${filterGrup}"`)
-      console.log(`📊 Filtrelemeden önce: ${res.length} kayıt`)
       res = res.filter(p => p.merch_grubu === filterGrup)
-      console.log(`📊 Filtrelemeden sonra: ${res.length} kayıt`)
-      console.log(`📊 İlk 3 sonuç:`, res.slice(0, 3).map(p => `${p.merch_adi} (${p.merch_grubu})`))
     }
 
     // Supervizör filtresi
@@ -398,7 +378,6 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
       )
     }
 
-    console.log(`✅ FINAL FILTERED: ${res.length} kayıt`)
     return res
   }, [visiblePersonnel, filterGrup, filterSup, filterJr, filterCari, search])
 
@@ -526,10 +505,7 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
           {/* Grup */}
           <FilterSelect
             value={filterGrup}
-            onChange={(v) => {
-              console.log(`📝 DROPDOWN DEĞİŞTİ: "${v}"`)
-              setFilterGrup(v)
-            }}
+            onChange={setFilterGrup}
             placeholder="Grup"
             options={[
               { value: 'Çetinler Merch',   label: 'Çetinler Merch'   },
@@ -596,11 +572,8 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
           </div>
         )}
 
-        {!loading && filtered.length > 0 && (() => {
-          console.log(`🎨 RENDER: ${filtered.length} kayıt render ediliyor`)
-          console.log(`🎨 İlk 3 render edilecek:`, filtered.slice(0, 3).map(p => `${p.merch_adi} (${p.merch_grubu})`))
-          return (
-          <div key={`filter-${filterGrup}-${filterSup}-${filterJr}-${filtered.length}`} className="divide-y divide-gray-100">
+        {!loading && filtered.length > 0 && (
+          <div className="divide-y divide-gray-100">
             {filtered.map(person => {
               const assignedJr = person.jr_profile_id
                 ? team.find(p => p.id === person.jr_profile_id)
@@ -647,8 +620,7 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
               )
             })}
           </div>
-          )
-        })()}
+        )}
       </div>
 
       {/* Detay / Atama Paneli */}
