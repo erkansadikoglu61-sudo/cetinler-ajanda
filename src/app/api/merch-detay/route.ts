@@ -27,7 +27,8 @@ function decodeHtml(s: string): string {
 
 export async function GET() {
   try {
-    const phpUrl = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_detay.php'
+    // Satış verisinden unique merch listesi çıkar (Çetinler Merch dahil)
+    const phpUrl = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
 
     const response = await fetch(phpUrl, {
       next: { revalidate: 900 }, // 15 dakika cache
@@ -38,7 +39,7 @@ export async function GET() {
     }
 
     const htmlText = await response.text()
-    const merchList: MerchDetay[] = []
+    const merchMap = new Map<string, MerchDetay>()
 
     // HTML table parse
     const trMatches = htmlText.match(/<tr>[\s\S]*?<\/tr>/gi) || []
@@ -47,37 +48,61 @@ export async function GET() {
       const tr = trMatches[i]
       const tdMatches = tr.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || []
 
-      if (tdMatches.length >= 11) {
+      if (tdMatches.length >= 15) {
         const cells = tdMatches.map(td => decodeHtml(td.replace(/<\/?td[^>]*>/gi, '')))
 
-        // Index mapping (görünen veriye göre)
-        // 0: Merch Adı
-        // 1: Merch ID
-        // 2: Merch Grubu (Bayi Merch / Çetinler Merch / Destek Personeli)
-        // 3: Cari Kod
-        // 4: Cari Adı
-        // 5: Şube Kod
-        // 6: Şube Adı
-        // 7: IBAN
-        // 8: BSY Kod
-        // 9: BSY Adı
-        // 10: Supervisor Adı
+        // export_merch_satis.php column mapping:
+        // 0: MERCH_PERSONEL
+        // 1: CARI_ISIM
+        // 2: SUBE_ADI
+        // 3: STOK_ADI
+        // 4: STOK_KODU
+        // 5: GRUP_ACIKLAMA
+        // 6: SATILAN_ADET
+        // 7: GRUP_KODU
+        // 8: BEKLENEN_CIRO
+        // 9: SUPERVISOR_ADI
+        // 10: CARI_KOD
+        // 11: SUBE_KOD
+        // 12: DONEM
+        // 13: TARIH
+        // 14: MERCH_TIPI
+        // 15: SV_TIPI (varsa)
+        // 16: BSY_ADI (varsa)
 
-        merchList.push({
-          merch_adi: cells[0] || '',
-          merch_id: cells[1] || '',
-          merch_grubu: cells[2] || '',
-          cari_kod: cells[3] || '',
-          cari_adi: cells[4] || '',
-          sube_kod: cells[5] || '',
-          sube_adi: cells[6] || '',
-          iban: cells[7] || '',
-          bsy_kod: cells[8] || '',
-          bsy_adi: cells[9] || '',
-          sup_adi: cells[10] || '',
-        })
+        const merchAdi = cells[0] || ''
+        const merchTipi = cells[14] || ''
+        const cariKod = cells[10] || ''
+        const cariAdi = cells[1] || ''
+        const subeKod = cells[11] || ''
+        const subeAdi = cells[2] || ''
+        const supAdi = cells[9] || ''
+        const bsyAdi = cells[16] || ''
+
+        if (!merchAdi) continue
+
+        // Unique key: merch_adi + cari_kod
+        const key = `${merchAdi}||${cariKod}`
+
+        if (!merchMap.has(key)) {
+          merchMap.set(key, {
+            merch_adi: merchAdi,
+            merch_id: '',
+            merch_grubu: merchTipi,
+            cari_kod: cariKod,
+            cari_adi: cariAdi,
+            sube_kod: subeKod,
+            sube_adi: subeAdi,
+            iban: '',
+            bsy_kod: '',
+            bsy_adi: bsyAdi,
+            sup_adi: supAdi,
+          })
+        }
       }
     }
+
+    const merchList = Array.from(merchMap.values())
 
     return NextResponse.json({
       count: merchList.length,
