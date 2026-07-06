@@ -13,6 +13,7 @@ interface MerchDetay {
   bsy_kod: string
   bsy_adi: string
   sup_adi: string
+  jr_adi: string
 }
 
 function decodeHtml(s: string): string {
@@ -96,7 +97,8 @@ export async function GET() {
             iban: iban,
             bsy_kod: bsyKod,
             bsy_adi: bsyAdi,
-            sup_adi: jrSupAdi || supAdi, // Jr varsa onu, yoksa Sup'ı kullan
+            sup_adi: supAdi,
+            jr_adi: jrSupAdi,
           })
         }
       }
@@ -130,6 +132,7 @@ export async function GET() {
               bsy_kod: '',
               bsy_adi: d.bsy_adi || '',
               sup_adi: d.sup_adi || '',
+              jr_adi: '',
             })
           }
         })

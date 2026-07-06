@@ -238,7 +238,7 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
           merch_grubu: m.merch_grubu,
           cari_adi: m.cari_adi,
           sube_adi: m.sube_adi,
-          jr_adi: null,
+          jr_adi: m.jr_adi || null,
           sup_adi: m.sup_adi,
           bsy_adi: m.bsy_adi || m.bsy_kod,
           jr_profile_id: null,
@@ -309,10 +309,10 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
   }, [visiblePersonnel])
 
   const jrOptions = useMemo(() => {
-    // Jr Supervizör listesi team'den çek
-    const jrs = team.filter(p => p.role === 'jr')
-    return jrs.map(j => j.full_name).sort((a, b) => a.localeCompare(b, 'tr'))
-  }, [team])
+    // Jr Supervizör listesi veriden çek (jr_adi dolu olanlar)
+    const s = new Set(visiblePersonnel.map(p => p.jr_adi).filter(Boolean) as string[])
+    return [...s].sort((a, b) => a.localeCompare(b, 'tr'))
+  }, [visiblePersonnel])
 
   const cariOptions = useMemo(() => {
     const base = filterSup
@@ -332,11 +332,8 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
     }
     if (filterSup)  res = res.filter(p => p.sup_adi === filterSup)
     if (filterJr) {
-      // Jr Supervizör'e atanmış kayıtları filtrele
-      const selectedJr = team.find(j => j.full_name === filterJr)
-      if (selectedJr) {
-        res = res.filter(p => p.jr_profile_id === selectedJr.id)
-      }
+      // Jr Supervizör ismine göre filtrele (jr_adi)
+      res = res.filter(p => p.jr_adi === filterJr)
     }
     if (filterCari) res = res.filter(p => p.cari_adi === filterCari)
     if (search) {
