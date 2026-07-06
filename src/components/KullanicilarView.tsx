@@ -318,7 +318,11 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
   // ── Uygulanan filtreler ───────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let res = visiblePersonnel
-    if (filterGrup) res = res.filter(p => p.merch_grubu === filterGrup)
+    if (filterGrup) {
+      console.log('🔍 Grup filtresi:', filterGrup)
+      console.log('📊 İlk 5 kaydın merch_grubu:', res.slice(0, 5).map(p => `"${p.merch_grubu}"`))
+      res = res.filter(p => p.merch_grubu?.trim() === filterGrup.trim())
+    }
     if (filterSup)  res = res.filter(p => p.sup_adi === filterSup)
     if (filterCari) res = res.filter(p => p.cari_adi === filterCari)
     if (search) {
@@ -329,6 +333,7 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
         (p.sube_adi  ?? '').toLowerCase().includes(q)
       )
     }
+    console.log('✅ Filtered sonuç:', res.length, 'kayıt')
     return res
   }, [visiblePersonnel, filterGrup, filterSup, filterCari, search])
 
