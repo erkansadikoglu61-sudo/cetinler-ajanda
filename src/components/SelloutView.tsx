@@ -530,6 +530,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   // Sadece seçili dönemde satışı olan kişiler (toplam satış > 0)
   const uniqueMerch = useMemo(() => {
     const map = new Map<string, { supApiName: string; cariIsim: string; subeAdi: string; totalSales: number }>()
+
+    // 1. Satış yapmış Çetinler Merch'leri ekle (periodRows'tan)
     periodRows.forEach(r => {
       if (!r.merch_personel) return
       if (r.merch_tipi === 'Çetinler Merch') {
@@ -546,11 +548,26 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
         }
       }
     })
+
+    // 2. Tüm Çetinler Merch'leri ekle (merchDetayData'dan - satış yapmamış olanlar dahil)
+    merchDetayData.forEach(m => {
+      if (m.merch_grubu === 'Çetinler Merch' && m.merch_adi) {
+        if (!map.has(m.merch_adi)) {
+          // Satış yapmamış, sadece kayıtlı olan
+          map.set(m.merch_adi, {
+            supApiName: m.jr_adi || m.sup_adi, // Jr varsa Jr, yoksa Sup
+            cariIsim:   m.cari_adi || '',
+            subeAdi:    m.sube_adi || '',
+            totalSales: 0,
+          })
+        }
+      }
+    })
+
     return Array.from(map.entries())
-      .filter(([_, v]) => v.totalSales > 0) // Sadece satışı olanlar
       .map(([name, v]) => ({ name, supApiName: v.supApiName, cariIsim: v.cariIsim, subeAdi: v.subeAdi }))
       .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
-  }, [periodRows])
+  }, [periodRows, merchDetayData])
 
   // Merch visible to current user: supervisor_adi'si mevcut kullanıcının görebileceği
   // bir süpervizör/jr. ismiyle eşleşenler
