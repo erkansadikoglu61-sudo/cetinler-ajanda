@@ -324,9 +324,9 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
     const supSet = new Set(
       visiblePersonnel
         .map(p => p.sup_adi)
-        .filter(Boolean)
+        .filter((sup): sup is string => Boolean(sup))
         .filter(sup => !jrSet.has(sup)) // Jr listesinde olmayanlar
-        .filter(sup => sup !== 'Atilla Yılmaz') as string[] // BSY olanı çıkar
+        .filter(sup => sup !== 'Atilla Yılmaz') // BSY olanı çıkar
     )
 
     return [...supSet].sort((a, b) => a.localeCompare(b, 'tr'))
@@ -338,8 +338,8 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
     const s = new Set(
       visiblePersonnel
         .map(p => p.jr_adi)
-        .filter(Boolean)
-        .filter(jr => !jr.toLowerCase().startsWith('atilla')) as string[]
+        .filter((jr): jr is string => Boolean(jr))
+        .filter(jr => !jr.toLowerCase().startsWith('atilla'))
     )
     return [...s].sort((a, b) => a.localeCompare(b, 'tr'))
   }, [visiblePersonnel])
