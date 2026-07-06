@@ -304,7 +304,13 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
 
   // ── Filtre seçenekleri (cascade) ──────────────────────────────────────────
   const supOptions = useMemo(() => {
-    const s = new Set(visiblePersonnel.map(p => p.sup_adi).filter(Boolean) as string[])
+    // Sadece jr_adi boş olan kayıtların sup_adi'lerini al (gerçek Supervizörler)
+    const s = new Set(
+      visiblePersonnel
+        .filter(p => !p.jr_adi) // Jr'si olmayan (doğrudan Supervizör'e bağlı)
+        .map(p => p.sup_adi)
+        .filter(Boolean) as string[]
+    )
     return [...s].sort((a, b) => a.localeCompare(b, 'tr'))
   }, [visiblePersonnel])
 
