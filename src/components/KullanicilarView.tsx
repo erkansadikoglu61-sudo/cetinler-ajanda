@@ -331,10 +331,14 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
       res = res.filter(p => p.merch_grubu?.trim() === filterGrup.trim())
     }
     if (filterSup) {
-      console.log('🔍 Supervizör filtresi:', filterSup)
-      console.log('📊 İlk 5 kaydın sup_adi:', res.slice(0, 5).map(p => `"${p.sup_adi}"`))
-      console.log('📊 İlk 5 kaydın jr_adi:', res.slice(0, 5).map(p => `"${p.jr_adi}"`))
+      console.log('🔍 Supervizör filtresi:', `"${filterSup}"`)
+      console.log('📊 İlk 10 kaydın sup_adi ve jr_adi:')
+      res.slice(0, 10).forEach((p, i) => {
+        console.log(`  ${i+1}. sup_adi="${p.sup_adi}" | jr_adi="${p.jr_adi}" | merch="${p.merch_adi}"`)
+      })
+      const before = res.length
       res = res.filter(p => p.sup_adi === filterSup)
+      console.log(`  Filtreleme: ${before} → ${res.length} kayıt`)
     }
     if (filterJr) {
       console.log('🔍 Jr. Supervizör filtresi:', filterJr)
