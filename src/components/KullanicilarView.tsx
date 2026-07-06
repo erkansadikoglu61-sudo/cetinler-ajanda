@@ -526,7 +526,10 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
           {/* Grup */}
           <FilterSelect
             value={filterGrup}
-            onChange={setFilterGrup}
+            onChange={(v) => {
+              console.log(`📝 DROPDOWN DEĞİŞTİ: "${v}"`)
+              setFilterGrup(v)
+            }}
             placeholder="Grup"
             options={[
               { value: 'Çetinler Merch',   label: 'Çetinler Merch'   },
@@ -597,7 +600,7 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
           console.log(`🎨 RENDER: ${filtered.length} kayıt render ediliyor`)
           console.log(`🎨 İlk 3 render edilecek:`, filtered.slice(0, 3).map(p => `${p.merch_adi} (${p.merch_grubu})`))
           return (
-          <div className="divide-y divide-gray-100">
+          <div key={`filter-${filterGrup}-${filterSup}-${filterJr}-${filtered.length}`} className="divide-y divide-gray-100">
             {filtered.map(person => {
               const assignedJr = person.jr_profile_id
                 ? team.find(p => p.id === person.jr_profile_id)
