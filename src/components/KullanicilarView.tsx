@@ -313,14 +313,20 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
 
   // ── Filtre seçenekleri (cascade) ──────────────────────────────────────────
   const supOptions = useMemo(() => {
-    // Sadece jr_adi boş olan kayıtların sup_adi'lerini al (gerçek Supervizörler)
-    const s = new Set(
-      visiblePersonnel
-        .filter(p => !p.jr_adi) // Jr'si olmayan (doğrudan Supervizör'e bağlı)
-        .map(p => p.sup_adi)
-        .filter(Boolean) as string[]
+    // Tüm jr_adi'leri topla
+    const jrSet = new Set(
+      visiblePersonnel.map(p => p.jr_adi).filter(Boolean) as string[]
     )
-    return [...s].sort((a, b) => a.localeCompare(b, 'tr'))
+
+    // sup_adi'leri topla ama jr_adi listesinde olanları çıkar
+    const supSet = new Set(
+      visiblePersonnel
+        .map(p => p.sup_adi)
+        .filter(Boolean)
+        .filter(sup => !jrSet.has(sup)) as string[] // Jr listesinde olmayanlar
+    )
+
+    return [...supSet].sort((a, b) => a.localeCompare(b, 'tr'))
   }, [visiblePersonnel])
 
   const jrOptions = useMemo(() => {
