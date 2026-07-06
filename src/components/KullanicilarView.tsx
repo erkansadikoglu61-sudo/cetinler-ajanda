@@ -318,12 +318,15 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
       visiblePersonnel.map(p => p.jr_adi).filter(Boolean) as string[]
     )
 
-    // sup_adi'leri topla ama jr_adi listesinde olanları çıkar
+    // sup_adi'leri topla ama:
+    // 1. jr_adi listesinde olanları çıkar
+    // 2. "Atilla Yılmaz" çıkar (BSY)
     const supSet = new Set(
       visiblePersonnel
         .map(p => p.sup_adi)
         .filter(Boolean)
-        .filter(sup => !jrSet.has(sup)) as string[] // Jr listesinde olmayanlar
+        .filter(sup => !jrSet.has(sup)) // Jr listesinde olmayanlar
+        .filter(sup => sup !== 'Atilla Yılmaz') as string[] // BSY olanı çıkar
     )
 
     return [...supSet].sort((a, b) => a.localeCompare(b, 'tr'))
@@ -331,7 +334,13 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
 
   const jrOptions = useMemo(() => {
     // Jr Supervizör listesi veriden çek (jr_adi dolu olanlar)
-    const s = new Set(visiblePersonnel.map(p => p.jr_adi).filter(Boolean) as string[])
+    // "Atilla" ile başlayanları çıkar
+    const s = new Set(
+      visiblePersonnel
+        .map(p => p.jr_adi)
+        .filter(Boolean)
+        .filter(jr => !jr.toLowerCase().startsWith('atilla')) as string[]
+    )
     return [...s].sort((a, b) => a.localeCompare(b, 'tr'))
   }, [visiblePersonnel])
 
