@@ -213,6 +213,7 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
   const [search,        setSearch]        = useState('')
   const [filterGrup,    setFilterGrup]    = useState('')
   const [filterSup,     setFilterSup]     = useState('')
+  const [filterJr,      setFilterJr]      = useState('')
   const [filterCari,    setFilterCari]    = useState('')
   const [selectedPerson, setSelectedPerson] = useState<FieldPerson | null>(null)
   const [assigning,     setAssigning]     = useState<string | null>(null)
@@ -307,6 +308,12 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
     return [...s].sort((a, b) => a.localeCompare(b, 'tr'))
   }, [visiblePersonnel])
 
+  const jrOptions = useMemo(() => {
+    // Jr Supervizör listesi team'den çek
+    const jrs = team.filter(p => p.role === 'jr')
+    return jrs.map(j => j.full_name).sort((a, b) => a.localeCompare(b, 'tr'))
+  }, [team])
+
   const cariOptions = useMemo(() => {
     const base = filterSup
       ? visiblePersonnel.filter(p => p.sup_adi === filterSup)
@@ -324,6 +331,13 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
       res = res.filter(p => p.merch_grubu?.trim() === filterGrup.trim())
     }
     if (filterSup)  res = res.filter(p => p.sup_adi === filterSup)
+    if (filterJr) {
+      // Jr Supervizör'e atanmış kayıtları filtrele
+      const selectedJr = team.find(j => j.full_name === filterJr)
+      if (selectedJr) {
+        res = res.filter(p => p.jr_profile_id === selectedJr.id)
+      }
+    }
     if (filterCari) res = res.filter(p => p.cari_adi === filterCari)
     if (search) {
       const q = search.toLowerCase()
@@ -335,7 +349,7 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
     }
     console.log('✅ Filtered sonuç:', res.length, 'kayıt')
     return res
-  }, [visiblePersonnel, filterGrup, filterSup, filterCari, search])
+  }, [visiblePersonnel, filterGrup, filterSup, filterJr, filterCari, search, team])
 
   // ── Jr atama / kaldırma ───────────────────────────────────────────────────
   // Her değişiklik jr_assignment_history'e loglanır (effective_month = bu ayın 1'i).
@@ -390,7 +404,7 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
     }
   }, [personnel, currentProfile.id])
 
-  const activeFilters = [filterGrup, filterSup, filterCari].filter(Boolean).length
+  const activeFilters = [filterGrup, filterSup, filterJr, filterCari].filter(Boolean).length
 
   // ── Yenile (PHP'den tekrar çek) ──────────────────────────────────────────
   const handleSync = useCallback(async () => {
@@ -474,9 +488,19 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
           {isAdminOrBsy && supOptions.length > 0 && (
             <FilterSelect
               value={filterSup}
-              onChange={v => { setFilterSup(v); setFilterCari('') }}
+              onChange={v => { setFilterSup(v); setFilterJr(''); setFilterCari('') }}
               placeholder="Süpervizör"
               options={supOptions.map(s => ({ value: s, label: s }))}
+            />
+          )}
+
+          {/* Jr. Supervizör — admin ve BSY */}
+          {isAdminOrBsy && jrOptions.length > 0 && (
+            <FilterSelect
+              value={filterJr}
+              onChange={v => { setFilterJr(v); setFilterCari('') }}
+              placeholder="Jr. Supervizör"
+              options={jrOptions.map(j => ({ value: j, label: j }))}
             />
           )}
 
@@ -492,7 +516,7 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
 
           {activeFilters > 0 && (
             <button
-              onClick={() => { setFilterGrup(''); setFilterSup(''); setFilterCari('') }}
+              onClick={() => { setFilterGrup(''); setFilterSup(''); setFilterJr(''); setFilterCari('') }}
               className="flex items-center gap-1 text-[11px] text-red-500 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50"
             >
               <X size={11} /> Temizle ({activeFilters})

@@ -28,8 +28,8 @@ function decodeHtml(s: string): string {
 
 export async function GET() {
   try {
-    // Satış verisinden unique merch listesi çıkar (Çetinler Merch dahil)
-    const phpUrl = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
+    // export_merch_detay.php'den tüm merch bilgilerini çek
+    const phpUrl = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_detay.php'
 
     const response = await fetch(phpUrl, {
       next: { revalidate: 900 }, // 15 dakika cache
@@ -49,36 +49,35 @@ export async function GET() {
       const tr = trMatches[i]
       const tdMatches = tr.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || []
 
-      if (tdMatches.length >= 15) {
+      if (tdMatches.length >= 12) {
         const cells = tdMatches.map(td => decodeHtml(td.replace(/<\/?td[^>]*>/gi, '')))
 
-        // export_merch_satis.php column mapping:
-        // 0: MERCH_PERSONEL
-        // 1: CARI_ISIM
-        // 2: SUBE_ADI
-        // 3: STOK_ADI
-        // 4: STOK_KODU
-        // 5: GRUP_ACIKLAMA
-        // 6: SATILAN_ADET
-        // 7: GRUP_KODU
-        // 8: BEKLENEN_CIRO
-        // 9: SUPERVISOR_ADI
-        // 10: CARI_KOD
-        // 11: SUBE_KOD
-        // 12: DONEM
-        // 13: TARIH
-        // 14: MERCH_TIPI
-        // 15: SV_TIPI (varsa)
-        // 16: BSY_ADI (varsa)
+        // export_merch_detay.php column mapping (Excel'deki sıraya göre):
+        // 0: MERCH_ADI
+        // 1: MERCH_ID
+        // 2: MERCH_TIPI (Bayi Merch / Çetinler Merch)
+        // 3: CARI_KODU
+        // 4: CARI_ISIM
+        // 5: SUBE_KODU
+        // 6: SUBE_ADI
+        // 7: IBAN
+        // 8: BSY_KODU
+        // 9: BSY_ADI
+        // 10: SUPERVIZOR
+        // 11: JR_SUPERVIZOR
 
         const merchAdi = cells[0] || ''
-        const merchTipi = cells[14] || ''
-        const cariKod = cells[10] || ''
-        const cariAdi = cells[1] || ''
-        const subeKod = cells[11] || ''
-        const subeAdi = cells[2] || ''
-        const supAdi = cells[9] || ''
-        const bsyAdi = cells[16] || ''
+        const merchId = cells[1] || ''
+        const merchTipi = cells[2] || ''
+        const cariKod = cells[3] || ''
+        const cariAdi = cells[4] || ''
+        const subeKod = cells[5] || ''
+        const subeAdi = cells[6] || ''
+        const iban = cells[7] || ''
+        const bsyKod = cells[8] || ''
+        const bsyAdi = cells[9] || ''
+        const supAdi = cells[10] || ''
+        const jrSupAdi = cells[11] || ''
 
         if (!merchAdi) continue
 
@@ -88,16 +87,16 @@ export async function GET() {
         if (!merchMap.has(key)) {
           merchMap.set(key, {
             merch_adi: merchAdi,
-            merch_id: '',
+            merch_id: merchId,
             merch_grubu: merchTipi,
             cari_kod: cariKod,
             cari_adi: cariAdi,
             sube_kod: subeKod,
             sube_adi: subeAdi,
-            iban: '',
-            bsy_kod: '',
+            iban: iban,
+            bsy_kod: bsyKod,
             bsy_adi: bsyAdi,
-            sup_adi: supAdi,
+            sup_adi: jrSupAdi || supAdi, // Jr varsa onu, yoksa Sup'ı kullan
           })
         }
       }
