@@ -286,6 +286,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const [merchSearch, setMerchSearch] = useState('')
   const [adetPrimData, setAdetPrimData] = useState<{ stokKodu: string; bayiMerch: number | null; kosulluDestek: number | null; kategori: string | null }[]>([])
   const [merchHedefData, setMerchHedefData] = useState<{ merch_name: string; grup: string; hedef: number }[]>([])
+  const [merchDetayData, setMerchDetayData] = useState<{ merch_adi: string; merch_grubu: string; sup_adi: string; jr_adi: string }[]>([])
 
   const isAdmin = currentProfile.role === 'admin'
   const isSup   = currentProfile.role === 'sup'
@@ -314,6 +315,15 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       .then(d => setMerchHedefData(d.merch_targets || []))
       .catch(() => setMerchHedefData([]))
   }, [active, donem])
+
+  // Merch detay verilerini fetch et (Jr ve Çetinler Merch sayıları için)
+  useEffect(() => {
+    if (!active) return
+    fetch('/api/merch-detay')
+      .then(r => r.json())
+      .then(d => setMerchDetayData(d.data || []))
+      .catch(() => setMerchDetayData([]))
+  }, [active])
 
   const {
     getProfileHedef, getMerchHedef,
@@ -382,35 +392,52 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     [visibleJrs]
   )
 
-  // ── Çetinler Merch'leri sayma (supervisor bazında) ──
+  // ── Jr sayısı (PHP merch-detay'dan) ──
+  const jrsOfSupName = useCallback(
+    (supName: string): number => {
+      const uniqueJrs = new Set<string>()
+      merchDetayData.forEach(m => {
+        if (m.jr_adi && m.sup_adi && normalizeName(m.sup_adi) === normalizeName(supName)) {
+          uniqueJrs.add(m.jr_adi.toLowerCase())
+        }
+      })
+      return uniqueJrs.size
+    },
+    [merchDetayData]
+  )
+
+  // ── Çetinler Merch sayısı (PHP merch-detay'dan) ──
   const merchsOfSup = useCallback(
     (supName: string): number => {
       const normSupName = normalizeName(supName)
-      // Jr'ları da dahil et
-      const jrNames = visibleJrs
-        .filter(j => {
-          const manager = team.find(p => p.id === j.manager_id)
-          return manager && normalizeName(manager.full_name) === normSupName
-        })
-        .map(j => normalizeName(j.full_name))
 
-      const allNames = [normSupName, ...jrNames]
+      // Bu Supervizör'ün Jr'larını bul
+      const jrNames = new Set<string>()
+      merchDetayData.forEach(m => {
+        if (m.jr_adi && m.sup_adi && normalizeName(m.sup_adi) === normSupName) {
+          jrNames.add(normalizeName(m.jr_adi))
+        }
+      })
 
-      // Bu supervisor veya jr'larının adı geçen Çetinler Merch'leri say
+      const allNames = new Set([normSupName, ...jrNames])
+
+      // Çetinler Merch'leri say
       const uniqueMerchs = new Set<string>()
-      periodRows.forEach(r => {
-        if (
-          r.merch_tipi === 'Çetinler Merch' &&
-          r.merch_personel &&
-          allNames.some(n => n === normalizeName(r.supervisor_adi || ''))
-        ) {
-          uniqueMerchs.add(r.merch_personel.toLowerCase())
+      merchDetayData.forEach(m => {
+        if (m.merch_grubu === 'Çetinler Merch' && m.merch_adi) {
+          // Merch'in sup_adi veya jr_adi bu Supervizör'e ait mi?
+          if (
+            (m.sup_adi && allNames.has(normalizeName(m.sup_adi))) ||
+            (m.jr_adi && allNames.has(normalizeName(m.jr_adi)))
+          ) {
+            uniqueMerchs.add(m.merch_adi.toLowerCase())
+          }
         }
       })
 
       return uniqueMerchs.size
     },
-    [periodRows, visibleJrs, team]
+    [merchDetayData]
   )
 
   // ── Gerç aggregation ────────────────────────────────────────
@@ -792,7 +819,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
         {!selloutLoading && subTab === 'sup' && showSupTab && (
           <SelloutTable
             rows={supRows.map(r => {
-              const jrCount = jrsOf(r.profile.id).length
+              const jrCount = jrsOfSupName(r.profile.full_name)
               const merchCount = merchsOfSup(r.profile.full_name)
               return {
                 label: r.profile.full_name,
