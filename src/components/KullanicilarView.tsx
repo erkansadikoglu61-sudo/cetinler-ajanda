@@ -392,25 +392,14 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
 
   const activeFilters = [filterGrup, filterSup, filterCari].filter(Boolean).length
 
-  // ── Dış URL'den sync ──────────────────────────────────────────────────────
+  // ── Yenile (PHP'den tekrar çek) ──────────────────────────────────────────
   const handleSync = useCallback(async () => {
     setSyncing(true)
     setSyncMsg(null)
-    try {
-      const res  = await fetch('/api/field-personnel-sync', { method: 'POST' })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Sync hatası')
-      setSyncMsg(json.inserted > 0
-        ? `✓ ${json.inserted} yeni kayıt eklendi`
-        : `✓ ${json.message ?? 'Güncelleme yok'}`
-      )
-      await load()
-    } catch (e) {
-      setSyncMsg(`✗ ${e instanceof Error ? e.message : String(e)}`)
-    } finally {
-      setSyncing(false)
-      setTimeout(() => setSyncMsg(null), 4000)
-    }
+    await load()
+    setSyncMsg('✓ Liste güncellendi')
+    setSyncing(false)
+    setTimeout(() => setSyncMsg(null), 4000)
   }, [load])
 
   // ── Render ────────────────────────────────────────────────────────────────

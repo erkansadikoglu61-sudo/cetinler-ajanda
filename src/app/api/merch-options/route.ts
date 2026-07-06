@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-const MERCH_URL = 'http://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
+const MERCH_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
 
 const COL = { CARI_ISIM: 1, SUBE_ADI: 2, STOK_KODU: 4, GRUP_KODU: 7, MERCH_TIPI: 14 }
 

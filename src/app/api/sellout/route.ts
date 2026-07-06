@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 const SOURCE_URL =
-  'http://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
+  'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
 
 export interface SelloutRow {
   merch_personel: string

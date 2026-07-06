@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 
 export const maxDuration = 30
 
-const MERCH_URL = 'http://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
+const MERCH_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
 
 // Column indices in the HTML table
 // 0:MERCH_PERSONEL 1:CARI_ISIM 2:SUBE_ADI 3:STOK_ADI 4:STOK_KODU
