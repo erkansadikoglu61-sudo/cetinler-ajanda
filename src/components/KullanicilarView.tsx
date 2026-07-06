@@ -243,6 +243,15 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
           bsy_adi: m.bsy_adi || m.bsy_kod,
           jr_profile_id: null,
         }))
+
+        // Debug: API'den gelen sup_adi ve jr_adi unique değerleri
+        const allSups = new Set(converted.map(p => p.sup_adi).filter(Boolean))
+        const allJrs = new Set(converted.map(p => p.jr_adi).filter(Boolean))
+        console.log('📊 API\'den gelen toplam unique sup_adi sayısı:', allSups.size)
+        console.log('📊 API\'den gelen toplam unique jr_adi sayısı:', allJrs.size)
+        console.log('📊 sup_adi listesi (ilk 10):', [...allSups].slice(0, 10))
+        console.log('📊 jr_adi listesi (ilk 10):', [...allJrs].slice(0, 10))
+
         setPersonnel(converted)
       } else {
         console.error('Merch detay API error:', json.error)
