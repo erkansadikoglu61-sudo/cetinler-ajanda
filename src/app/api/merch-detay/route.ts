@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 interface MerchDetay {
   merch_adi: string
@@ -100,6 +101,42 @@ export async function GET() {
           })
         }
       }
+    }
+
+    // Destek Personeli'ni Supabase'den ekle
+    try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+
+      const { data: destekData } = await supabase
+        .from('field_personnel')
+        .select('merch_adi, merch_grubu, cari_adi, sube_adi, sup_adi, bsy_adi')
+        .eq('merch_grubu', 'Destek Personeli')
+
+      if (destekData) {
+        destekData.forEach(d => {
+          const key = `${d.merch_adi}||${d.cari_adi}`
+          if (!merchMap.has(key)) {
+            merchMap.set(key, {
+              merch_adi: d.merch_adi || '',
+              merch_id: '',
+              merch_grubu: 'Destek Personeli',
+              cari_kod: '',
+              cari_adi: d.cari_adi || '',
+              sube_kod: '',
+              sube_adi: d.sube_adi || '',
+              iban: '',
+              bsy_kod: '',
+              bsy_adi: d.bsy_adi || '',
+              sup_adi: d.sup_adi || '',
+            })
+          }
+        })
+      }
+    } catch (dbError) {
+      console.warn('Destek Personeli fetch hatası:', dbError)
     }
 
     const merchList = Array.from(merchMap.values())
