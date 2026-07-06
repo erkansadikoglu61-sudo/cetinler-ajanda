@@ -685,8 +685,17 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   // ── Target entry rows ────────────────────────────────────────
   const supTargetRows = useMemo((): TargetRow[] =>
     (isAdmin ? visibleSups : visibleSups.filter(s => s.id === currentProfile.id))
-      .map(s => ({ key: s.id, label: s.full_name, isProfile: true })),
-  [visibleSups, isAdmin, currentProfile.id])
+      .map(s => {
+        const jrCount = jrsOfSupName(s.full_name)
+        const merchCount = merchsOfSup(s.full_name)
+        return {
+          key: s.id,
+          label: s.full_name,
+          sublabel: `${jrCount} jr.sup, ${merchCount} merch`,
+          isProfile: true,
+        }
+      }),
+  [visibleSups, isAdmin, currentProfile.id, jrsOfSupName, merchsOfSup])
 
   const jrTargetRows = useMemo((): TargetRow[] => {
     const jrs = (isAdmin)
