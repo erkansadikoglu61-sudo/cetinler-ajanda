@@ -407,19 +407,14 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   )
 
   // ── Şube sayısı (PHP F kolonu SUBE_KODU + K kolonu SUPERVIZOR) ──
-  // Sadece Çetinler Merch + K kolonu = Supervizör olanların F kolonu unique değerleri
+  // Sadece K kolonu = Supervizör olanların F kolonu unique değerleri
   const subesOfSup = useCallback(
     (supName: string): number => {
       const normSupName = normalizeName(supName)
 
       const uniqueSubeKods = new Set<string>()
       merchDetayData.forEach(m => {
-        if (
-          m.merch_grubu === 'Çetinler Merch' &&
-          m.sube_kod &&
-          m.sup_adi &&
-          normalizeName(m.sup_adi) === normSupName
-        ) {
+        if (m.sube_kod && m.sup_adi && normalizeName(m.sup_adi) === normSupName) {
           uniqueSubeKods.add(m.sube_kod.trim())
         }
       })
