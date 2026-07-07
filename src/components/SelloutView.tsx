@@ -406,7 +406,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     [merchDetayData]
   )
 
-  // ── Şube sayısı (PHP merch-detay'dan) ──
+  // ── Şube sayısı (PHP merch-detay'dan G kolonu - SUBE_ADI) ──
   const subesOfSup = useCallback(
     (supName: string): number => {
       const normSupName = normalizeName(supName)
@@ -421,16 +421,15 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
       const allNames = new Set([normSupName, ...jrNames])
 
-      // Şubeleri say (cari + şube unique)
+      // Sadece G kolonu (sube_adi) benzersiz şubeleri say
       const uniqueSubes = new Set<string>()
       merchDetayData.forEach(m => {
-        if (m.merch_grubu === 'Çetinler Merch') {
+        if (m.merch_grubu === 'Çetinler Merch' && m.sube_adi) {
           if (
             (m.sup_adi && allNames.has(normalizeName(m.sup_adi))) ||
             (m.jr_adi && allNames.has(normalizeName(m.jr_adi)))
           ) {
-            const key = `${m.cari_adi}||${m.sube_adi}`
-            uniqueSubes.add(key.toLowerCase())
+            uniqueSubes.add(m.sube_adi.trim().toLowerCase())
           }
         }
       })
