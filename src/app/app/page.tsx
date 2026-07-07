@@ -245,9 +245,16 @@ function TaskSheet({
         <div className="sticky top-0 bg-white pt-3 pb-2 z-10 border-b border-gray-100">
           <div className="w-8 h-1 bg-gray-200 rounded-full mx-auto mb-2 md:hidden" />
           <div className="flex items-center justify-between px-4">
-            <h2 className="font-semibold text-base text-gray-800">
-              {isNew ? 'Yeni Görev' : 'Görev Detayı'}
-            </h2>
+            <div>
+              <h2 className="font-semibold text-base text-gray-800">
+                {isNew ? 'Yeni Görev' : 'Görev Detayı'}
+              </h2>
+              {!isNew && task && (
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {team.find(p => p.id === task.pid)?.full_name || 'Bilinmeyen kullanıcı'}
+                </p>
+              )}
+            </div>
             <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
               <X size={18} />
             </button>
