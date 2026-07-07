@@ -406,6 +406,40 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     [merchDetayData]
   )
 
+  // ── Şube sayısı (PHP merch-detay'dan) ──
+  const subesOfSup = useCallback(
+    (supName: string): number => {
+      const normSupName = normalizeName(supName)
+
+      // Bu Supervizör'ün Jr'larını bul
+      const jrNames = new Set<string>()
+      merchDetayData.forEach(m => {
+        if (m.jr_adi && m.sup_adi && normalizeName(m.sup_adi) === normSupName) {
+          jrNames.add(normalizeName(m.jr_adi))
+        }
+      })
+
+      const allNames = new Set([normSupName, ...jrNames])
+
+      // Şubeleri say (cari + şube unique)
+      const uniqueSubes = new Set<string>()
+      merchDetayData.forEach(m => {
+        if (m.merch_grubu === 'Çetinler Merch') {
+          if (
+            (m.sup_adi && allNames.has(normalizeName(m.sup_adi))) ||
+            (m.jr_adi && allNames.has(normalizeName(m.jr_adi)))
+          ) {
+            const key = `${m.cari_adi}||${m.sube_adi}`
+            uniqueSubes.add(key.toLowerCase())
+          }
+        }
+      })
+
+      return uniqueSubes.size
+    },
+    [merchDetayData]
+  )
+
   // ── Çetinler Merch sayısı (PHP merch-detay'dan) ──
   const merchsOfSup = useCallback(
     (supName: string): number => {
@@ -687,15 +721,16 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     (isAdmin ? visibleSups : visibleSups.filter(s => s.id === currentProfile.id))
       .map(s => {
         const jrCount = jrsOfSupName(s.full_name)
+        const subeCount = subesOfSup(s.full_name)
         const merchCount = merchsOfSup(s.full_name)
         return {
           key: s.id,
           label: s.full_name,
-          sublabel: `${jrCount} jr.sup, ${merchCount} merch`,
+          sublabel: `${jrCount} jr.sup, ${subeCount} şube, ${merchCount} merch`,
           isProfile: true,
         }
       }),
-  [visibleSups, isAdmin, currentProfile.id, jrsOfSupName, merchsOfSup])
+  [visibleSups, isAdmin, currentProfile.id, jrsOfSupName, subesOfSup, merchsOfSup])
 
   const jrTargetRows = useMemo((): TargetRow[] => {
     const jrs = (isAdmin)
@@ -846,10 +881,11 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
           <SelloutTable
             rows={supRows.map(r => {
               const jrCount = jrsOfSupName(r.profile.full_name)
+              const subeCount = subesOfSup(r.profile.full_name)
               const merchCount = merchsOfSup(r.profile.full_name)
               return {
                 label: r.profile.full_name,
-                sublabel: `${jrCount} jr.sup, ${merchCount} merch`,
+                sublabel: `${jrCount} jr.sup, ${subeCount} şube, ${merchCount} merch`,
                 color: r.profile.color,
                 groups: r.groups.map(g => ({ h: g.h, v: g.v, p: g.p, prim: g.prim })),
                 tH: r.tH, tV: r.tV, tP: r.tP, tPrim: r.tPrim,
