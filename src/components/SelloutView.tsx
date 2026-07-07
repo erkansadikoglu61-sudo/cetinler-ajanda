@@ -915,6 +915,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 sublabel2: [r.cariIsim?.split(' ')[0], r.subeAdi].filter(Boolean).join(' / '),
                 groups:    r.groups.map(g => ({ h: g.h, v: g.v, p: g.p, prim: g.prim })),
                 tH: r.tH, tV: r.tV, tP: r.tP, tPrim: r.tPrim,
+                labelColor: r.tV === 0 ? '#ef4444' : undefined, // Satış yoksa kırmızı
               }))}
               footer={(() => {
                 const totH    = merchRows.reduce((s, r) => s + r.tH, 0)
@@ -1161,7 +1162,8 @@ interface TableRowData {
   label: string
   sublabel?: string
   sublabel2?: string   // cari/şube satırı
-  color?: string
+  color?: string       // satır başındaki renk nokta
+  labelColor?: string  // label text rengi
   groups: GrupCell[]
   tH: number; tV: number; tP: number
   tPrim?: number
@@ -1246,7 +1248,12 @@ function SelloutTable({
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />
                   )}
                   <div>
-                    <p className="font-medium text-gray-800 whitespace-nowrap">{r.label}</p>
+                    <p
+                      className="font-medium whitespace-nowrap"
+                      style={{ color: r.labelColor || '#1f2937' }}
+                    >
+                      {r.label}
+                    </p>
                     {r.sublabel  && <p className="text-[10px] text-gray-400 leading-tight">{r.sublabel}</p>}
                     {r.sublabel2 && <p className="text-[8px] text-gray-400 leading-tight">{r.sublabel2}</p>}
                   </div>
