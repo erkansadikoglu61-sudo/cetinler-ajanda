@@ -286,7 +286,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const [merchSearch, setMerchSearch] = useState('')
   const [adetPrimData, setAdetPrimData] = useState<{ stokKodu: string; bayiMerch: number | null; kosulluDestek: number | null; kategori: string | null }[]>([])
   const [merchHedefData, setMerchHedefData] = useState<{ merch_name: string; grup: string; hedef: number }[]>([])
-  const [merchDetayData, setMerchDetayData] = useState<{ merch_adi: string; merch_grubu: string; sup_adi: string; jr_adi: string; cari_adi: string; sube_adi: string }[]>([])
+  const [merchDetayData, setMerchDetayData] = useState<{ merch_adi: string; merch_grubu: string; sup_adi: string; jr_adi: string; cari_adi: string; sube_adi: string; sube_kod: string }[]>([])
 
   const isAdmin = currentProfile.role === 'admin'
   const isSup   = currentProfile.role === 'sup'
@@ -406,27 +406,25 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     [merchDetayData]
   )
 
-  // ── Şube sayısı (PHP merch-detay'dan G kolonu - SUBE_ADI) ──
-  // Sadece Supervizör'ün kendisinin şubeleri (Jr'lar dahil değil)
+  // ── Şube sayısı (PHP F kolonu SUBE_KODU + K kolonu SUPERVIZOR) ──
   const subesOfSup = useCallback(
     (supName: string): number => {
       const normSupName = normalizeName(supName)
 
-      // Sadece bu Supervizör'ün şubelerini say (Jr dahil değil)
-      const uniqueSubes = new Set<string>()
+      // F kolonu (sube_kod) unique değerleri - K kolonunda bu Supervizör olanlar
+      const uniqueSubeKods = new Set<string>()
       merchDetayData.forEach(m => {
         if (
           m.merch_grubu === 'Çetinler Merch' &&
-          m.sube_adi &&
+          m.sube_kod &&
           m.sup_adi &&
-          normalizeName(m.sup_adi) === normSupName &&
-          !m.jr_adi // Jr'si olmayan, doğrudan Supervizör'e bağlı
+          normalizeName(m.sup_adi) === normSupName
         ) {
-          uniqueSubes.add(m.sube_adi.trim().toLowerCase())
+          uniqueSubeKods.add(m.sube_kod.trim().toLowerCase())
         }
       })
 
-      return uniqueSubes.size
+      return uniqueSubeKods.size
     },
     [merchDetayData]
   )
