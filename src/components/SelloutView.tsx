@@ -458,6 +458,45 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     [merchDetayData]
   )
 
+  // ── Jr için şube sayısı (L kolonunda Jr ismi olanlar) ──
+  const subesOfJr = useCallback(
+    (jrName: string): number => {
+      const normJrName = normalizeName(jrName)
+      const uniqueSubeKods = new Set<string>()
+
+      merchDetayData.forEach(m => {
+        if (m.sube_kod && m.jr_adi && normalizeName(m.jr_adi) === normJrName) {
+          uniqueSubeKods.add(m.sube_kod.trim())
+        }
+      })
+
+      return uniqueSubeKods.size
+    },
+    [merchDetayData]
+  )
+
+  // ── Jr için Çetinler Merch sayısı ──
+  const merchsOfJr = useCallback(
+    (jrName: string): number => {
+      const normJrName = normalizeName(jrName)
+      const uniqueMerchs = new Set<string>()
+
+      merchDetayData.forEach(m => {
+        if (m.merch_grubu === 'Çetinler Merch' && m.merch_adi) {
+          if (
+            (m.sup_adi && normalizeName(m.sup_adi) === normJrName) ||
+            (m.jr_adi && normalizeName(m.jr_adi) === normJrName)
+          ) {
+            uniqueMerchs.add(m.merch_adi.toLowerCase())
+          }
+        }
+      })
+
+      return uniqueMerchs.size
+    },
+    [merchDetayData]
+  )
+
   // ── Gerç aggregation ────────────────────────────────────────
   const getGerc = useCallback(
     (supApiNames: string[], grup: string): number => {
@@ -883,13 +922,17 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
         {!selloutLoading && subTab === 'jr' && showJrTab && (
           <SelloutTable
-            rows={jrRows.map(r => ({
-              label: r.profile.full_name,
-              sublabel: r.sup?.full_name,
-              color: r.profile.color,
-              groups: r.groups.map(g => ({ h: g.h, v: g.v, p: g.p, prim: g.prim })),
-              tH: r.tH, tV: r.tV, tP: r.tP, tPrim: r.tPrim,
-            }))}
+            rows={jrRows.map(r => {
+              const subeCount = subesOfJr(r.profile.full_name)
+              const merchCount = merchsOfJr(r.profile.full_name)
+              return {
+                label: r.profile.full_name,
+                sublabel: `${r.sup?.full_name || '—'} · ${subeCount} şube, ${merchCount} merch`,
+                color: r.profile.color,
+                groups: r.groups.map(g => ({ h: g.h, v: g.v, p: g.p, prim: g.prim })),
+                tH: r.tH, tV: r.tV, tP: r.tP, tPrim: r.tPrim,
+              }
+            })}
             footer={{ groups: jrFooter.groupTotals.map(g => ({ h: g.h, v: g.v, p: pct(g.h, g.v), prim: g.prim })), tH: jrFooter.totH, tV: jrFooter.totV, tP: jrFooter.totP, tPrim: jrFooter.totPrim }}
             showPrim
             kategoriPrimi={PRIM_JR}
