@@ -407,30 +407,22 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   )
 
   // ── Şube sayısı (PHP merch-detay'dan G kolonu - SUBE_ADI) ──
+  // Sadece Supervizör'ün kendisinin şubeleri (Jr'lar dahil değil)
   const subesOfSup = useCallback(
     (supName: string): number => {
       const normSupName = normalizeName(supName)
 
-      // Bu Supervizör'ün Jr'larını bul
-      const jrNames = new Set<string>()
-      merchDetayData.forEach(m => {
-        if (m.jr_adi && m.sup_adi && normalizeName(m.sup_adi) === normSupName) {
-          jrNames.add(normalizeName(m.jr_adi))
-        }
-      })
-
-      const allNames = new Set([normSupName, ...jrNames])
-
-      // Sadece G kolonu (sube_adi) benzersiz şubeleri say
+      // Sadece bu Supervizör'ün şubelerini say (Jr dahil değil)
       const uniqueSubes = new Set<string>()
       merchDetayData.forEach(m => {
-        if (m.merch_grubu === 'Çetinler Merch' && m.sube_adi) {
-          if (
-            (m.sup_adi && allNames.has(normalizeName(m.sup_adi))) ||
-            (m.jr_adi && allNames.has(normalizeName(m.jr_adi)))
-          ) {
-            uniqueSubes.add(m.sube_adi.trim().toLowerCase())
-          }
+        if (
+          m.merch_grubu === 'Çetinler Merch' &&
+          m.sube_adi &&
+          m.sup_adi &&
+          normalizeName(m.sup_adi) === normSupName &&
+          !m.jr_adi // Jr'si olmayan, doğrudan Supervizör'e bağlı
+        ) {
+          uniqueSubes.add(m.sube_adi.trim().toLowerCase())
         }
       })
 
