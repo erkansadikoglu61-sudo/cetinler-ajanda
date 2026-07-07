@@ -407,12 +407,12 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   )
 
   // ── Şube sayısı (PHP F kolonu SUBE_KODU + K kolonu SUPERVIZOR) ──
-  // Sadece K kolonu = Supervizör olanların F kolonu unique değerleri
+  // K kolonundaki süpervizör isimlerini baz alarak gruplama, her süpervizöre bağlı benzersiz şube sayısı
   const subesOfSup = useCallback(
     (supName: string): number => {
       const normSupName = normalizeName(supName)
-
       const uniqueSubeKods = new Set<string>()
+
       merchDetayData.forEach(m => {
         if (m.sube_kod && m.sup_adi && normalizeName(m.sup_adi) === normSupName) {
           uniqueSubeKods.add(m.sube_kod.trim())
