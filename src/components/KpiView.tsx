@@ -24,6 +24,9 @@ interface Kampanya {
   renk:        string
   headerBg:    string
   accentText:  string
+  // Özel sayım: 'eslesme' → bir cariye her iki stok da gitmiş olmalı; min(s1,s2) sayılır
+  sayimTipi?: 'eslesme'
+  aciklama?:  string   // bireysel kural altında gösterilecek ek açıklama
 }
 
 const KAMPANYALAR: Kampanya[] = [
@@ -85,6 +88,22 @@ const KAMPANYALAR: Kampanya[] = [
     headerBg:    'bg-[#dc2626]',
     accentText:  'text-red-600',
   },
+  {
+    id:          'k5',
+    stokKodlar:  ['RHS8900', 'RHD7130'],
+    stokAdi:     'RHS8900 · RHD7130',
+    marka:       'Relux',
+    yil:         2026,
+    ayBaslangic: 7, ayBitis: 7,
+    donemAdi:    '1–31 Temmuz 2026',
+    esik:        150,
+    odul:        'Tatilbudur Çeki', odulTutar: '25.000 TL',
+    renk:        'from-[#b45309] to-[#f59e0b]',
+    headerBg:    'bg-[#b45309]',
+    accentText:  'text-amber-700',
+    sayimTipi:   'eslesme',
+    aciklama:    'Sayım: aynı cariye her iki ürün de gitmiş olmalı (min adet sayılır)',
+  },
 ]
 
 // ─── Tipler ──────────────────────────────────────────────────────
@@ -107,6 +126,10 @@ function hesapla(adet: number, esik: number): Omit<BsyKpiRow, 'bsyAdi' | 'adet'>
 }
 
 function apiUrl(k: Kampanya) {
+  if (k.sayimTipi === 'eslesme') {
+    return `/api/kpi-adet-eslesme?yil=${k.yil}&ayBaslangic=${k.ayBaslangic}&ayBitis=${k.ayBitis}` +
+      `&stokKod1=${encodeURIComponent(k.stokKodlar[0])}&stokKod2=${encodeURIComponent(k.stokKodlar[1])}`
+  }
   const base = `/api/kpi-adet?yil=${k.yil}&ayBaslangic=${k.ayBaslangic}&ayBitis=${k.ayBitis}`
   return k.stokKodlar.length === 1
     ? `${base}&stokKodu=${encodeURIComponent(k.stokKodlar[0])}`
@@ -151,6 +174,13 @@ function KampanyaBlok({ k, rows, loading, onRefresh }: {
                 <ChevronRight size={9} className="opacity-60" />
                 <span className="font-bold text-xs">{k.odulTutar}</span>
               </div>
+
+              {/* Eşleşme açıklaması */}
+              {k.aciklama && (
+                <div className="flex items-center gap-1.5 bg-white/10 rounded-lg px-2.5 py-1 w-fit">
+                  <span className="text-[9px] opacity-80 italic">{k.aciklama}</span>
+                </div>
+              )}
 
               {/* Kolektif kural */}
               {toplamEsik != null && (
