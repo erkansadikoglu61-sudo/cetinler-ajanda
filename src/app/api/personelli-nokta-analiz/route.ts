@@ -61,12 +61,21 @@ export interface PersonelliNoktaResponse {
 }
 
 export async function GET(req: Request) {
-  const sp         = new URL(req.url).searchParams
-  const yil        = sp.get('yil')  ? parseInt(sp.get('yil')!)  : new Date().getFullYear()
-  const ay         = sp.get('ay')   ? parseInt(sp.get('ay')!)   : new Date().getMonth() + 1
-  const grupFilter = sp.get('grup')?.trim().toUpperCase() || ''
-  const bsyFilter  = sp.get('bsy')?.trim() || ''
-  const isDebug    = sp.get('debug') === '1'
+  const sp      = new URL(req.url).searchParams
+  const yil     = sp.get('yil') ? parseInt(sp.get('yil')!) : new Date().getFullYear()
+  const isDebug = sp.get('debug') === '1'
+
+  // Çoklu ay: ?aylar=6,7  (geriye uyumluluk: ?ay=6 de çalışır)
+  const aylarParam = sp.get('aylar') || sp.get('ay') || String(new Date().getMonth() + 1)
+  const aySet = new Set(aylarParam.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)))
+
+  // Çoklu grup: ?gruplar=RELUX,ELUX  (geriye uyumluluk: ?grup=RELUX de çalışır)
+  const gruplarParam = sp.get('gruplar') || sp.get('grup') || ''
+  const grupSet2 = gruplarParam
+    ? new Set(gruplarParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean))
+    : null  // null = filtre yok
+
+  const bsyFilter = sp.get('bsy')?.trim() || ''
 
   // ── 1. PHP → Çetinler Merch ──────────────────────────────────────────────
   // Key: cariKod (PHP sistemi)
@@ -116,10 +125,9 @@ export async function GET(req: Request) {
   for (const [kod, v] of cariMap.entries()) normToKod.set(v.normAdi, kod)
 
   // ── 2. SAHA.xlsx → cari bazında net ciro ─────────────────────────────────
-  // İki ayrı map: cariKod (r[1]) ve normCariAdi (r[2]) üzerinden
   const ciroByKod  = new Map<string, number>()   // r[1] → ciro
   const ciroByNorm = new Map<string, number>()   // norm(r[2]) → ciro
-  const grupSet    = new Set<string>()
+  const grupSet    = new Set<string>()           // dropdown için
 
   // debug için ham Excel satırları (r[1], r[2]) — seçili dönem
   const excelOrnek: { r1: string; r2: string; normR2: string }[] = []
@@ -146,9 +154,11 @@ export async function GET(req: Request) {
         if (!rowYil || !rowAy) continue
         if (gc !== 'C' && gc !== 'G') continue
 
-        if (rowYil === yil && rowAy === ay && grupKodu) grupSet.add(grupKodu)
-        if (rowYil !== yil || rowAy !== ay) continue
-        if (grupFilter && grupKodu !== grupFilter) continue
+        // Grup dropdown için seçili dönemdeki tüm grupları topla
+        if (rowYil === yil && aySet.has(rowAy) && grupKodu) grupSet.add(grupKodu)
+
+        if (rowYil !== yil || !aySet.has(rowAy)) continue
+        if (grupSet2 && !grupSet2.has(grupKodu)) continue
 
         if (isDebug && excelOrnek.length < 40) {
           const key = cariKod + '||' + cariIsim
