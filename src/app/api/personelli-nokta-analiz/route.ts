@@ -29,7 +29,6 @@ async function getExcelBuffer(): Promise<Buffer | null> {
   } catch { return null }
 }
 
-// ─── PHP parse yardımcısı ────────────────────────────────────────────────────
 function decodeHtml(s: string): string {
   return s
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
@@ -39,13 +38,13 @@ function decodeHtml(s: string): string {
 
 // ─── Tipler ──────────────────────────────────────────────────────────────────
 export interface PersonelliNoktaRow {
-  cariAdi:       string
+  cariAdi:        string
   personelSayisi: number
-  gercCiro:      number
+  gercCiro:       number
 }
 
 export interface PersonelliNoktaResponse {
-  rows:   PersonelliNoktaRow[]
+  rows:    PersonelliNoktaRow[]
   gruplar: string[]
   bsyler:  string[]
   carilar: string[]
@@ -53,17 +52,16 @@ export interface PersonelliNoktaResponse {
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
 export async function GET(req: Request) {
-  const sp  = new URL(req.url).searchParams
-  const yil = sp.get('yil') ? parseInt(sp.get('yil')!) : new Date().getFullYear()
-  const ay  = sp.get('ay')  ? parseInt(sp.get('ay')!)  : new Date().getMonth() + 1
+  const sp         = new URL(req.url).searchParams
+  const yil        = sp.get('yil')  ? parseInt(sp.get('yil')!)  : new Date().getFullYear()
+  const ay         = sp.get('ay')   ? parseInt(sp.get('ay')!)   : new Date().getMonth() + 1
   const grupFilter = sp.get('grup')?.trim().toUpperCase() || ''
-  const bsyFilter  = sp.get('bsy')?.trim()  || ''
+  const bsyFilter  = sp.get('bsy')?.trim() || ''
 
-  // ── 1. PHP'den Çetinler Merch verisini çek ────────────────────────────────
-  // cariAdi → Set<subeAdi>  (personel sayısı = unique şube sayısı)
-  const cariSubeMap   = new Map<string, Set<string>>()  // cariAdi → subeler
-  const cariBsyMap    = new Map<string, string>()        // cariAdi → bsyAdi
-  const bsySet        = new Set<string>()
+  // ── 1. PHP → Çetinler Merch ──────────────────────────────────────────────
+  // cariKod → { cariAdi, subeler: Set<string> }
+  const cariMap = new Map<string, { cariAdi: string; subeler: Set<string> }>()
+  const bsySet  = new Set<string>()
 
   try {
     const phpUrl = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_detay.php'
@@ -73,37 +71,34 @@ export async function GET(req: Request) {
     const trMatches = html.match(/<tr>[\s\S]*?<\/tr>/gi) || []
     for (let i = 1; i < trMatches.length; i++) {
       const tdMatches = trMatches[i].match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || []
-      if (tdMatches.length < 12) continue
-      const cells   = tdMatches.map(td => decodeHtml(td.replace(/<\/?td[^>]*>/gi, '')))
+      if (tdMatches.length < 10) continue
+      const cells = tdMatches.map(td => decodeHtml(td.replace(/<\/?td[^>]*>/gi, '')))
       // 0:MERCH_ADI 1:MERCH_ID 2:MERCH_TIPI 3:CARI_KOD 4:CARI_ISIM
       // 5:SUBE_KOD  6:SUBE_ADI 7:IBAN       8:BSY_KOD  9:BSY_ADI
-      // 10:SUP_ADI  11:JR_SUP
       const merchTipi = cells[2] || ''
+      const cariKod   = cells[3] || ''
       const cariAdi   = cells[4] || ''
-      const subeAdi   = cells[6] || cells[5] || ''
+      // Şube tanımlayıcı: önce sube_adi, yoksa sube_kod, hiçbiri yoksa merch_adi ile fallback
+      const subeKey   = (cells[6] || cells[5] || cells[0] || '__default__').trim()
       const bsyAdi    = cells[9] || ''
 
       if (merchTipi !== 'Çetinler Merch') continue
-      if (!cariAdi) continue
-
-      // BSY filtresi
+      if (!cariKod) continue
       if (bsyFilter && bsyAdi !== bsyFilter) continue
 
-      if (!cariSubeMap.has(cariAdi)) cariSubeMap.set(cariAdi, new Set())
-      if (subeAdi) cariSubeMap.get(cariAdi)!.add(subeAdi)
-      else         cariSubeMap.get(cariAdi)!.add('__default__')  // şube yoksa kendisi
-
-      if (bsyAdi) {
-        bsySet.add(bsyAdi)
-        if (!cariBsyMap.has(cariAdi)) cariBsyMap.set(cariAdi, bsyAdi)
+      if (!cariMap.has(cariKod)) {
+        cariMap.set(cariKod, { cariAdi: cariAdi || cariKod, subeler: new Set() })
       }
+      cariMap.get(cariKod)!.subeler.add(subeKey)
+
+      if (bsyAdi) bsySet.add(bsyAdi)
     }
   } catch (e) {
     console.warn('PHP fetch hatası:', e)
   }
 
-  // ── 2. SAHA.xlsx'den cari bazında net ciro hesapla ────────────────────────
-  // cariAdi → net tutar (seçili dönem + grup filtresi)
+  // ── 2. SAHA.xlsx → cariKod bazında net ciro ──────────────────────────────
+  // cariKod → net tutar, seçili dönem + grup filtresi
   const cariCiroMap = new Map<string, number>()
   const grupSet     = new Set<string>()
 
@@ -117,44 +112,52 @@ export async function GET(req: Request) {
         const r = raw[i]
         if (!r) continue
 
-        const gc        = String(r[18] ?? '').toUpperCase().trim()
-        const rowYil    = typeof r[21] === 'number' ? r[21] : parseInt(String(r[21] ?? '0'))
-        const rowAy     = typeof r[20] === 'number' ? r[20] : parseInt(String(r[20] ?? '0'))
-        const cariIsim  = String(r[2]  ?? '').trim()
-        const grupKodu  = String(r[17] ?? '').toUpperCase().trim()
-        const rawNet    = typeof r[11] === 'number' ? r[11]
-                        : parseFloat(String(r[11] ?? '0').replace(',', '.')) || 0
+        const gc       = String(r[18] ?? '').toUpperCase().trim()
+        const rowYil   = typeof r[21] === 'number' ? r[21] : parseInt(String(r[21] ?? '0'))
+        const rowAy    = typeof r[20] === 'number' ? r[20] : parseInt(String(r[20] ?? '0'))
+        const cariKod  = String(r[1]  ?? '').trim()
+        const grupKodu = String(r[17] ?? '').toUpperCase().trim()
+        const rawNet   = typeof r[11] === 'number' ? r[11]
+                       : parseFloat(String(r[11] ?? '0').replace(',', '.')) || 0
 
-        if (!cariIsim || !rowYil || !rowAy) continue
+        if (!cariKod || !rowYil || !rowAy) continue
         if (gc !== 'C' && gc !== 'G') continue
+
+        // Grup dropdown için filtre uygulanmadan önce topla
+        if (rowYil === yil && rowAy === ay && grupKodu) grupSet.add(grupKodu)
+
         if (rowYil !== yil || rowAy !== ay) continue
         if (grupFilter && grupKodu !== grupFilter) continue
 
-        if (grupKodu) grupSet.add(grupKodu)
+        // Sadece PHP'de Çetinler Merch olan cari kodlarının cirosu ilgilendiriyor
+        if (!cariMap.has(cariKod)) continue
 
         const net = gc === 'G' ? -Math.abs(rawNet) : rawNet
-        cariCiroMap.set(cariIsim, (cariCiroMap.get(cariIsim) ?? 0) + net)
+        cariCiroMap.set(cariKod, (cariCiroMap.get(cariKod) ?? 0) + net)
       }
     }
   }
 
   // ── 3. Birleştir ──────────────────────────────────────────────────────────
   const rows: PersonelliNoktaRow[] = []
-  for (const [cariAdi, subeler] of cariSubeMap.entries()) {
+  for (const [cariKod, { cariAdi, subeler }] of cariMap.entries()) {
     rows.push({
       cariAdi,
       personelSayisi: subeler.size,
-      gercCiro:       cariCiroMap.get(cariAdi) ?? 0,
+      gercCiro:       cariCiroMap.get(cariKod) ?? 0,
     })
   }
 
-  // Ciro büyüklüğüne göre sırala, sonra ada göre
   rows.sort((a, b) => b.gercCiro - a.gercCiro || a.cariAdi.localeCompare(b.cariAdi, 'tr'))
+
+  const carilar = [...cariMap.values()]
+    .map(v => v.cariAdi)
+    .sort((a, b) => a.localeCompare(b, 'tr'))
 
   return NextResponse.json<PersonelliNoktaResponse>({
     rows,
     gruplar: [...grupSet].sort((a, b) => a.localeCompare(b, 'tr')),
     bsyler:  [...bsySet].sort((a, b) => a.localeCompare(b, 'tr')),
-    carilar: [...cariSubeMap.keys()].sort((a, b) => a.localeCompare(b, 'tr')),
+    carilar,
   })
 }
