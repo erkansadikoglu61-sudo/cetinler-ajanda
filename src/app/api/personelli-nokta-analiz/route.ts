@@ -138,7 +138,33 @@ export async function GET(req: Request) {
     }
   }
 
-  // ── 3. Birleştir ──────────────────────────────────────────────────────────
+  // ── 3. Debug modu ─────────────────────────────────────────────────────────
+  if (sp.get('debug') === '1') {
+    const phpKodlar  = [...cariMap.entries()].map(([kod, v]) => ({ kod, adi: v.cariAdi })).slice(0, 30)
+    const excelKodlar = [...cariCiroMap.entries()].map(([kod, ciro]) => ({ kod, ciro })).slice(0, 30)
+    // Excel'den tüm cariKodları (filtresiz, aynı dönem) — eşleşme olup olmadığını görme
+    const excelTumKodlar: string[] = []
+    if (buf) {
+      const wb2 = XLSX.read(buf, { type: 'buffer', dense: true })
+      const ws2 = wb2.Sheets['Data']
+      if (ws2) {
+        const raw2: unknown[][] = XLSX.utils.sheet_to_json(ws2, { header: 1, defval: null })
+        const kodSet = new Set<string>()
+        for (let i = 1; i < raw2.length; i++) {
+          const r = raw2[i]; if (!r) continue
+          const rowYil = typeof r[21] === 'number' ? r[21] : parseInt(String(r[21] ?? '0'))
+          const rowAy  = typeof r[20] === 'number' ? r[20] : parseInt(String(r[20] ?? '0'))
+          if (rowYil !== yil || rowAy !== ay) continue
+          const kod = String(r[1] ?? '').trim()
+          if (kod) kodSet.add(kod)
+        }
+        excelTumKodlar.push(...[...kodSet].slice(0, 50))
+      }
+    }
+    return NextResponse.json({ phpKodlar, excelKodlar, excelTumKodlar })
+  }
+
+  // ── 4. Birleştir ──────────────────────────────────────────────────────────
   const rows: PersonelliNoktaRow[] = []
   for (const [cariKod, { cariAdi, subeler }] of cariMap.entries()) {
     rows.push({
