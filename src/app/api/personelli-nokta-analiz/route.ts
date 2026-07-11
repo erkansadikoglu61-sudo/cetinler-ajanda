@@ -4,7 +4,6 @@ import * as path from 'path'
 import * as XLSX from 'xlsx'
 import { createClient } from '@supabase/supabase-js'
 
-// ─── Excel ───────────────────────────────────────────────────────────────────
 const EXCEL_PATH =
   process.env.BSY_EXCEL_PATH ??
   path.join(process.env.HOME ?? '/Users/erkansadikoglu', 'Desktop/SAHA.xlsx')
@@ -36,7 +35,18 @@ function decodeHtml(s: string): string {
     .trim()
 }
 
-// ─── Tipler ──────────────────────────────────────────────────────────────────
+// Cari adı normalize: büyük harf, fazla boşluk kaldır, yaygın noktalama farklarını sil
+function norm(s: string): string {
+  return s
+    .toUpperCase()
+    .replace(/\./g, ' ')
+    .replace(/,/g, ' ')
+    .replace(/İ/g, 'I').replace(/Ğ/g, 'G').replace(/Ü/g, 'U')
+    .replace(/Ş/g, 'S').replace(/Ö/g, 'O').replace(/Ç/g, 'C')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export interface PersonelliNoktaRow {
   cariAdi:        string
   personelSayisi: number
@@ -50,18 +60,22 @@ export interface PersonelliNoktaResponse {
   carilar: string[]
 }
 
-// ─── Handler ─────────────────────────────────────────────────────────────────
 export async function GET(req: Request) {
   const sp         = new URL(req.url).searchParams
   const yil        = sp.get('yil')  ? parseInt(sp.get('yil')!)  : new Date().getFullYear()
   const ay         = sp.get('ay')   ? parseInt(sp.get('ay')!)   : new Date().getMonth() + 1
   const grupFilter = sp.get('grup')?.trim().toUpperCase() || ''
   const bsyFilter  = sp.get('bsy')?.trim() || ''
+  const isDebug    = sp.get('debug') === '1'
 
   // ── 1. PHP → Çetinler Merch ──────────────────────────────────────────────
-  // cariKod → { cariAdi, subeler: Set<string> }
-  const cariMap = new Map<string, { cariAdi: string; subeler: Set<string> }>()
-  const bsySet  = new Set<string>()
+  // Key: cariKod (PHP sistemi)
+  const cariMap = new Map<string, {
+    cariAdi:  string
+    normAdi:  string
+    subeler:  Set<string>
+  }>()
+  const bsySet = new Set<string>()
 
   try {
     const phpUrl = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_detay.php'
@@ -72,13 +86,10 @@ export async function GET(req: Request) {
     for (let i = 1; i < trMatches.length; i++) {
       const tdMatches = trMatches[i].match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || []
       if (tdMatches.length < 10) continue
-      const cells = tdMatches.map(td => decodeHtml(td.replace(/<\/?td[^>]*>/gi, '')))
-      // 0:MERCH_ADI 1:MERCH_ID 2:MERCH_TIPI 3:CARI_KOD 4:CARI_ISIM
-      // 5:SUBE_KOD  6:SUBE_ADI 7:IBAN       8:BSY_KOD  9:BSY_ADI
+      const cells     = tdMatches.map(td => decodeHtml(td.replace(/<\/?td[^>]*>/gi, '')))
       const merchTipi = cells[2] || ''
       const cariKod   = cells[3] || ''
       const cariAdi   = cells[4] || ''
-      // Şube tanımlayıcı: önce sube_adi, yoksa sube_kod, hiçbiri yoksa merch_adi ile fallback
       const subeKey   = (cells[6] || cells[5] || cells[0] || '__default__').trim()
       const bsyAdi    = cells[9] || ''
 
@@ -87,20 +98,31 @@ export async function GET(req: Request) {
       if (bsyFilter && bsyAdi !== bsyFilter) continue
 
       if (!cariMap.has(cariKod)) {
-        cariMap.set(cariKod, { cariAdi: cariAdi || cariKod, subeler: new Set() })
+        cariMap.set(cariKod, {
+          cariAdi: cariAdi || cariKod,
+          normAdi: norm(cariAdi),
+          subeler: new Set(),
+        })
       }
       cariMap.get(cariKod)!.subeler.add(subeKey)
-
       if (bsyAdi) bsySet.add(bsyAdi)
     }
   } catch (e) {
     console.warn('PHP fetch hatası:', e)
   }
 
-  // ── 2. SAHA.xlsx → cariKod bazında net ciro ──────────────────────────────
-  // cariKod → net tutar, seçili dönem + grup filtresi
-  const cariCiroMap = new Map<string, number>()
-  const grupSet     = new Set<string>()
+  // normAdi → cariKod (hızlı lookup için)
+  const normToKod = new Map<string, string>()
+  for (const [kod, v] of cariMap.entries()) normToKod.set(v.normAdi, kod)
+
+  // ── 2. SAHA.xlsx → cari bazında net ciro ─────────────────────────────────
+  // İki ayrı map: cariKod (r[1]) ve normCariAdi (r[2]) üzerinden
+  const ciroByKod  = new Map<string, number>()   // r[1] → ciro
+  const ciroByNorm = new Map<string, number>()   // norm(r[2]) → ciro
+  const grupSet    = new Set<string>()
+
+  // debug için ham Excel satırları (r[1], r[2]) — seçili dönem
+  const excelOrnek: { r1: string; r2: string; normR2: string }[] = []
 
   const buf = await getExcelBuffer()
   if (buf) {
@@ -116,64 +138,58 @@ export async function GET(req: Request) {
         const rowYil   = typeof r[21] === 'number' ? r[21] : parseInt(String(r[21] ?? '0'))
         const rowAy    = typeof r[20] === 'number' ? r[20] : parseInt(String(r[20] ?? '0'))
         const cariKod  = String(r[1]  ?? '').trim()
+        const cariIsim = String(r[2]  ?? '').trim()
         const grupKodu = String(r[17] ?? '').toUpperCase().trim()
         const rawNet   = typeof r[11] === 'number' ? r[11]
                        : parseFloat(String(r[11] ?? '0').replace(',', '.')) || 0
 
-        if (!cariKod || !rowYil || !rowAy) continue
+        if (!rowYil || !rowAy) continue
         if (gc !== 'C' && gc !== 'G') continue
 
-        // Grup dropdown için filtre uygulanmadan önce topla
         if (rowYil === yil && rowAy === ay && grupKodu) grupSet.add(grupKodu)
-
         if (rowYil !== yil || rowAy !== ay) continue
         if (grupFilter && grupKodu !== grupFilter) continue
 
-        // Sadece PHP'de Çetinler Merch olan cari kodlarının cirosu ilgilendiriyor
-        if (!cariMap.has(cariKod)) continue
+        if (isDebug && excelOrnek.length < 40) {
+          const key = cariKod + '||' + cariIsim
+          if (!excelOrnek.some(e => e.r1 === cariKod && e.r2 === cariIsim)) {
+            excelOrnek.push({ r1: cariKod, r2: cariIsim, normR2: norm(cariIsim) })
+          }
+        }
 
         const net = gc === 'G' ? -Math.abs(rawNet) : rawNet
-        cariCiroMap.set(cariKod, (cariCiroMap.get(cariKod) ?? 0) + net)
+
+        if (cariKod) ciroByKod.set(cariKod,   (ciroByKod.get(cariKod)   ?? 0) + net)
+        if (cariIsim) {
+          const n = norm(cariIsim)
+          ciroByNorm.set(n, (ciroByNorm.get(n) ?? 0) + net)
+        }
       }
     }
   }
 
-  // ── 3. Debug modu ─────────────────────────────────────────────────────────
-  if (sp.get('debug') === '1') {
-    const phpKodlar   = [...cariMap.entries()].map(([kod, v]) => ({ kod, adi: v.cariAdi })).slice(0, 30)
-    const excelKodlar = [...cariCiroMap.entries()].map(([kod, ciro]) => ({ kod, ciro })).slice(0, 30)
-    // Excel'den tüm r[1]+r[2] çiftleri (filtresiz, aynı dönem)
-    const excelOrnek: { r1: string; r2: string }[] = []
-    if (buf) {
-      const wb2 = XLSX.read(buf, { type: 'buffer', dense: true })
-      const ws2 = wb2.Sheets['Data']
-      if (ws2) {
-        const raw2: unknown[][] = XLSX.utils.sheet_to_json(ws2, { header: 1, defval: null })
-        const seen = new Set<string>()
-        for (let i = 1; i < raw2.length; i++) {
-          const r = raw2[i]; if (!r) continue
-          const rowYil = typeof r[21] === 'number' ? r[21] : parseInt(String(r[21] ?? '0'))
-          const rowAy  = typeof r[20] === 'number' ? r[20] : parseInt(String(r[20] ?? '0'))
-          if (rowYil !== yil || rowAy !== ay) continue
-          const r1 = String(r[1] ?? '').trim()
-          const r2 = String(r[2] ?? '').trim()
-          const key = r1 + '||' + r2
-          if (!seen.has(key)) { seen.add(key); excelOrnek.push({ r1, r2 }) }
-          if (excelOrnek.length >= 30) break
-        }
-      }
-    }
-    return NextResponse.json({ phpKodlar, excelKodlar, excelOrnek })
+  // ── 3. Debug ──────────────────────────────────────────────────────────────
+  if (isDebug) {
+    const phpKodlar = [...cariMap.entries()].map(([kod, v]) => ({
+      kod, adi: v.cariAdi, normAdi: v.normAdi,
+    }))
+    // Hangi PHP carilarının Excel'de adıyla eşleştiğini göster
+    const eslesmeler = phpKodlar.map(p => ({
+      phpAdi:     p.adi,
+      normPhp:    p.normAdi,
+      ciroByKod:  ciroByKod.get(p.kod) ?? null,
+      ciroByNorm: ciroByNorm.get(p.normAdi) ?? null,
+      excelEsles: excelOrnek.find(e => e.normR2 === p.normAdi)?.r2 ?? null,
+    }))
+    return NextResponse.json({ eslesmeler, excelOrnek: excelOrnek.slice(0, 20), gruplar: [...grupSet] })
   }
 
   // ── 4. Birleştir ──────────────────────────────────────────────────────────
   const rows: PersonelliNoktaRow[] = []
-  for (const [cariKod, { cariAdi, subeler }] of cariMap.entries()) {
-    rows.push({
-      cariAdi,
-      personelSayisi: subeler.size,
-      gercCiro:       cariCiroMap.get(cariKod) ?? 0,
-    })
+  for (const [cariKod, { cariAdi, normAdi, subeler }] of cariMap.entries()) {
+    // Önce cariKod ile dene, çakışmazsa normalize ad ile dene
+    const ciro = ciroByKod.get(cariKod) ?? ciroByNorm.get(normAdi) ?? 0
+    rows.push({ cariAdi, personelSayisi: subeler.size, gercCiro: ciro })
   }
 
   rows.sort((a, b) => b.gercCiro - a.gercCiro || a.cariAdi.localeCompare(b.cariAdi, 'tr'))
