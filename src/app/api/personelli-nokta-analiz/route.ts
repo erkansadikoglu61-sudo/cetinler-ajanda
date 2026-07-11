@@ -140,28 +140,30 @@ export async function GET(req: Request) {
 
   // ── 3. Debug modu ─────────────────────────────────────────────────────────
   if (sp.get('debug') === '1') {
-    const phpKodlar  = [...cariMap.entries()].map(([kod, v]) => ({ kod, adi: v.cariAdi })).slice(0, 30)
+    const phpKodlar   = [...cariMap.entries()].map(([kod, v]) => ({ kod, adi: v.cariAdi })).slice(0, 30)
     const excelKodlar = [...cariCiroMap.entries()].map(([kod, ciro]) => ({ kod, ciro })).slice(0, 30)
-    // Excel'den tüm cariKodları (filtresiz, aynı dönem) — eşleşme olup olmadığını görme
-    const excelTumKodlar: string[] = []
+    // Excel'den tüm r[1]+r[2] çiftleri (filtresiz, aynı dönem)
+    const excelOrnek: { r1: string; r2: string }[] = []
     if (buf) {
       const wb2 = XLSX.read(buf, { type: 'buffer', dense: true })
       const ws2 = wb2.Sheets['Data']
       if (ws2) {
         const raw2: unknown[][] = XLSX.utils.sheet_to_json(ws2, { header: 1, defval: null })
-        const kodSet = new Set<string>()
+        const seen = new Set<string>()
         for (let i = 1; i < raw2.length; i++) {
           const r = raw2[i]; if (!r) continue
           const rowYil = typeof r[21] === 'number' ? r[21] : parseInt(String(r[21] ?? '0'))
           const rowAy  = typeof r[20] === 'number' ? r[20] : parseInt(String(r[20] ?? '0'))
           if (rowYil !== yil || rowAy !== ay) continue
-          const kod = String(r[1] ?? '').trim()
-          if (kod) kodSet.add(kod)
+          const r1 = String(r[1] ?? '').trim()
+          const r2 = String(r[2] ?? '').trim()
+          const key = r1 + '||' + r2
+          if (!seen.has(key)) { seen.add(key); excelOrnek.push({ r1, r2 }) }
+          if (excelOrnek.length >= 30) break
         }
-        excelTumKodlar.push(...[...kodSet].slice(0, 50))
       }
     }
-    return NextResponse.json({ phpKodlar, excelKodlar, excelTumKodlar })
+    return NextResponse.json({ phpKodlar, excelKodlar, excelOrnek })
   }
 
   // ── 4. Birleştir ──────────────────────────────────────────────────────────
