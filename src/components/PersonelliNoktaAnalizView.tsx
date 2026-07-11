@@ -154,8 +154,9 @@ export function PersonelliNoktaAnalizView() {
   const rows = cariFilter ? allRows.filter(r => r.cariAdi === cariFilter) : allRows
 
   const birimSayi   = parseFloat(birimButce.replace(/\./g, '').replace(',', '.')) || 0
+  const aySayisi    = aylar.length || 1   // seçili ay sayısı (en az 1)
   const toplamPersonel = rows.reduce((s, r) => s + r.personelSayisi, 0)
-  const toplamButce    = rows.reduce((s, r) => s + birimSayi * r.personelSayisi, 0)
+  const toplamButce    = rows.reduce((s, r) => s + birimSayi * r.personelSayisi * aySayisi, 0)
   const toplamCiro     = rows.reduce((s, r) => s + r.gercCiro, 0)
   const toplamOran     = toplamCiro > 0 ? (toplamButce / toplamCiro) * 100 : 0
 
@@ -275,7 +276,7 @@ export function PersonelliNoktaAnalizView() {
             </thead>
             <tbody>
               {rows.map((row, idx) => {
-                const personelButce = birimSayi * row.personelSayisi
+                const personelButce = birimSayi * row.personelSayisi * aySayisi
                 const oran = row.gercCiro > 0 ? (personelButce / row.gercCiro) * 100 : null
                 const oranYuksek = oran != null && oran > 9.99
                 return (
