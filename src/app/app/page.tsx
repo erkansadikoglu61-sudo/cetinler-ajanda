@@ -32,7 +32,8 @@ import { AnalizView } from '@/components/AnalizView'
 import { AdminDashboardView } from '@/components/AdminDashboardView'
 import { DestekPersoneliPrimView } from '@/components/DestekPersoneliPrimView'
 import { TahsilatTakvimiView } from '@/components/TahsilatTakvimiView'
-type TabType = 'month' | 'week' | 'day' | 'report' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'destek-personel' | 'analiz' | 'tahsilat-planim' | 'tahsilat-takvimi' | 'dashboard'
+import { PersonelliNoktaAnalizView } from '@/components/PersonelliNoktaAnalizView'
+type TabType = 'month' | 'week' | 'day' | 'report' | 'personelli-nokta-analiz' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'destek-personel' | 'analiz' | 'tahsilat-planim' | 'tahsilat-takvimi' | 'dashboard'
 
 // Renk hex'ine alpha ekle
 function hexWithAlpha(hex: string, alpha: string) {
@@ -1854,13 +1855,13 @@ export default function AppPage() {
                   <Calendar size={15} /> Takvim
                 </button>
               )}
-              {/* Rapor (admin) */}
+              {/* Rapor grubu (admin) */}
               {currentProfile?.role === 'admin' && (
                 <button
-                  onClick={() => setTab('report')}
+                  onClick={() => { if (!['report','personelli-nokta-analiz'].includes(tab)) setTab('report') }}
                   className={clsx(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                    tab === 'report' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                    ['report','personelli-nokta-analiz'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
                   )}
                 >
                   <FileText size={15} /> Rapor
@@ -2029,6 +2030,24 @@ export default function AppPage() {
               ))}
             </div>
           )}
+          {/* Rapor alt sekmeleri */}
+          {currentProfile?.role === 'admin' && ['report','personelli-nokta-analiz'].includes(tab) && (
+            <div className="flex overflow-x-auto items-center gap-1 px-3 pb-1.5 scrollbar-none">
+              {([
+                { key: 'report'                   as const, icon: FileText,  label: 'Ziyaret Raporu' },
+                { key: 'personelli-nokta-analiz'  as const, icon: MapPin,    label: 'Personelli Nokta Analiz' },
+              ] as const).map(({ key, icon: Icon, label }) => (
+                <button key={key} onClick={() => setTab(key)}
+                  className={clsx(
+                    'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
+                    tab === key ? 'bg-brand-100 text-brand-700' : 'text-gray-400 hover:bg-gray-100'
+                  )}
+                >
+                  <Icon size={12} /> {label}
+                </button>
+              ))}
+            </div>
+          )}
           {/* BSY alt sekmeleri */}
           {isBsyOrAdmin && ['bsy','kpi','genel-raporlar','tahsilat-planim'].includes(tab) && (
             <div className="flex overflow-x-auto items-center gap-1 px-3 pb-1.5 scrollbar-none">
@@ -2123,6 +2142,11 @@ export default function AppPage() {
               tasks={tasks} team={team} year={year} month={month}
               filterPid={filterPid} filterName={filterName}
             />
+          )}
+          {tab === 'personelli-nokta-analiz' && currentProfile?.role === 'admin' && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <PersonelliNoktaAnalizView />
+            </div>
           )}
           {tab === 'sellout' && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
@@ -2227,7 +2251,7 @@ export default function AppPage() {
       )}
 
       {/* FAB — sadece takvim erişimi olan kullanıcılar takvim sekmelerinde görünür */}
-      {hasCalendarAccess && tab !== 'report' && tab !== 'visits' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && tab !== 'tahsilat-planim' && tab !== 'dashboard' && tab !== 'destek-personel' && (
+      {hasCalendarAccess && tab !== 'report' && tab !== 'personelli-nokta-analiz' && tab !== 'visits' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && tab !== 'tahsilat-planim' && tab !== 'dashboard' && tab !== 'destek-personel' && (
         <button
           onClick={handleAddTask}
           className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
@@ -2264,11 +2288,12 @@ export default function AppPage() {
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
-              onClick={() => key === 'month' ? (!['month','week','day'].includes(tab) && setTab('month')) : setTab(key)}
+              onClick={() => key === 'month' ? (!['month','week','day'].includes(tab) && setTab('month')) : key === 'report' ? (!['report','personelli-nokta-analiz'].includes(tab) && setTab('report')) : setTab(key)}
               className={clsx(
                 'flex flex-col items-center justify-center gap-0.5 transition-colors',
                 (tab === key ||
                   (key === 'month' && ['month','week','day'].includes(tab)) ||
+                  (key === 'report' && tab === 'personelli-nokta-analiz') ||
                   (key === 'bsy' && ['bsy','kpi','genel-raporlar'].includes(tab)) ||
                   (key === 'noktalar' && tab === 'kullanicilar') ||
                   (key === 'adet-prim' && ['bayi-merch','destek-personel'].includes(tab)))
