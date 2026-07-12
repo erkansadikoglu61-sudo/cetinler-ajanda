@@ -35,16 +35,21 @@ function decodeHtml(s: string): string {
     .trim()
 }
 
-// Cari adı normalize: büyük harf, fazla boşluk kaldır, yaygın noktalama farklarını sil
+// Cari adı normalize: büyük harf, noktalama sil, Türkçe karakterleri dönüştür
 function norm(s: string): string {
   return s
     .toUpperCase()
-    .replace(/\./g, ' ')
-    .replace(/,/g, ' ')
+    .replace(/\./g, ' ').replace(/,/g, ' ')
     .replace(/İ/g, 'I').replace(/Ğ/g, 'G').replace(/Ü/g, 'U')
     .replace(/Ş/g, 'S').replace(/Ö/g, 'O').replace(/Ç/g, 'C')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+// İlk 2 anlamlı kelime (≥3 karakter) — zincir şirketlerin farklı kayıtlarını yakalar
+function prefixKey(normalized: string): string {
+  const words = normalized.split(' ').filter(w => w.length >= 3)
+  return words.slice(0, 2).join(' ')
 }
 
 export interface PersonelliNoktaRow {
@@ -125,11 +130,11 @@ export async function GET(req: Request) {
   for (const [kod, v] of cariMap.entries()) normToKod.set(v.normAdi, kod)
 
   // ── 2. SAHA.xlsx → cari bazında net ciro ─────────────────────────────────
-  const ciroByKod  = new Map<string, number>()   // r[1] → ciro
-  const ciroByNorm = new Map<string, number>()   // norm(r[2]) → ciro
-  const grupSet    = new Set<string>()           // dropdown için
+  const ciroByKod    = new Map<string, number>()  // r[1] (cariKod) → ciro
+  const ciroByNorm   = new Map<string, number>()  // norm(r[2]) tam eşleşme → ciro
+  const ciroByPrefix = new Map<string, number>()  // prefixKey(norm(r[2])) → ciro (zincir desteği)
+  const grupSet      = new Set<string>()
 
-  // debug için ham Excel satırları (r[1], r[2]) — seçili dönem
   const excelOrnek: { r1: string; r2: string; normR2: string }[] = []
 
   const buf = await getExcelBuffer()
@@ -151,29 +156,30 @@ export async function GET(req: Request) {
         const rawNet   = typeof r[11] === 'number' ? r[11]
                        : parseFloat(String(r[11] ?? '0').replace(',', '.')) || 0
 
-        if (!rowYil || !rowAy) continue
-        if (gc !== 'C' && gc !== 'G') continue
+        if (!cariIsim || !rowYil || !rowAy) continue
 
-        // Grup dropdown için seçili dönemdeki tüm grupları topla
+        // Grup dropdown için filtresiz topla
         if (rowYil === yil && aySet.has(rowAy) && grupKodu) grupSet.add(grupKodu)
 
         if (rowYil !== yil || !aySet.has(rowAy)) continue
-        if (grupSet2 && !grupSet2.has(grupKodu)) continue
+        if (grupSet2 && grupKodu && !grupSet2.has(grupKodu)) continue
 
         if (isDebug && excelOrnek.length < 40) {
-          const key = cariKod + '||' + cariIsim
           if (!excelOrnek.some(e => e.r1 === cariKod && e.r2 === cariIsim)) {
             excelOrnek.push({ r1: cariKod, r2: cariIsim, normR2: norm(cariIsim) })
           }
         }
 
+        // G = iade (negatif), diğerleri = satış (pozitif) — gc filtresi yok
         const net = gc === 'G' ? -Math.abs(rawNet) : rawNet
 
-        if (cariKod) ciroByKod.set(cariKod,   (ciroByKod.get(cariKod)   ?? 0) + net)
-        if (cariIsim) {
-          const n = norm(cariIsim)
-          ciroByNorm.set(n, (ciroByNorm.get(n) ?? 0) + net)
+        if (cariKod) {
+          ciroByKod.set(cariKod, (ciroByKod.get(cariKod) ?? 0) + net)
         }
+        const n  = norm(cariIsim)
+        const pk = prefixKey(n)
+        ciroByNorm.set(n,   (ciroByNorm.get(n)   ?? 0) + net)
+        if (pk) ciroByPrefix.set(pk, (ciroByPrefix.get(pk) ?? 0) + net)
       }
     }
   }
@@ -185,11 +191,13 @@ export async function GET(req: Request) {
     }))
     // Hangi PHP carilarının Excel'de adıyla eşleştiğini göster
     const eslesmeler = phpKodlar.map(p => ({
-      phpAdi:     p.adi,
-      normPhp:    p.normAdi,
-      ciroByKod:  ciroByKod.get(p.kod) ?? null,
-      ciroByNorm: ciroByNorm.get(p.normAdi) ?? null,
-      excelEsles: excelOrnek.find(e => e.normR2 === p.normAdi)?.r2 ?? null,
+      phpAdi:       p.adi,
+      normPhp:      p.normAdi,
+      prefix:       prefixKey(p.normAdi),
+      ciroByKod:    ciroByKod.get(p.kod) ?? null,
+      ciroByNorm:   ciroByNorm.get(p.normAdi) ?? null,
+      ciroByPrefix: ciroByPrefix.get(prefixKey(p.normAdi)) ?? null,
+      excelEsles:   excelOrnek.find(e => e.normR2 === p.normAdi)?.r2 ?? null,
     }))
     return NextResponse.json({ eslesmeler, excelOrnek: excelOrnek.slice(0, 20), gruplar: [...grupSet] })
   }
@@ -197,8 +205,14 @@ export async function GET(req: Request) {
   // ── 4. Birleştir ──────────────────────────────────────────────────────────
   const rows: PersonelliNoktaRow[] = []
   for (const [cariKod, { cariAdi, normAdi, subeler }] of cariMap.entries()) {
-    // Önce cariKod ile dene, çakışmazsa normalize ad ile dene
-    const ciro = ciroByKod.get(cariKod) ?? ciroByNorm.get(normAdi) ?? 0
+    // 1) Cari kod (PHP ↔ Excel tam eşleşme)
+    // 2) Normalize tam ad eşleşme
+    // 3) Prefix eşleşme (zincir firmaların farklı kayıtlarını kapsar)
+    const ciro =
+      ciroByKod.get(cariKod) ??
+      ciroByNorm.get(normAdi) ??
+      ciroByPrefix.get(prefixKey(normAdi)) ??
+      0
     rows.push({ cariAdi, personelSayisi: subeler.size, gercCiro: ciro })
   }
 
