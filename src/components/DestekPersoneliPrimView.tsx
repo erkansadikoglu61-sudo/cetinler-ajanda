@@ -181,7 +181,7 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId, curren
           <div className="text-xs text-gray-500">
             <span className="font-semibold">{rows.length}</span> kişi
             <span className="mx-1">•</span>
-            Toplam: <span className="font-bold text-brand-700">{toplamHakEdis.toLocaleString('tr-TR')} ₺</span>
+            Toplam: <span className="font-bold text-brand-700">{toplamHakEdis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺</span>
           </div>
         )}
       </div>
@@ -238,10 +238,10 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId, curren
                       {row.satis_adedi.toLocaleString('tr-TR')}
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums font-medium text-gray-800">
-                      {row.kosullu_destek_prim.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺
+                      {row.kosullu_destek_prim.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums font-bold text-brand-700 bg-brand-50">
-                      {row.hak_edis.toLocaleString('tr-TR')} ₺
+                      {row.hak_edis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
                     </td>
                   </tr>
                 ))}
@@ -252,7 +252,7 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId, curren
                     TOPLAM
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-brand-700 bg-brand-100">
-                    {toplamHakEdis.toLocaleString('tr-TR')} ₺
+                    {toplamHakEdis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
                   </td>
                 </tr>
               </tfoot>
