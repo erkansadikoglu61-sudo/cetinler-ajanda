@@ -9,456 +9,123 @@ function getAdmin() {
 }
 
 interface DestekPersonelRow {
-  merch_adi: string
-  sube_adi: string
-  cari_adi: string
-  cetinler_merch: string
-  kategori: string
-  hedef_gerceklesme: number      // %
-  satis_adedi: number
-  kosullu_destek_prim: number    // ₺/adet
-  hak_edis: number               // ₺
+  merch_adi:           string
+  sube_adi:            string
+  cari_adi:            string
+  cetinler_merch:      string
+  kategori:            string
+  hedef_gerceklesme:   number   // %
+  satis_adedi:         number
+  kosullu_destek_prim: number   // ₺/adet
+  hak_edis:            number   // ₺
 }
 
-// Merch hedef ve satış verilerini çek
-// Key: merch_adi → { kategori, hedef, gerceklesen, hedefGerceklesme }[]
-async function fetchMerchPerformance(phpUrl: string, donem: string): Promise<Map<string, { kategori: string; hedef: number; gerceklesen: number; hedefGerceklesme: number }[]>> {
-  try {
-    // 1. Merch hedeflerini Supabase'den çek
-    const sb = getAdmin()
-    const { data: hedefData } = await sb
-      .from('sellout_targets_merch')
-      .select('merch_name, grup, hedef')
-      .eq('donem', donem)
-
-    const hedefMap = new Map<string, Map<string, number>>() // merchName → { kategori → hedef }
-
-    if (hedefData) {
-      hedefData.forEach((row: { merch_name: string; grup: string; hedef: number }) => {
-        const merchKey = row.merch_name.toLowerCase()
-        if (!hedefMap.has(merchKey)) {
-          hedefMap.set(merchKey, new Map())
-        }
-        hedefMap.get(merchKey)!.set(row.grup, row.hedef || 0)
-      })
-    }
-
-    // 2. Satış verilerini PHP API'den çek (HTML)
-    const [yil, ay] = donem.split('-')
-    const params = new URLSearchParams({ yil, ay })
-    const response = await fetch(`${phpUrl}?${params}`, {
-      next: { revalidate: 900 }, // 15 dakika cache
-    })
-
-    if (!response.ok) return new Map()
-
-    const htmlText = await response.text()
-    const satisMap = new Map<string, Map<string, number>>() // merchName → { kategori → satış }
-
-    const trMatches = htmlText.match(/<tr>[\s\S]*?<\/tr>/gi) || []
-
-    for (let i = 1; i < trMatches.length; i++) {
-      const tr = trMatches[i]
-      const tdMatches = tr.match(/<td>([\s\S]*?)<\/td>/gi) || []
-
-      if (tdMatches.length >= 7) {
-        // Index 0: MERCH_PERSONEL
-        // Index 5: GRUP_ACIKLAMA (kategori)
-        // Index 6: SATILAN_ADET
-        const merchAdi = tdMatches[0]?.replace(/<\/?td>/gi, '').trim()
-        const kategori = tdMatches[5]?.replace(/<\/?td>/gi, '').trim()
-        const satisAdedi = parseFloat(tdMatches[6]?.replace(/<\/?td>/gi, '').trim() || '0') || 0
-
-        if (merchAdi && kategori) {
-          const merchKey = merchAdi.toLowerCase()
-
-          if (!satisMap.has(merchKey)) {
-            satisMap.set(merchKey, new Map())
-          }
-
-          const kategoriMap = satisMap.get(merchKey)!
-          kategoriMap.set(kategori, (kategoriMap.get(kategori) || 0) + satisAdedi)
-        }
-      }
-    }
-
-    // 3. Hedef + Satış → Performans hesapla
-    const result = new Map<string, { kategori: string; hedef: number; gerceklesen: number; hedefGerceklesme: number }[]>()
-
-    // Tüm merch'leri topla (hedef veya satış olanlar)
-    const allMerchKeys = new Set([...hedefMap.keys(), ...satisMap.keys()])
-
-    allMerchKeys.forEach(merchKey => {
-      const hedefKategoriMap = hedefMap.get(merchKey) || new Map()
-      const satisKategoriMap = satisMap.get(merchKey) || new Map()
-
-      // Tüm kategorileri topla
-      const allKategoriler = new Set([...hedefKategoriMap.keys(), ...satisKategoriMap.keys()])
-
-      const rows: { kategori: string; hedef: number; gerceklesen: number; hedefGerceklesme: number }[] = []
-
-      allKategoriler.forEach(kategori => {
-        const hedef = hedefKategoriMap.get(kategori) || 0
-        const gerceklesen = satisKategoriMap.get(kategori) || 0
-        const hedefGerceklesme = hedef > 0 ? (gerceklesen / hedef) * 100 : 0
-
-        rows.push({
-          kategori,
-          hedef,
-          gerceklesen,
-          hedefGerceklesme,
-        })
-      })
-
-      if (rows.length > 0) {
-        result.set(merchKey, rows)
-      }
-    })
-
-    return result
-  } catch (error) {
-    console.error('Merch performance fetch error:', error)
-    return new Map()
-  }
+function decodeHtml(text: string): string {
+  return text
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)))
 }
 
-// Koşullu destek prim değerlerini çek (kategori bazında ortalama)
-async function fetchKosulluDestekPrim(phpUrl: string, yil: number, ay: number): Promise<Map<string, number>> {
-  try {
-    // 1. Adet prim tablosunu çek
-    const sb = getAdmin()
-    const { data: primData, error } = await sb
-      .from('adet_prim_override')
-      .select('stok_kodu, kosullu_destek')
-      .eq('yil', yil)
-      .eq('ay', ay)
-
-    // Defaults ile merge et
-    const { ADET_PRIM_DEFAULTS } = await import('@/lib/adet-prim-defaults')
-    const primMap = new Map<string, number>()
-
-    // Defaults ekle
-    ADET_PRIM_DEFAULTS.forEach(r => {
-      if (r.kosulluDestek != null) {
-        primMap.set(r.stokKodu, r.kosulluDestek)
-      }
-    })
-
-    // Override'ları uygula
-    if (!error && primData) {
-      primData.forEach((row: { stok_kodu: string; kosullu_destek: number | null }) => {
-        if (row.kosullu_destek != null) {
-          primMap.set(row.stok_kodu, row.kosullu_destek)
-        }
-      })
-    }
-
-    // 2. Stok kodu → kategori mapping (PHP API HTML'den)
-    const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
-    const response = await fetch(`${phpUrl}?${params}`, {
-      next: { revalidate: 900 }, // 15 dakika cache
-    })
-
-    const kategoriMap = new Map<string, string>() // stok_kodu → kategori
-
-    if (response.ok) {
-      const htmlText = await response.text()
-      const trMatches = htmlText.match(/<tr>[\s\S]*?<\/tr>/gi) || []
-
-      for (let i = 1; i < trMatches.length; i++) {
-        const tr = trMatches[i]
-        const tdMatches = tr.match(/<td>([\s\S]*?)<\/td>/gi) || []
-
-        if (tdMatches.length >= 6) {
-          // Index 4: STOK_KODU
-          // Index 5: GRUP_ACIKLAMA (kategori)
-          const stokKodu = tdMatches[4]?.replace(/<\/?td>/gi, '').trim()
-          const kategori = tdMatches[5]?.replace(/<\/?td>/gi, '').trim()
-
-          if (stokKodu && kategori && !kategoriMap.has(stokKodu)) {
-            kategoriMap.set(stokKodu, kategori)
-          }
-        }
-      }
-    }
-
-    // 3. Kategori bazında ortalama hesapla
-    const kategoriPrimler = new Map<string, number[]>()
-
-    primMap.forEach((prim, stokKodu) => {
-      const kategori = kategoriMap.get(stokKodu) || 'Diğer'
-      if (!kategoriPrimler.has(kategori)) {
-        kategoriPrimler.set(kategori, [])
-      }
-      kategoriPrimler.get(kategori)!.push(prim)
-    })
-
-    const result = new Map<string, number>()
-    kategoriPrimler.forEach((primler, kategori) => {
-      const avg = primler.reduce((sum, val) => sum + val, 0) / primler.length
-      result.set(kategori, avg)
-    })
-
-    return result
-  } catch (error) {
-    console.error('Koşullu destek prim fetch error:', error)
-    return new Map()
-  }
+function normalize(str: string): string {
+  return str.trim().toLowerCase()
+    .replace(/i̇/g, 'i').replace(/ı/g, 'i').replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c')
+    .replace(/\s+/g, ' ')
 }
 
 export async function GET(req: Request) {
-  const sp = new URL(req.url).searchParams
-  const yil = sp.get('yil') ? parseInt(sp.get('yil')!) : new Date().getFullYear()
-  const ay = sp.get('ay') ? parseInt(sp.get('ay')!) : new Date().getMonth() + 1
-  const donem = `${yil}-${String(ay).padStart(2, '0')}`
-
-  // Filtreleme parametreleri
-  const bsyKod = sp.get('bsyKod') || null // BSY kullanıcısı için (KB1, MB1 vb.)
-  const supAdi = sp.get('supAdi') || null // Supervisor kullanıcısı için
+  const sp    = new URL(req.url).searchParams
+  const yil   = sp.get('yil') ? parseInt(sp.get('yil')!) : new Date().getFullYear()
+  const ay    = sp.get('ay')  ? parseInt(sp.get('ay')!)  : new Date().getMonth() + 1
+  const bsyKod = sp.get('bsyKod') || null
+  const supAdi = sp.get('supAdi') || null
 
   try {
     const sb = getAdmin()
 
-    // 1. Destek personelleri + şube/cari bilgileri
+    // 1. Destek personelleri
     const { data: destekPersonel, error: fpError } = await sb
       .from('field_personnel')
       .select('merch_adi, sube_adi, cari_adi, merch_grubu')
       .eq('merch_grubu', 'Destek Personeli')
 
-    if (fpError) {
-      return NextResponse.json({ error: fpError.message }, { status: 500 })
-    }
+    if (fpError) return NextResponse.json({ error: fpError.message }, { status: 500 })
+    if (!destekPersonel?.length) return NextResponse.json({ rows: [] })
 
-    console.log('📊 Destek Personeli sayısı:', destekPersonel?.length || 0)
-
-    if (!destekPersonel || destekPersonel.length === 0) {
-      console.warn('⚠️ field_personnel tablosunda Destek Personeli bulunamadı!')
-      return NextResponse.json({ rows: [] })
-    }
-
-    // 2. Sellout verisinden Çetinler merch'leri bul (şube + cari bazında)
     const phpUrl = process.env.PHP_API_URL
-    if (!phpUrl) {
-      console.warn('⚠️ PHP_API_URL not configured - returning placeholder data')
+    if (!phpUrl) return NextResponse.json({ rows: [] })
 
-      // PHP API olmadan placeholder data
-      const placeholderRows: DestekPersonelRow[] = destekPersonel.map(dp => ({
-        merch_adi: dp.merch_adi,
-        sube_adi: dp.sube_adi,
-        cari_adi: dp.cari_adi,
-        cetinler_merch: '-',
-        kategori: '-',
-        hedef_gerceklesme: 0,
-        satis_adedi: 0,
-        kosullu_destek_prim: 0,
-        hak_edis: 0,
-      }))
+    // 2. PHP'den şube+cari → Çetinler Merch / BSY / Supervisor mapping
+    const phpRes = await fetch(
+      'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php',
+      { cache: 'no-store' }
+    )
+    if (!phpRes.ok) return NextResponse.json({ rows: [] })
 
-      return NextResponse.json({
-        rows: placeholderRows,
-        warning: 'PHP_API_URL not configured - showing placeholder data'
-      })
-    }
+    const html = await phpRes.text()
 
-    const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
-    const selloutRes = await fetch(`${phpUrl}?${params}`, {
-      next: { revalidate: 900 }, // 15 dakika cache
-    })
-
-    if (!selloutRes.ok) {
-      console.warn('⚠️ PHP Sellout API error:', selloutRes.status)
-      return NextResponse.json({ rows: [] })
-    }
-
-    const htmlText = await selloutRes.text()
-    console.log('📊 Sellout HTML length:', htmlText.length)
-
-    // Şube + Cari → Çetinler Merch mapping (HTML'den parse)
     const subeCarimierchMap = new Map<string, string>()
-    // Şube + Cari → BSY mapping
-    const subeCariBsyMap = new Map<string, string>()
-    // Şube + Cari → Supervisor mapping
-    const subeCariSupMap = new Map<string, string>()
+    const subeCariBsyMap    = new Map<string, string>()
+    const subeCariSupMap    = new Map<string, string>()
 
-    // Türkçe karakterleri normalize et
-    const normalize = (str: string) => {
-      return str
-        .trim()
-        .toLowerCase()
-        .replace(/i̇/g, 'i')
-        .replace(/ı/g, 'i')
-        .replace(/ğ/g, 'g')
-        .replace(/ü/g, 'u')
-        .replace(/ş/g, 's')
-        .replace(/ö/g, 'o')
-        .replace(/ç/g, 'c')
-        .replace(/\s+/g, ' ')
-    }
-
-    const trMatches = htmlText.match(/<tr>[\s\S]*?<\/tr>/gi) || []
-
+    const trMatches = [...html.matchAll(/<tr>([\s\S]*?)<\/tr>/gi)]
     for (let i = 1; i < trMatches.length; i++) {
-      const tr = trMatches[i]
-      const tdMatches = tr.match(/<td>([\s\S]*?)<\/td>/gi) || []
+      const cells = [...trMatches[i][1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)]
+        .map(m => decodeHtml(m[1].replace(/<[^>]+>/g, '')).trim())
+      if (cells.length < 15) continue
 
-      if (tdMatches.length >= 17) {
-        // Index 0: MERCH_PERSONEL
-        // Index 1: CARI_ISIM
-        // Index 2: SUBE_ADI
-        // Index 9: SUPERVISOR_ADI
-        // Index 14: MERCH_TIPI
-        // Index 16: BSY
-        const merchAdi = tdMatches[0]?.replace(/<\/?td>/gi, '').trim()
-        const cariAdi = tdMatches[1]?.replace(/<\/?td>/gi, '').trim()
-        const subeAdi = tdMatches[2]?.replace(/<\/?td>/gi, '').trim()
-        const supervisorAdi = tdMatches[9]?.replace(/<\/?td>/gi, '').trim()
-        const merchTipi = tdMatches[14]?.replace(/<\/?td>/gi, '').trim()
-        const bsy = tdMatches[16]?.replace(/<\/?td>/gi, '').trim()
+      // [0] MERCH_PERSONEL, [1] CARI_ISIM, [2] SUBE_ADI
+      // [9] SUPERVISOR_ADI, [14] MERCH_TIPI, [16] BSY
+      const merchAdi     = cells[0]
+      const cariAdi      = cells[1]
+      const subeAdi      = cells[2]
+      const supervisorAdi = cells[9]  ?? ''
+      const merchTipi    = cells[14] ?? ''
+      const bsy          = cells[16] ?? ''
 
-        if (subeAdi && cariAdi) {
-          const key = `${normalize(subeAdi)}||${normalize(cariAdi)}`
+      if (!subeAdi || !cariAdi) continue
+      const key = `${normalize(subeAdi)}||${normalize(cariAdi)}`
 
-          // Çetinler Merch mapping
-          if (merchAdi && merchTipi === 'Çetinler Merch') {
-            if (!subeCarimierchMap.has(key)) {
-              subeCarimierchMap.set(key, merchAdi)
-            }
-          }
-
-          // BSY ve Supervisor mapping (en son kayıt kullanılacak)
-          if (bsy) subeCariBsyMap.set(key, bsy)
-          if (supervisorAdi) subeCariSupMap.set(key, supervisorAdi)
-        }
+      if (merchAdi && merchTipi === 'Çetinler Merch' && !subeCarimierchMap.has(key)) {
+        subeCarimierchMap.set(key, merchAdi)
       }
+      if (bsy)           subeCariBsyMap.set(key, bsy)
+      if (supervisorAdi) subeCariSupMap.set(key, supervisorAdi)
     }
 
-    // 3. Merch performans verileri (hedef + satış → performans)
-    const merchPerformanceMap = await fetchMerchPerformance(phpUrl, donem)
-    console.log(`📊 Toplam ${merchPerformanceMap.size} merch'in performans verisi yüklendi`)
-
-    // İlk 3 merch'i logla
-    let count = 0
-    for (const [merchName, data] of merchPerformanceMap) {
-      if (count++ < 3) {
-        console.log(`  ${merchName}:`, data.length, 'kategori')
-      }
-    }
-
-    // 4. Koşullu destek prim değerleri (kategori bazında ortalama)
-    const kosulluDestekPrimMap = await fetchKosulluDestekPrim(phpUrl, yil, ay)
-
-    // 5. Her destek personeli için hesaplama
+    // 3. Her destek personeli → satır oluştur (son 4 kolon boş)
     const rows: DestekPersonelRow[] = []
 
-    // Normalize fonksiyonu - Türkçe karakter dönüşümü
-    const normalizeStr = (str: string) => {
-      return str
-        .trim()
-        .toLowerCase()
-        .replace(/i̇/g, 'i')
-        .replace(/ı/g, 'i')
-        .replace(/ğ/g, 'g')
-        .replace(/ü/g, 'u')
-        .replace(/ş/g, 's')
-        .replace(/ö/g, 'o')
-        .replace(/ç/g, 'c')
-        .replace(/\s+/g, ' ')
-    }
+    for (const dp of destekPersonel) {
+      const subeKey = `${normalize(dp.sube_adi)}||${normalize(dp.cari_adi)}`
 
-    destekPersonel.forEach(dp => {
-      const subeKey = `${normalizeStr(dp.sube_adi)}||${normalizeStr(dp.cari_adi)}`
-
-      // Filtreleme: BSY veya Supervisor kontrolü
       if (bsyKod) {
-        // BSY kullanıcısı - sadece kendi BSY kodundaki kayıtları göster
-        const recordBsy = subeCariBsyMap.get(subeKey)
-        if (recordBsy !== bsyKod) return // Bu kayıt bu BSY'ye ait değil
+        if (subeCariBsyMap.get(subeKey) !== bsyKod) continue
       } else if (supAdi) {
-        // Supervisor kullanıcısı - sadece kendi adındaki kayıtları göster
-        const recordSup = subeCariSupMap.get(subeKey)
-        if (normalizeStr(recordSup || '') !== normalizeStr(supAdi)) return // Bu kayıt bu Supervisor'e ait değil
+        if (normalize(subeCariSupMap.get(subeKey) || '') !== normalize(supAdi)) continue
       }
 
       const cetinlerMerch = subeCarimierchMap.get(subeKey) || '-'
 
-      if (cetinlerMerch === '-') {
-        // Çetinler merch bulunamadı
-        rows.push({
-          merch_adi: dp.merch_adi,
-          sube_adi: dp.sube_adi,
-          cari_adi: dp.cari_adi,
-          cetinler_merch: '-',
-          kategori: '-',
-          hedef_gerceklesme: 0,
-          satis_adedi: 0,
-          kosullu_destek_prim: 0,
-          hak_edis: 0,
-        })
-      } else {
-        // Çetinler merch bulundu - kategori bazında satırlar
-        const kategoriData = merchPerformanceMap.get(cetinlerMerch.toLowerCase()) || []
+      rows.push({
+        merch_adi:           dp.merch_adi,
+        sube_adi:            dp.sube_adi,
+        cari_adi:            dp.cari_adi,
+        cetinler_merch:      cetinlerMerch,
+        kategori:            '-',
+        hedef_gerceklesme:   0,
+        satis_adedi:         0,
+        kosullu_destek_prim: 0,
+        hak_edis:            0,
+      })
+    }
 
-        console.log(`🔍 Çetinler Merch: ${cetinlerMerch}, Kategori Data:`, kategoriData.length, 'kategoriler')
-
-        if (kategoriData.length === 0) {
-          console.warn(`⚠️ ${cetinlerMerch} için kategori verisi bulunamadı!`)
-          rows.push({
-            merch_adi: dp.merch_adi,
-            sube_adi: dp.sube_adi,
-            cari_adi: dp.cari_adi,
-            cetinler_merch: cetinlerMerch,
-            kategori: '-',
-            hedef_gerceklesme: 0,
-            satis_adedi: 0,
-            kosullu_destek_prim: 0,
-            hak_edis: 0,
-          })
-        } else {
-          // Her kategori için hesaplama
-          kategoriData.forEach(({ kategori, hedef, gerceklesen, hedefGerceklesme }) => {
-            const kategoriPrim = kosulluDestekPrimMap.get(kategori) || 0
-
-            // HAK EDİŞ FORMÜLÜ:
-            // %0-%99.99 → (gerceklesme / 100) × prim × satış
-            // %100+     → prim × satış (tam prim)
-            let hakEdis = 0
-            if (hedefGerceklesme < 100) {
-              hakEdis = (hedefGerceklesme / 100) * kategoriPrim * gerceklesen
-            } else {
-              hakEdis = kategoriPrim * gerceklesen
-            }
-
-            rows.push({
-              merch_adi: dp.merch_adi,
-              sube_adi: dp.sube_adi,
-              cari_adi: dp.cari_adi,
-              cetinler_merch: cetinlerMerch,
-              kategori,
-              hedef_gerceklesme: hedefGerceklesme,
-              satis_adedi: gerceklesen,
-              kosullu_destek_prim: kategoriPrim,
-              hak_edis: hakEdis,
-            })
-          })
-        }
-      }
-    })
-
-    // Hak ediş büyükten küçüğe sırala
-    rows.sort((a, b) => b.hak_edis - a.hak_edis)
-
-    console.log('✅ Toplam row sayısı:', rows.length)
-    console.log('📊 İlk 3 row:', rows.slice(0, 3).map(r => ({
-      merch: r.merch_adi,
-      sube: r.sube_adi,
-      cetinler: r.cetinler_merch,
-      performans: r.hedef_gerceklesme,
-    })))
+    rows.sort((a, b) => a.merch_adi.localeCompare(b.merch_adi, 'tr'))
 
     return NextResponse.json({ rows })
   } catch (e: unknown) {
     const err = e as Error
-    console.error('Destek personel prim API error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }

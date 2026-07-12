@@ -35,21 +35,13 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId, curren
   const loadData = async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({
-        yil: String(yil),
-        ay: String(ay),
-      })
+      const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
+      if (currentUserRole === 'bsy' && bsyKod) params.append('bsyKod', bsyKod)
+      else if (currentUserRole === 'sup') params.append('supAdi', currentUserName)
 
-      // Role bazlı filtreleme parametreleri
-      if (currentUserRole === 'bsy' && bsyKod) {
-        params.append('bsyKod', bsyKod)
-      } else if (currentUserRole === 'sup') {
-        params.append('supAdi', currentUserName)
-      }
-
-      const res = await fetch(`/api/destek-personel-prim?${params}`)
+      const res  = await fetch(`/api/destek-personel-prim?${params}`)
       const data = await res.json()
-      setRows(data.rows || [])
+      setRows(data.rows ?? [])
     } catch (e) {
       console.error('Destek personeli prim yükleme hatası:', e)
       setRows([])
