@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, KeyboardEvent } from 'react'
 import { RefreshCw, ChevronDown, Check } from 'lucide-react'
 import clsx from 'clsx'
 import type { PersonelliNoktaRow, PersonelliNoktaResponse } from '@/app/api/personelli-nokta-analiz/route'
@@ -116,8 +116,15 @@ export function PersonelliNoktaAnalizView() {
   const [cariFilter, setCariFilter] = useState('')
   const [bsyFilter,  setBsyFilter]  = useState('')
 
-  // Bütçe
-  const [birimButce, setBirimButce] = useState('')
+  // Bütçe: input (yazılan) ve applied (tabloda kullanılan) ayrı
+  const DEFAULT_BUTCE = 80000
+  const [birimButceInput,   setBirimButceInput]   = useState('80.000')
+  const [birimSayiApplied,  setBirimSayiApplied]  = useState(DEFAULT_BUTCE)
+
+  const applyButce = useCallback(() => {
+    const parsed = parseFloat(birimButceInput.replace(/\./g, '').replace(',', '.'))
+    if (!isNaN(parsed) && parsed >= 0) setBirimSayiApplied(parsed)
+  }, [birimButceInput])
 
   // Veri
   const [allRows,  setAllRows]  = useState<PersonelliNoktaRow[]>([])
@@ -153,8 +160,8 @@ export function PersonelliNoktaAnalizView() {
   // Cari filtresi frontend'de
   const rows = cariFilter ? allRows.filter(r => r.cariAdi === cariFilter) : allRows
 
-  const birimSayi   = parseFloat(birimButce.replace(/\./g, '').replace(',', '.')) || 0
-  const aySayisi    = aylar.length || 1   // seçili ay sayısı (en az 1)
+  const birimSayi   = birimSayiApplied
+  const aySayisi    = aylar.length || 1
   const toplamPersonel = rows.reduce((s, r) => s + r.personelSayisi, 0)
   const toplamButce    = rows.reduce((s, r) => s + birimSayi * r.personelSayisi * aySayisi, 0)
   const toplamCiro     = rows.reduce((s, r) => s + r.gercCiro, 0)
@@ -226,20 +233,27 @@ export function PersonelliNoktaAnalizView() {
           <ChevronDown size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
         </div>
 
-        {/* Kişi başı bütçe */}
-        <div className="flex items-center gap-1.5 border border-amber-300 bg-amber-50 rounded-lg px-2 py-1">
-          <span className="text-[10px] text-amber-700 font-medium whitespace-nowrap">Kişi Başı Bütçe (₺):</span>
+        {/* Kişi başı bütçe + güncelle butonu */}
+        <div className="flex items-center border border-amber-300 bg-amber-50 rounded-lg overflow-hidden">
+          <span className="text-[10px] text-amber-700 font-medium whitespace-nowrap pl-2 pr-1">Kişi Başı Bütçe (₺):</span>
           <input
             type="text"
             inputMode="numeric"
-            value={birimButce}
-            onChange={e => setBirimButce(e.target.value.replace(/[^0-9.,]/g, ''))}
-            placeholder="0"
-            className="w-24 text-xs font-semibold text-right bg-transparent border-none outline-none text-amber-900 placeholder-amber-300"
+            value={birimButceInput}
+            onChange={e => setBirimButceInput(e.target.value.replace(/[^0-9.,]/g, ''))}
+            onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') applyButce() }}
+            className="w-24 text-xs font-semibold text-right bg-transparent border-none outline-none text-amber-900 py-1 pr-1"
           />
+          <button
+            onClick={applyButce}
+            title="Güncelle"
+            className="flex items-center justify-center px-2 py-1 bg-amber-400 hover:bg-amber-500 transition-colors text-white"
+          >
+            <Check size={12} strokeWidth={3} />
+          </button>
         </div>
 
-        {/* Yenile */}
+        {/* Veri yenile */}
         <button onClick={load} disabled={loading}
           className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50">
           <RefreshCw size={13} className={loading ? 'animate-spin text-brand-500' : 'text-gray-500'} />
