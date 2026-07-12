@@ -209,10 +209,33 @@ export function PersonelliNoktaAnalizView() {
     return Math.max(0, r.personelSayisi - (excludedCountMap.get(ck) ?? 0))
   }
 
-  const birimSayi   = birimSayiApplied
-  const aySayisi    = aylar.length || 1
+  const birimSayi = birimSayiApplied
+  const aySayisi  = aylar.length || 1
+
+  // Pivot verisinden türetilen cari bazında bütçe:
+  // Her merch için (veri olan ay sayısı × birimSayi), dışlananlar hariç
+  const budgetByCariAdi = new Map<string, number>()
+  if (pivotData) {
+    for (const cari of pivotData.cariler) {
+      let total = 0
+      for (const sube of cari.subeler) {
+        for (const p of sube.personeller) {
+          if (excludedSlots.has(`${cari.cariKod}|${sube.subeKod}|${p.personelAdi}`)) continue
+          const aktifAy = Object.values(p.aylikAdet).filter(a => a > 0).length
+          total += birimSayi * aktifAy
+        }
+      }
+      budgetByCariAdi.set(cari.cariAdi, total)
+    }
+  }
+
+  const getButce = (r: PersonelliNoktaRow) =>
+    budgetByCariAdi.has(r.cariAdi)
+      ? budgetByCariAdi.get(r.cariAdi)!
+      : birimSayi * effectivePSayisi(r) * aySayisi
+
   const toplamPersonel = visibleRows.reduce((s, r) => s + effectivePSayisi(r), 0)
-  const toplamButce    = visibleRows.reduce((s, r) => s + birimSayi * effectivePSayisi(r) * aySayisi, 0)
+  const toplamButce    = visibleRows.reduce((s, r) => s + getButce(r), 0)
   const toplamCiro     = visibleRows.reduce((s, r) => s + r.gercCiro, 0)
   const toplamOran     = toplamCiro > 0 ? (toplamButce / toplamCiro) * 100 : 0
 
@@ -367,7 +390,7 @@ export function PersonelliNoktaAnalizView() {
               {rows.map((row, idx) => {
                 const hidden   = hiddenCaris.has(row.cariAdi)
                 const effPS    = effectivePSayisi(row)
-                const personelButce = birimSayi * effPS * aySayisi
+                const personelButce = getButce(row)
                 const oran = row.gercCiro > 0 ? (personelButce / row.gercCiro) * 100 : null
                 const oranYuksek = oran != null && oran > 9.99
                 return (
