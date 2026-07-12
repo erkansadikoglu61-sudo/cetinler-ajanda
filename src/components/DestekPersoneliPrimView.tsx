@@ -32,6 +32,8 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId, curren
   const [ay, setAy] = useState(now.getMonth() + 1)
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<DestekPersonelRow[]>([])
+  const [cariFilter, setCariFilter]   = useState('')
+  const [merchFilter, setMerchFilter] = useState('')
 
   const loadData = async () => {
     setLoading(true)
@@ -129,9 +131,16 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId, curren
     loadData()
   }, [yil, ay, currentUserRole, bsyKod, currentUserName])
 
-  const toplamHakEdis = useMemo(() => {
-    return rows.reduce((sum, r) => sum + r.hak_edis, 0)
-  }, [rows])
+  // Filtre seçenekleri (tüm rows'tan unique değerler)
+  const cariOptions   = useMemo(() => [...new Set(rows.map(r => r.cari_adi))].sort((a, b) => a.localeCompare(b, 'tr')), [rows])
+  const merchOptions  = useMemo(() => [...new Set(rows.map(r => r.cetinler_merch).filter(m => m !== '-'))].sort((a, b) => a.localeCompare(b, 'tr')), [rows])
+
+  const visibleRows = useMemo(() => rows.filter(r =>
+    (!cariFilter   || r.cari_adi        === cariFilter) &&
+    (!merchFilter  || r.cetinler_merch  === merchFilter)
+  ), [rows, cariFilter, merchFilter])
+
+  const toplamHakEdis = useMemo(() => visibleRows.reduce((sum, r) => sum + r.hak_edis, 0), [visibleRows])
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -175,11 +184,41 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId, curren
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
 
+        {/* Cari filtresi */}
+        {cariOptions.length > 0 && (
+          <div className="relative">
+            <select
+              value={cariFilter}
+              onChange={e => setCariFilter(e.target.value)}
+              className="appearance-none pl-2 pr-6 py-1 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none max-w-[200px]"
+            >
+              <option value="">Tüm Cariler</option>
+              {cariOptions.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <ChevronDown size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+        )}
+
+        {/* Çetinler Merch filtresi */}
+        {merchOptions.length > 0 && (
+          <div className="relative">
+            <select
+              value={merchFilter}
+              onChange={e => setMerchFilter(e.target.value)}
+              className="appearance-none pl-2 pr-6 py-1 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none max-w-[160px]"
+            >
+              <option value="">Tüm Merch'ler</option>
+              {merchOptions.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <ChevronDown size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+        )}
+
         <div className="flex-1" />
 
         {!loading && rows.length > 0 && (
           <div className="text-xs text-gray-500">
-            <span className="font-semibold">{rows.length}</span> kişi
+            <span className="font-semibold">{visibleRows.length}</span> kişi
             <span className="mx-1">•</span>
             Toplam: <span className="font-bold text-brand-700">{toplamHakEdis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺</span>
           </div>
@@ -192,7 +231,7 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId, curren
           <div className="flex items-center justify-center py-16 gap-2 text-xs text-gray-400">
             <RefreshCw size={14} className="animate-spin" /> Yükleniyor…
           </div>
-        ) : rows.length === 0 ? (
+        ) : visibleRows.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-sm text-gray-500 mb-2">Veri bulunamadı</p>
             <p className="text-xs text-gray-400">
@@ -217,7 +256,7 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId, curren
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, idx) => (
+                {visibleRows.map((row, idx) => (
                   <tr
                     key={idx}
                     className={clsx(
