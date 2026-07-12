@@ -84,10 +84,11 @@ export async function GET(req: Request) {
 
   // ── 1. PHP → Çetinler Merch ──────────────────────────────────────────────
   // Key: cariKod (PHP sistemi)
+  // personeller: unique (subeKod|merchAdi) çiftleri — aynı şubede 2 merch → 2 sayılır
   const cariMap = new Map<string, {
-    cariAdi:  string
-    normAdi:  string
-    subeler:  Set<string>
+    cariAdi:    string
+    normAdi:    string
+    personeller: Set<string>
   }>()
   const bsySet = new Set<string>()
 
@@ -101,10 +102,11 @@ export async function GET(req: Request) {
       const tdMatches = trMatches[i].match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || []
       if (tdMatches.length < 10) continue
       const cells     = tdMatches.map(td => decodeHtml(td.replace(/<\/?td[^>]*>/gi, '')))
+      const merchAdi  = cells[0]?.trim() || ''
       const merchTipi = cells[2] || ''
       const cariKod   = cells[3] || ''
       const cariAdi   = cells[4] || ''
-      const subeKey   = (cells[6] || cells[5] || cells[0] || '__default__').trim()
+      const subeKod   = (cells[5] || '__default__').trim()
       const bsyAdi    = cells[9] || ''
 
       if (merchTipi !== 'Çetinler Merch') continue
@@ -115,10 +117,11 @@ export async function GET(req: Request) {
         cariMap.set(cariKod, {
           cariAdi: cariAdi || cariKod,
           normAdi: norm(cariAdi),
-          subeler: new Set(),
+          personeller: new Set(),
         })
       }
-      cariMap.get(cariKod)!.subeler.add(subeKey)
+      // (subeKod|merchAdi) — aynı şubedeki farklı kişiler ayrı sayılır
+      cariMap.get(cariKod)!.personeller.add(`${subeKod}|${merchAdi}`)
       if (bsyAdi) bsySet.add(bsyAdi)
     }
   } catch (e) {
@@ -204,16 +207,13 @@ export async function GET(req: Request) {
 
   // ── 4. Birleştir ──────────────────────────────────────────────────────────
   const rows: PersonelliNoktaRow[] = []
-  for (const [cariKod, { cariAdi, normAdi, subeler }] of cariMap.entries()) {
-    // 1) Cari kod (PHP ↔ Excel tam eşleşme)
-    // 2) Normalize tam ad eşleşme
-    // 3) Prefix eşleşme (zincir firmaların farklı kayıtlarını kapsar)
+  for (const [cariKod, { cariAdi, normAdi, personeller }] of cariMap.entries()) {
     const ciro =
       ciroByKod.get(cariKod) ??
       ciroByNorm.get(normAdi) ??
       ciroByPrefix.get(prefixKey(normAdi)) ??
       0
-    rows.push({ cariAdi, personelSayisi: subeler.size, gercCiro: ciro })
+    rows.push({ cariAdi, personelSayisi: personeller.size, gercCiro: ciro })
   }
 
   rows.sort((a, b) => b.gercCiro - a.gercCiro || a.cariAdi.localeCompare(b.cariAdi, 'tr'))

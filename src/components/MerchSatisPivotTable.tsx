@@ -87,7 +87,7 @@ export function MerchSatisPivotTable({ data, yil, excludedSlots, onToggleSlot }:
 
       for (let pi = 0; pi < sube.personeller.length; pi++) {
         const p        = sube.personeller[pi]
-        const slotKey  = `${cari.cariKod}|${sube.subeKod}`
+        const slotKey  = `${cari.cariKod}|${sube.subeKod}|${p.personelAdi}`
         const excluded = excludedSlots.has(slotKey)
 
         rows.push(
