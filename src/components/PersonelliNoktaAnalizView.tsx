@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef, KeyboardEvent } from 'react'
 import { RefreshCw, ChevronDown, Check } from 'lucide-react'
 import clsx from 'clsx'
 import type { PersonelliNoktaRow, PersonelliNoktaResponse } from '@/app/api/personelli-nokta-analiz/route'
+import type { MerchSatisPivotResponse } from '@/app/api/merch-satis-pivot/route'
+import { MerchSatisPivotTable } from '@/components/MerchSatisPivotTable'
 
 const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
                    'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
@@ -131,6 +133,7 @@ export function PersonelliNoktaAnalizView() {
   const [gruplar,  setGruplar]  = useState<string[]>([])
   const [bsyler,   setBsyler]   = useState<string[]>([])
   const [carilar,  setCarilar]  = useState<string[]>([])
+  const [pivotData, setPivotData] = useState<MerchSatisPivotResponse | null>(null)
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
 
@@ -142,12 +145,17 @@ export function PersonelliNoktaAnalizView() {
       if (aylar.length > 0)       params.set('aylar',  aylar.join(','))
       if (grupFilters.length > 0) params.set('gruplar', grupFilters.join(','))
 
-      const res  = await fetch(`/api/personelli-nokta-analiz?${params}`)
+      const [res, pivotRes] = await Promise.all([
+        fetch(`/api/personelli-nokta-analiz?${params}`),
+        fetch(`/api/merch-satis-pivot?${params}`),
+      ])
       const data: PersonelliNoktaResponse = await res.json()
+      const pivot: MerchSatisPivotResponse = await pivotRes.json()
       setAllRows(data.rows    ?? [])
       setGruplar(data.gruplar ?? [])
       setBsyler(data.bsyler   ?? [])
       setCarilar(data.carilar  ?? [])
+      setPivotData(pivot)
     } catch (e) {
       setError(String(e))
     } finally {
@@ -389,6 +397,10 @@ export function PersonelliNoktaAnalizView() {
               </tr>
             </tfoot>
           </table>
+
+          {pivotData && pivotData.cariler.length > 0 && (
+            <MerchSatisPivotTable data={pivotData} yil={yil} />
+          )}
         </div>
       )}
     </div>
