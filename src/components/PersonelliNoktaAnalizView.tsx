@@ -179,46 +179,46 @@ export function PersonelliNoktaAnalizView() {
   const rows = cariFilter ? allRows.filter(r => r.cariAdi === cariFilter) : allRows
   const visibleRows = rows
 
-  // Pivot cariAdi → cariKod haritası (dışlama hesabı için)
-  const pivotCariKodMap = new Map<string, string>()
-  if (pivotData) {
-    for (const c of pivotData.cariler) pivotCariKodMap.set(c.cariAdi, c.cariKod)
-  }
-  // Dışlanan slot sayısı per cariKod
+  // Dışlanan slot sayısı per cariKod (slot = "cariKod|subeKod|personelAdi")
   const excludedCountMap = new Map<string, number>()
   for (const slot of excludedSlots) {
     const [ck] = slot.split('|')
     excludedCountMap.set(ck, (excludedCountMap.get(ck) ?? 0) + 1)
   }
-  const effectivePSayisi = (r: PersonelliNoktaRow) => {
-    const ck = pivotCariKodMap.get(r.cariAdi) ?? ''
-    return Math.max(0, r.personelSayisi - (excludedCountMap.get(ck) ?? 0))
-  }
+  const effectivePSayisi = (r: PersonelliNoktaRow) =>
+    Math.max(0, r.personelSayisi - (excludedCountMap.get(r.cariKod) ?? 0))
 
   const birimSayi = birimSayiApplied
   const aySayisi  = aylar.length || 1
 
-  // Pivot verisinden türetilen cari bazında bütçe:
-  // Her merch için (veri olan ay sayısı × birimSayi), dışlananlar hariç
-  const budgetByCariAdi = new Map<string, number>()
+  // Pivot verisinden cariKod bazında bütçe ve Personel/Ay hesabı
+  // Her merch için: veri olan ay sayısı — dışlananlar hariç
+  const budgetByCariKod    = new Map<string, number>()
+  const personelAyByCariKod = new Map<string, number>()
   if (pivotData) {
     for (const cari of pivotData.cariler) {
-      let total = 0
+      let totalBudget = 0
+      let totalAy     = 0
       for (const sube of cari.subeler) {
         for (const p of sube.personeller) {
           if (excludedSlots.has(`${cari.cariKod}|${sube.subeKod}|${p.personelAdi}`)) continue
           const aktifAy = Object.values(p.aylikAdet).filter(a => a > 0).length
-          total += birimSayi * aktifAy
+          totalBudget += birimSayi * aktifAy
+          totalAy     += aktifAy
         }
       }
-      budgetByCariAdi.set(cari.cariAdi, total)
+      budgetByCariKod.set(cari.cariKod, totalBudget)
+      personelAyByCariKod.set(cari.cariKod, totalAy)
     }
   }
 
   const getButce = (r: PersonelliNoktaRow) =>
-    budgetByCariAdi.has(r.cariAdi)
-      ? budgetByCariAdi.get(r.cariAdi)!
+    budgetByCariKod.has(r.cariKod)
+      ? budgetByCariKod.get(r.cariKod)!
       : birimSayi * effectivePSayisi(r) * aySayisi
+
+  const getPersonelAy = (r: PersonelliNoktaRow) =>
+    personelAyByCariKod.get(r.cariKod) ?? (effectivePSayisi(r) * aySayisi)
 
   const toplamPersonel = visibleRows.reduce((s, r) => s + effectivePSayisi(r), 0)
   const toplamButce    = visibleRows.reduce((s, r) => s + getButce(r), 0)
@@ -349,9 +349,9 @@ export function PersonelliNoktaAnalizView() {
             </thead>
             <tbody>
               {rows.map((row, idx) => {
-                const effPS       = effectivePSayisi(row)
+                const effPS         = effectivePSayisi(row)
                 const personelButce = getButce(row)
-                const personelAy  = birimSayi > 0 ? Math.round(personelButce / birimSayi) : 0
+                const personelAy    = getPersonelAy(row)
                 const oran = row.gercCiro > 0 ? (personelButce / row.gercCiro) * 100 : null
                 const oranYuksek = oran != null && oran > 9.99
                 return (
@@ -369,7 +369,7 @@ export function PersonelliNoktaAnalizView() {
                       )}
                     </td>
                     <td className="px-3 py-2.5 text-right text-gray-700 tabular-nums">
-                      {birimSayi > 0 ? personelAy : <span className="text-gray-300">—</span>}
+                      {personelAy}
                     </td>
                     <td className="px-3 py-2.5 text-right text-gray-700">
                       {birimSayi > 0 ? fmt(personelButce) + ' ₺' : <span className="text-gray-300">—</span>}
@@ -394,7 +394,7 @@ export function PersonelliNoktaAnalizView() {
                 <td className="px-3 py-2.5" colSpan={2}>Toplam · {ayEtiketi}</td>
                 <td className="px-3 py-2.5 text-right">{toplamPersonel}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums">
-                  {birimSayi > 0 ? Math.round(toplamButce / birimSayi) : '—'}
+                  {visibleRows.reduce((s, r) => s + getPersonelAy(r), 0)}
                 </td>
                 <td className="px-3 py-2.5 text-right">{birimSayi > 0 ? fmt(toplamButce) + ' ₺' : '—'}</td>
                 <td className="px-3 py-2.5 text-right">{fmt(toplamCiro)} ₺</td>

@@ -53,6 +53,7 @@ function prefixKey(normalized: string): string {
 }
 
 export interface PersonelliNoktaRow {
+  cariKod:        string
   cariAdi:        string
   personelSayisi: number
   gercCiro:       number
@@ -213,7 +214,7 @@ export async function GET(req: Request) {
       ciroByNorm.get(normAdi) ??
       ciroByPrefix.get(prefixKey(normAdi)) ??
       0
-    rows.push({ cariAdi, personelSayisi: personeller.size, gercCiro: ciro })
+    rows.push({ cariKod, cariAdi, personelSayisi: personeller.size, gercCiro: ciro })
   }
 
   rows.sort((a, b) => b.gercCiro - a.gercCiro || a.cariAdi.localeCompare(b.cariAdi, 'tr'))
