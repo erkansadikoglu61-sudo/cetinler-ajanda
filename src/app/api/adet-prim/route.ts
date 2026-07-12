@@ -45,9 +45,17 @@ export async function GET(req: Request) {
       return NextResponse.json({ rows: [] })
     }
 
-    // 2. Header mapping
-    // A: Marka, B: Kategori, C: Stok Kodu, D: Bayi Merch, E: Koşullu Destek Personeli
-    const headerRow = jsonData[0]
+    // 2. Header mapping — başlık satırını bul (ilk 5 satırda tara)
+    let headerRowIdx = 0
+    for (let i = 0; i < Math.min(5, jsonData.length); i++) {
+      const rowStr = jsonData[i].map((c: any) => String(c ?? '').toLowerCase()).join(' ')
+      if (rowStr.includes('stok') && (rowStr.includes('kod') || rowStr.includes('kategori'))) {
+        headerRowIdx = i
+        break
+      }
+    }
+
+    const headerRow = jsonData[headerRowIdx]
     const cols: { [key: string]: number } = {}
 
     headerRow.forEach((h: any, c: number) => {
@@ -59,12 +67,10 @@ export async function GET(req: Request) {
       if (hs.includes('koşullu') || hs.includes('kosullu') || hs.includes('destek')) cols['kosulluDestek'] = c
     })
 
-    console.log('📊 Column mapping:', cols)
-
     // 3. Parse rows
     const primData: Record<string, AdetPrimRow> = {}
 
-    for (let r = 1; r < jsonData.length; r++) {
+    for (let r = headerRowIdx + 1; r < jsonData.length; r++) {
       const row = jsonData[r]
       if (!row || row.length === 0) continue
 
