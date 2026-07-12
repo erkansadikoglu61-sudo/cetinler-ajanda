@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { RefreshCw, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
+import { GRUP_NORMALIZE } from '@/lib/sellout'
 
 const MONTHS_TR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
 
@@ -35,13 +36,87 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId, curren
   const loadData = async () => {
     setLoading(true)
     try {
+      const donem  = `${yil}-${String(ay).padStart(2, '0')}`
       const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
       if (currentUserRole === 'bsy' && bsyKod) params.append('bsyKod', bsyKod)
       else if (currentUserRole === 'sup') params.append('supAdi', currentUserName)
 
-      const res  = await fetch(`/api/destek-personel-prim?${params}`)
-      const data = await res.json()
-      setRows(data.rows ?? [])
+      // 4 kaynağı paralel çek
+      const [destekRes, selloutRes, primRes, targetsRes] = await Promise.all([
+        fetch(`/api/destek-personel-prim?${params}`),
+        fetch('/api/sellout'),
+        fetch(`/api/adet-prim?yil=${yil}&ay=${ay}`),
+        fetch(`/api/sellout-targets?donem=${donem}`),
+      ])
+      const [destekData, selloutData, primData, targetsData] = await Promise.all([
+        destekRes.json(), selloutRes.json(), primRes.json(), targetsRes.json(),
+      ])
+
+      // 1. stokPrimMap: stokKodu → koşullu destek prim (₺/adet)
+      const stokPrimMap = new Map<string, number>()
+      for (const p of (primData.rows ?? [])) {
+        if (p.stokKodu && p.kosulluDestek != null) {
+          stokPrimMap.set(p.stokKodu as string, p.kosulluDestek as number)
+        }
+      }
+
+      // 2. Sadece ilgili dönem + Çetinler Merch satışları
+      // satisMap: merch_personel.lower → kategori(normalized) → { satis_adedi, kosullu_prim_toplam }
+      const satisMap = new Map<string, Map<string, { satis_adedi: number; kosullu_prim_toplam: number }>>()
+      for (const r of (selloutData.rows ?? [])) {
+        if ((r.donem as string) !== donem) continue
+        if ((r.merch_tipi as string) !== 'Çetinler Merch') continue
+        const mk   = (r.merch_personel as string).toLowerCase()
+        const kat  = GRUP_NORMALIZE[r.grup_aciklama as string] ?? (r.grup_aciklama as string)
+        const adet = (r.satilan_adet as number) || 0
+        const prim = stokPrimMap.get(r.stok_kodu as string) ?? 0
+        if (!satisMap.has(mk)) satisMap.set(mk, new Map())
+        const km = satisMap.get(mk)!
+        if (!km.has(kat)) km.set(kat, { satis_adedi: 0, kosullu_prim_toplam: 0 })
+        const e = km.get(kat)!
+        e.satis_adedi        += adet
+        e.kosullu_prim_toplam += adet * prim
+      }
+
+      // 3. hedefMap: merch_name.lower → grup(normalized) → hedef_adet
+      const hedefMap = new Map<string, Map<string, number>>()
+      for (const t of (targetsData.merch_targets ?? [])) {
+        const k = (t.merch_name as string).toLowerCase()
+        if (!hedefMap.has(k)) hedefMap.set(k, new Map())
+        hedefMap.get(k)!.set(t.grup as string, (t.hedef as number) ?? 0)
+      }
+
+      // 4. Destek personeli × kategori satırları
+      const rawRows: DestekPersonelRow[] = destekData.rows ?? []
+      const computed: DestekPersonelRow[] = []
+
+      for (const row of rawRows) {
+        if (row.cetinler_merch === '-') { computed.push(row); continue }
+
+        const mk         = row.cetinler_merch.toLowerCase()
+        const kategoriMap = satisMap.get(mk)
+        if (!kategoriMap?.size) { computed.push(row); continue }
+
+        for (const [kategori, { satis_adedi, kosullu_prim_toplam }] of kategoriMap) {
+          const hedef              = hedefMap.get(mk)?.get(kategori) ?? 0
+          const hedef_gerceklesme  = hedef > 0 ? (satis_adedi / hedef) * 100 : 0
+          const hak_edis           = kosullu_prim_toplam * (hedef_gerceklesme / 100)
+          computed.push({
+            merch_adi:           row.merch_adi,
+            sube_adi:            row.sube_adi,
+            cari_adi:            row.cari_adi,
+            cetinler_merch:      row.cetinler_merch,
+            kategori,
+            hedef_gerceklesme,
+            satis_adedi,
+            kosullu_destek_prim: kosullu_prim_toplam,
+            hak_edis,
+          })
+        }
+      }
+
+      computed.sort((a, b) => b.hak_edis - a.hak_edis)
+      setRows(computed)
     } catch (e) {
       console.error('Destek personeli prim yükleme hatası:', e)
       setRows([])
@@ -163,7 +238,7 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId, curren
                       {row.satis_adedi.toLocaleString('tr-TR')}
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums font-medium text-gray-800">
-                      {row.kosullu_destek_prim.toLocaleString('tr-TR')} ₺/adet
+                      {row.kosullu_destek_prim.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums font-bold text-brand-700 bg-brand-50">
                       {row.hak_edis.toLocaleString('tr-TR')} ₺
