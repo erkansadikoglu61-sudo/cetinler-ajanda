@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, KeyboardEvent } from 'react'
-import { RefreshCw, ChevronDown, Check } from 'lucide-react'
+import { RefreshCw, ChevronDown, Check } from 'lucide-react' // Check: MultiSelect ve bütçe butonu için
 import clsx from 'clsx'
 import type { PersonelliNoktaRow, PersonelliNoktaResponse } from '@/app/api/personelli-nokta-analiz/route'
 import type { MerchSatisPivotResponse } from '@/app/api/merch-satis-pivot/route'
@@ -177,21 +177,7 @@ export function PersonelliNoktaAnalizView() {
 
   // Cari filtresi frontend'de
   const rows = cariFilter ? allRows.filter(r => r.cariAdi === cariFilter) : allRows
-
-  // Gizlenen cariler (checkbox ile)
-  const [hiddenCaris, setHiddenCaris] = useState<Set<string>>(new Set())
-
-  // Yeni veri gelince gizleme listesini sıfırla
-  useEffect(() => { setHiddenCaris(new Set()) }, [allRows])
-
-  const toggleCari = (cariAdi: string) =>
-    setHiddenCaris(prev => {
-      const next = new Set(prev)
-      next.has(cariAdi) ? next.delete(cariAdi) : next.add(cariAdi)
-      return next
-    })
-
-  const visibleRows = rows.filter(r => !hiddenCaris.has(r.cariAdi))
+  const visibleRows = rows
 
   // Pivot cariAdi → cariKod haritası (dışlama hesabı için)
   const pivotCariKodMap = new Map<string, string>()
@@ -332,9 +318,7 @@ export function PersonelliNoktaAnalizView() {
         </button>
 
         {!loading && (
-          <span className="text-[10px] text-gray-400">
-            {visibleRows.length}{rows.length !== visibleRows.length ? `/${rows.length}` : ''} cari
-          </span>
+          <span className="text-[10px] text-gray-400">{rows.length} cari</span>
         )}
       </div>
 
@@ -354,33 +338,10 @@ export function PersonelliNoktaAnalizView() {
           <table className="w-full text-xs border-collapse">
             <thead className="sticky top-0 z-10">
               <tr className="bg-gray-800 text-white text-[11px]">
-                <th className="px-2 py-2.5 w-8">
-                  {/* tümünü aç/kapat */}
-                  <button
-                    type="button"
-                    title={hiddenCaris.size > 0 ? 'Tümünü göster' : 'Tümünü gizle'}
-                    onClick={() =>
-                      hiddenCaris.size > 0
-                        ? setHiddenCaris(new Set())
-                        : setHiddenCaris(new Set(rows.map(r => r.cariAdi)))
-                    }
-                    className={clsx(
-                      'w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors mx-auto',
-                      hiddenCaris.size === 0
-                        ? 'bg-white border-white'
-                        : hiddenCaris.size === rows.length
-                          ? 'border-gray-500 bg-transparent'
-                          : 'bg-white/60 border-white/60'
-                    )}
-                  >
-                    {hiddenCaris.size < rows.length && (
-                      <Check size={9} className={hiddenCaris.size === 0 ? 'text-gray-800' : 'text-gray-800/40'} />
-                    )}
-                  </button>
-                </th>
                 <th className="text-left px-3 py-2.5 font-semibold w-6">#</th>
                 <th className="text-left px-3 py-2.5 font-semibold">Cari İsim</th>
                 <th className="text-right px-3 py-2.5 font-semibold">Personel Sayısı</th>
+                <th className="text-right px-3 py-2.5 font-semibold">Personel/Ay</th>
                 <th className="text-right px-3 py-2.5 font-semibold">Personel Bütçesi</th>
                 <th className="text-right px-3 py-2.5 font-semibold">Gerçekleşen Ciro</th>
                 <th className="text-right px-3 py-2.5 font-semibold">Bütçe/Ciro Oranı</th>
@@ -388,29 +349,17 @@ export function PersonelliNoktaAnalizView() {
             </thead>
             <tbody>
               {rows.map((row, idx) => {
-                const hidden   = hiddenCaris.has(row.cariAdi)
-                const effPS    = effectivePSayisi(row)
+                const effPS       = effectivePSayisi(row)
                 const personelButce = getButce(row)
+                const personelAy  = birimSayi > 0 ? Math.round(personelButce / birimSayi) : 0
                 const oran = row.gercCiro > 0 ? (personelButce / row.gercCiro) * 100 : null
                 const oranYuksek = oran != null && oran > 9.99
                 return (
                   <tr key={row.cariAdi}
                     className={clsx(
                       'border-b border-gray-100 transition-colors',
-                      hidden ? 'opacity-35 bg-gray-100' : idx % 2 === 0 ? 'bg-white hover:bg-brand-50/40' : 'bg-gray-50/60 hover:bg-brand-50/40'
+                      idx % 2 === 0 ? 'bg-white hover:bg-brand-50/40' : 'bg-gray-50/60 hover:bg-brand-50/40'
                     )}>
-                    <td className="px-2 py-2.5 text-center">
-                      <button
-                        type="button"
-                        onClick={() => toggleCari(row.cariAdi)}
-                        className={clsx(
-                          'w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors mx-auto',
-                          hidden ? 'border-gray-300 bg-white' : 'bg-brand-500 border-brand-500'
-                        )}
-                      >
-                        {!hidden && <Check size={9} className="text-white" strokeWidth={3} />}
-                      </button>
-                    </td>
                     <td className="px-3 py-2.5 text-gray-400 font-mono text-[10px]">{idx + 1}</td>
                     <td className="px-3 py-2.5 font-medium text-gray-800">{row.cariAdi}</td>
                     <td className="px-3 py-2.5 text-right font-semibold text-gray-700">
@@ -418,6 +367,9 @@ export function PersonelliNoktaAnalizView() {
                       {effPS !== row.personelSayisi && (
                         <span className="text-gray-400 font-normal text-[10px] ml-1">/{row.personelSayisi}</span>
                       )}
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-gray-700 tabular-nums">
+                      {birimSayi > 0 ? personelAy : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-3 py-2.5 text-right text-gray-700">
                       {birimSayi > 0 ? fmt(personelButce) + ' ₺' : <span className="text-gray-300">—</span>}
@@ -439,8 +391,11 @@ export function PersonelliNoktaAnalizView() {
             </tbody>
             <tfoot>
               <tr className="bg-gray-800 text-white text-[11px] font-semibold">
-                <td className="px-3 py-2.5" colSpan={3}>Toplam · {ayEtiketi}</td>
+                <td className="px-3 py-2.5" colSpan={2}>Toplam · {ayEtiketi}</td>
                 <td className="px-3 py-2.5 text-right">{toplamPersonel}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">
+                  {birimSayi > 0 ? Math.round(toplamButce / birimSayi) : '—'}
+                </td>
                 <td className="px-3 py-2.5 text-right">{birimSayi > 0 ? fmt(toplamButce) + ' ₺' : '—'}</td>
                 <td className="px-3 py-2.5 text-right">{fmt(toplamCiro)} ₺</td>
                 <td className={clsx(

@@ -18,7 +18,10 @@ interface Props {
 
 export function MerchSatisPivotTable({ data, yil, excludedSlots, onToggleSlot }: Props) {
   const { aylar, cariler } = data
-  const [collapsedCaris, setCollapsedCaris] = useState<Set<string>>(new Set())
+  // Varsayılan: tüm cariler kapalı — kullanıcı açmak istediğinde tıklar
+  const [collapsedCaris, setCollapsedCaris] = useState<Set<string>>(
+    () => new Set(cariler.map(c => c.cariKod))
+  )
   const [collapsedSubes, setCollapsedSubes] = useState<Set<string>>(new Set())
 
   const toggleCari = (key: string) =>
