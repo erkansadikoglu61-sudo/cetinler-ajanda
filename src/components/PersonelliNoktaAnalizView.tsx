@@ -133,7 +133,9 @@ export function PersonelliNoktaAnalizView() {
   const [gruplar,  setGruplar]  = useState<string[]>([])
   const [bsyler,   setBsyler]   = useState<string[]>([])
   const [carilar,  setCarilar]  = useState<string[]>([])
-  const [pivotData, setPivotData] = useState<MerchSatisPivotResponse | null>(null)
+  const [pivotData,      setPivotData]      = useState<MerchSatisPivotResponse | null>(null)
+  // Pivot tablosundan dışlanan şube slotları: "cariKod|subeKod"
+  const [excludedSlots,  setExcludedSlots]  = useState<Set<string>>(new Set())
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
 
@@ -165,6 +167,14 @@ export function PersonelliNoktaAnalizView() {
 
   useEffect(() => { load() }, [load])
 
+  // Yeni pivot veri gelince dışlama listesini sıfırla
+  useEffect(() => { setExcludedSlots(new Set()) }, [pivotData])
+
+  const toggleSlot = (key: string) =>
+    setExcludedSlots(prev => {
+      const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next
+    })
+
   // Cari filtresi frontend'de
   const rows = cariFilter ? allRows.filter(r => r.cariAdi === cariFilter) : allRows
 
@@ -183,10 +193,26 @@ export function PersonelliNoktaAnalizView() {
 
   const visibleRows = rows.filter(r => !hiddenCaris.has(r.cariAdi))
 
+  // Pivot cariAdi → cariKod haritası (dışlama hesabı için)
+  const pivotCariKodMap = new Map<string, string>()
+  if (pivotData) {
+    for (const c of pivotData.cariler) pivotCariKodMap.set(c.cariAdi, c.cariKod)
+  }
+  // Dışlanan slot sayısı per cariKod
+  const excludedCountMap = new Map<string, number>()
+  for (const slot of excludedSlots) {
+    const [ck] = slot.split('|')
+    excludedCountMap.set(ck, (excludedCountMap.get(ck) ?? 0) + 1)
+  }
+  const effectivePSayisi = (r: PersonelliNoktaRow) => {
+    const ck = pivotCariKodMap.get(r.cariAdi) ?? ''
+    return Math.max(0, r.personelSayisi - (excludedCountMap.get(ck) ?? 0))
+  }
+
   const birimSayi   = birimSayiApplied
   const aySayisi    = aylar.length || 1
-  const toplamPersonel = visibleRows.reduce((s, r) => s + r.personelSayisi, 0)
-  const toplamButce    = visibleRows.reduce((s, r) => s + birimSayi * r.personelSayisi * aySayisi, 0)
+  const toplamPersonel = visibleRows.reduce((s, r) => s + effectivePSayisi(r), 0)
+  const toplamButce    = visibleRows.reduce((s, r) => s + birimSayi * effectivePSayisi(r) * aySayisi, 0)
   const toplamCiro     = visibleRows.reduce((s, r) => s + r.gercCiro, 0)
   const toplamOran     = toplamCiro > 0 ? (toplamButce / toplamCiro) * 100 : 0
 
@@ -339,8 +365,9 @@ export function PersonelliNoktaAnalizView() {
             </thead>
             <tbody>
               {rows.map((row, idx) => {
-                const hidden = hiddenCaris.has(row.cariAdi)
-                const personelButce = birimSayi * row.personelSayisi * aySayisi
+                const hidden   = hiddenCaris.has(row.cariAdi)
+                const effPS    = effectivePSayisi(row)
+                const personelButce = birimSayi * effPS * aySayisi
                 const oran = row.gercCiro > 0 ? (personelButce / row.gercCiro) * 100 : null
                 const oranYuksek = oran != null && oran > 9.99
                 return (
@@ -363,7 +390,12 @@ export function PersonelliNoktaAnalizView() {
                     </td>
                     <td className="px-3 py-2.5 text-gray-400 font-mono text-[10px]">{idx + 1}</td>
                     <td className="px-3 py-2.5 font-medium text-gray-800">{row.cariAdi}</td>
-                    <td className="px-3 py-2.5 text-right font-semibold text-gray-700">{row.personelSayisi}</td>
+                    <td className="px-3 py-2.5 text-right font-semibold text-gray-700">
+                      {effPS}
+                      {effPS !== row.personelSayisi && (
+                        <span className="text-gray-400 font-normal text-[10px] ml-1">/{row.personelSayisi}</span>
+                      )}
+                    </td>
                     <td className="px-3 py-2.5 text-right text-gray-700">
                       {birimSayi > 0 ? fmt(personelButce) + ' ₺' : <span className="text-gray-300">—</span>}
                     </td>
@@ -399,7 +431,12 @@ export function PersonelliNoktaAnalizView() {
           </table>
 
           {pivotData && pivotData.cariler.length > 0 && (
-            <MerchSatisPivotTable data={pivotData} yil={yil} />
+            <MerchSatisPivotTable
+              data={pivotData}
+              yil={yil}
+              excludedSlots={excludedSlots}
+              onToggleSlot={toggleSlot}
+            />
           )}
         </div>
       )}
