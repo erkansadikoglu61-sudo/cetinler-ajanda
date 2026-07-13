@@ -928,7 +928,7 @@ function MonthView({
                         color: hasCheckin ? '#15803d' : p.color,
                       }}
                     >
-                      {t.checkin_ts && '✓ '}{t.customer ?? t.type}
+                      {t.checkin_ts && '✓ '}{p.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}-{t.customer ?? t.type}
                     </div>
                   )
                 })}
@@ -1035,7 +1035,7 @@ function WeekView({
                           color: hasCheckin ? '#15803d' : p.color,
                         }}
                       >
-                        {t.checkin_ts && '✓ '}{t.customer ?? t.type}
+                        {t.checkin_ts && '✓ '}{p.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}-{t.customer ?? t.type}
                       </div>
                     )
                   })}
