@@ -120,7 +120,7 @@ function TaskSheet({
     }
   }, [task?.id])
 
-  // Kullanıcının şubelerini çek
+  // Kullanıcının şubelerini çek (export_merch_detay.php üzerinden)
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
@@ -130,44 +130,37 @@ function TaskSheet({
           return
         }
 
-        // Supabase'den field_personnel verilerini çek
-        const { supabase } = await import('@/lib/supabase')
-        const { data, error } = await supabase
-          .from('field_personnel')
-          .select('cari_adi, sube_adi, sup_adi, jr_profile_id')
+        const res = await fetch('/api/merch-detay')
+        if (!res.ok) throw new Error('merch-detay API hatası')
+        const json = await res.json()
+        const data: { cari_adi: string; sube_adi: string; bsy_adi: string; sup_adi: string; jr_adi: string }[] = json.data ?? []
 
-        if (error) {
-          console.error('Field personnel hatası:', error)
-          setCustomerOptions([])
-          return
-        }
+        const name = selectedProfile.full_name?.trim() ?? ''
 
-        if (!data) {
-          setCustomerOptions([])
-          return
-        }
-
-        // Kullanıcının rolüne göre filtrele
+        // Rol bazlı filtreleme
         let filtered = data
         if (selectedProfile.role === 'jr') {
-          // Jr. için sadece jr_profile_id eşleşenler
-          filtered = data.filter(r => r.jr_profile_id === selectedProfile.id)
+          filtered = data.filter(r => r.jr_adi?.trim() === name)
         } else if (selectedProfile.role === 'sup') {
-          // Sup için sup_adi eşleşenler veya altındaki jr'lar
-          const jrIds = team.filter(p => p.role === 'jr' && p.manager_id === selectedProfile.id).map(p => p.id)
+          // Hem kendi sup_adi'na hem altındaki jr'ların jr_adi'na göre filtrele
+          const jrNames = team
+            .filter(p => p.role === 'jr' && p.manager_id === selectedProfile.id)
+            .map(p => p.full_name?.trim() ?? '')
           filtered = data.filter(r =>
-            r.sup_adi?.trim() === selectedProfile.full_name?.trim() ||
-            (r.jr_profile_id && jrIds.includes(r.jr_profile_id))
+            r.sup_adi?.trim() === name ||
+            (r.jr_adi && jrNames.includes(r.jr_adi.trim()))
           )
+        } else if (selectedProfile.role === 'bsy') {
+          filtered = data.filter(r => r.bsy_adi?.trim() === name)
         }
-        // Admin için tümü
+        // admin → tümü
 
         // Benzersiz "CariAdi / ŞubeAdi" kombinasyonları
         const options = [...new Set(
           filtered.map(r => `${r.cari_adi?.trim() || ''} / ${r.sube_adi?.trim() || ''}`)
-        )].filter(Boolean).sort((a, b) => (a as string).localeCompare(b as string, 'tr'))
+        )].filter(Boolean).sort((a, b) => a.localeCompare(b, 'tr'))
 
-        setCustomerOptions(options as string[])
+        setCustomerOptions(options)
       } catch (err) {
         console.error('Müşteri listesi yüklenemedi:', err)
         setCustomerOptions([])
