@@ -881,22 +881,22 @@ function MonthView({
       <div className="grid grid-cols-7">
         {/* Boş kutular */}
         {Array.from({ length: startPad }).map((_, i) => (
-          <div key={`pad-${i}`} className="min-h-[68px] border-b border-r border-gray-100" />
+          <div key={`pad-${i}`} className="min-h-[120px] border-b border-r border-gray-100" />
         ))}
 
         {days.map(day => {
           const dt = dayTasks(day)
           const isWeekend = getDay(day) === 0 || getDay(day) === 6
           const today = isToday(day)
-          const shown = dt.slice(0, 2)
-          const extra = dt.length - 2
+          const shown = dt.slice(0, 5)
+          const extra = dt.length - 5
 
           return (
             <div
               key={day.toISOString()}
               onClick={() => onDayClick(day)}
               className={clsx(
-                'min-h-[68px] border-b border-r border-gray-100 p-1 cursor-pointer',
+                'min-h-[120px] border-b border-r border-gray-100 p-1 cursor-pointer',
                 isWeekend && 'bg-gray-50',
               )}
             >

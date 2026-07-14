@@ -13,6 +13,7 @@ import {
   fmtCur, currentDonem, donemOptions, donemLabel,
 } from '@/lib/sellout'
 import { Profile } from '@/lib/supabase'
+import { BSY_NAME_TO_KOD } from '@/lib/bsy'
 
 type SubTab = 'sup' | 'jr' | 'merch' | 'top20' | 'satislar'
 
@@ -518,13 +519,20 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     [team, visibleIds]
   )
 
-  // ── Filtered period rows (sadece bağlı supervisorlar) ──
+  // ── Filtered period rows (sadece bağlı supervisorlar / BSY için kendi Carileri) ──
+  const bsyKod = isBsy
+    ? (BSY_NAME_TO_KOD[currentProfile.full_name.toLocaleLowerCase('tr')] ?? null)
+    : null
+
   const filteredPeriodRows = useMemo(() => {
     return periodRows.filter(r => {
+      if (isBsy && bsyKod) {
+        return r.bsy === bsyKod
+      }
       const normApi = normalizeName(r.supervisor_adi || '')
       return allSupNames.some(n => normalizeName(n) === normApi)
     })
-  }, [periodRows, allSupNames])
+  }, [periodRows, allSupNames, isBsy, bsyKod])
 
   // ── Adet prim lookup ──
   const adetPrimMap = useMemo(() => {
