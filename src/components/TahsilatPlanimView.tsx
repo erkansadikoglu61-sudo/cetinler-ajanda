@@ -380,7 +380,7 @@ export function TahsilatPlanimView({
 
                       {/* Ay kolonları */}
                       {ayKolonlari.map((kolon, i) => {
-                        const deger = row[kolon.field]
+                        const deger = row[kolon.field] as number ?? 0
                         return (
                           <td key={i} className="border-r border-gray-100 px-1 py-1 text-right text-gray-600 tabular-nums">
                             {deger > 0 ? Math.round(deger).toLocaleString('tr-TR') : '—'}
