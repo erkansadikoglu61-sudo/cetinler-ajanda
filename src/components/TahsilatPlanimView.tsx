@@ -33,16 +33,20 @@ function kisaltCariIsim(isim: string): string {
 interface TahsilatPlanimRow {
   cariKod:   string
   cariIsim:  string
-  bsyAdi?:   string  // Admin için BSY bilgisi
+  bsyAdi?:   string
   onceki:    number
-  kasim:     number
-  aralik:    number
   ocak:      number
   subat:     number
   mart:      number
   nisan:     number
   mayis:     number
   haziran:   number
+  temmuz:    number
+  agustos:   number
+  eylul:     number
+  ekim:      number
+  kasim:     number
+  aralik:    number
   toplam:    number
   tahsilatHaftasi?: string
   tutar?: number
@@ -217,45 +221,27 @@ export function TahsilatPlanimView({
     }
   }
 
-  // Ay başlıklarını ve değerlerini dinamik oluştur
+  // Tüm ay kolonları sırası (Ocak=index 0 ... Aralık=index 11)
+  const ALL_AY_KOLONLARI: { baslik: string; field: keyof TahsilatPlanimRow }[] = [
+    { baslik: 'Ocak',    field: 'ocak'    },
+    { baslik: 'Şubat',   field: 'subat'   },
+    { baslik: 'Mart',    field: 'mart'    },
+    { baslik: 'Nisan',   field: 'nisan'   },
+    { baslik: 'Mayıs',   field: 'mayis'   },
+    { baslik: 'Haziran', field: 'haziran' },
+    { baslik: 'Temmuz',  field: 'temmuz'  },
+    { baslik: 'Ağustos', field: 'agustos' },
+    { baslik: 'Eylül',   field: 'eylul'   },
+    { baslik: 'Ekim',    field: 'ekim'    },
+    { baslik: 'Kasım',   field: 'kasim'   },
+    { baslik: 'Aralık',  field: 'aralik'  },
+  ]
+
+  // Ay başlıklarını ve değerlerini dinamik oluştur: Önceki + Ocak'tan mevcut aya kadar
   const ayKolonlari = useMemo(() => {
-    if (ay === 6) {
-      // Haziran için
-      return [
-        { baslik: 'Önceki', field: 'onceki' as const },
-        { baslik: 'Kasım', field: 'kasim' as const },
-        { baslik: 'Aralık', field: 'aralik' as const },
-        { baslik: 'Ocak', field: 'ocak' as const },
-        { baslik: 'Şubat', field: 'subat' as const },
-        { baslik: 'Mart', field: 'mart' as const },
-        { baslik: 'Nisan', field: 'nisan' as const },
-        { baslik: 'Mayıs', field: 'mayis' as const },
-        { baslik: 'Haziran', field: 'haziran' as const },
-      ]
-    } else if (ay === 7) {
-      // Temmuz için - Excel'de sadece Haziran'a kadar var, Temmuz verisi yok
-      return [
-        { baslik: 'Önceki', field: 'onceki' as const },
-        { baslik: 'Aralık', field: 'aralik' as const },
-        { baslik: 'Ocak', field: 'ocak' as const },
-        { baslik: 'Şubat', field: 'subat' as const },
-        { baslik: 'Mart', field: 'mart' as const },
-        { baslik: 'Nisan', field: 'nisan' as const },
-        { baslik: 'Mayıs', field: 'mayis' as const },
-        { baslik: 'Haziran', field: 'haziran' as const },
-      ]
-    }
-    // Diğer aylar için varsayılan
     return [
-      { baslik: 'Önceki', field: 'onceki' as const },
-      { baslik: 'Kasım', field: 'kasim' as const },
-      { baslik: 'Aralık', field: 'aralik' as const },
-      { baslik: 'Ocak', field: 'ocak' as const },
-      { baslik: 'Şubat', field: 'subat' as const },
-      { baslik: 'Mart', field: 'mart' as const },
-      { baslik: 'Nisan', field: 'nisan' as const },
-      { baslik: 'Mayıs', field: 'mayis' as const },
-      { baslik: 'Haziran', field: 'haziran' as const },
+      { baslik: 'Önceki', field: 'onceki' as keyof TahsilatPlanimRow },
+      ...ALL_AY_KOLONLARI.slice(0, ay),
     ]
   }, [ay])
 

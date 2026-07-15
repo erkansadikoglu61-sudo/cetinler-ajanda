@@ -34,20 +34,24 @@ function toNum(v: unknown): number {
 export interface TahsilatPlanimRow {
   cariKod:   string
   cariIsim:  string
-  bsyAdi?:   string         // Admin için BSY bilgisi
+  bsyAdi?:   string
   onceki:    number
-  kasim:     number
-  aralik:    number
   ocak:      number
   subat:     number
   mart:      number
   nisan:     number
   mayis:     number
   haziran:   number
+  temmuz:    number
+  agustos:   number
+  eylul:     number
+  ekim:      number
+  kasim:     number
+  aralik:    number
   toplam:    number
-  tahsilatHaftasi?: string  // Kullanıcı seçimi
-  tutar?: number            // Kullanıcı girişi
-  tahsilatTuru?: string     // Kullanıcı seçimi
+  tahsilatHaftasi?: string
+  tutar?: number
+  tahsilatTuru?: string
 }
 
 export interface TahsilatPlanimResponse {
@@ -76,7 +80,7 @@ export async function GET(req: Request) {
   // Header'dan kolon indekslerini bul
   const header = raw[0] as unknown[]
   const cols: Record<string, number> = {}
-  const colNames = ['Cari Kod', 'Cari İsim', 'Önceki', 'Kasım', 'Aralık', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Toplam']
+  const colNames = ['Cari Kod', 'Cari İsim', 'Önceki', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık', 'Toplam']
 
   for (let c = 0; c < header.length; c++) {
     const h = String(header[c] ?? '').trim()
@@ -170,14 +174,18 @@ export async function GET(req: Request) {
     }
 
     const onceki  = toNum(r[cols['Önceki']])
-    const kasim   = toNum(r[cols['Kasım']])
-    const aralik  = toNum(r[cols['Aralık']])
     const ocak    = toNum(r[cols['Ocak']])
     const subat   = toNum(r[cols['Şubat']])
     const mart    = toNum(r[cols['Mart']])
     const nisan   = toNum(r[cols['Nisan']])
     const mayis   = toNum(r[cols['Mayıs']])
     const haziran = toNum(r[cols['Haziran']])
+    const temmuz  = toNum(r[cols['Temmuz']])
+    const agustos = toNum(r[cols['Ağustos']])
+    const eylul   = toNum(r[cols['Eylül']])
+    const ekim    = toNum(r[cols['Ekim']])
+    const kasim   = toNum(r[cols['Kasım']])
+    const aralik  = toNum(r[cols['Aralık']])
     const toplam  = toNum(r[cols['Toplam']])
 
     const secim = secimMap.get(cariKod)
@@ -186,14 +194,18 @@ export async function GET(req: Request) {
       cariIsim,
       ...(showAll && rowBsyAdi ? { bsyAdi: rowBsyAdi } : {}),
       onceki,
-      kasim,
-      aralik,
       ocak,
       subat,
       mart,
       nisan,
       mayis,
       haziran,
+      temmuz,
+      agustos,
+      eylul,
+      ekim,
+      kasim,
+      aralik,
       toplam,
       tahsilatHaftasi: secim?.tahsilatHaftasi,
       tutar: secim?.tutar ?? undefined,
