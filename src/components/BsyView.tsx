@@ -836,18 +836,19 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
   const [tahsilatDetay,   setTahsilatDetay]   = useState<TahsilatDetayRow[]>([])
   const [tahsilatLoading, setTahsilatLoading] = useState(false)
 
-  useEffect(() => {
+  const loadTahsilat = useCallback(() => {
     setTahsilatLoading(true)
     fetch(`/api/tahsilat?yil=${yil}&ay=${ay}`)
       .then(r => r.json())
       .then(d => {
         const allRows: TahsilatRow[] = d.rows ?? []
-        // BSY kullanıcısı tahsilat tablosunda sadece kendini görür
         setTahsilatRows(isBsy && bsyAdi ? allRows.filter(r => r.bsyAdi === bsyAdi) : allRows)
         setTahsilatDetay(d.detay ?? [])
       })
       .finally(() => setTahsilatLoading(false))
   }, [yil, ay, isBsy, bsyAdi])
+
+  useEffect(() => { loadTahsilat() }, [loadTahsilat])
 
   async function handleExcelUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -870,6 +871,7 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
 
       setUploadMsg('✓ Yüklendi, veriler güncellendi')
       reload()
+      loadTahsilat()
     } catch (err) {
       setUploadMsg('✗ ' + (err instanceof Error ? err.message : String(err)))
     } finally {
@@ -987,7 +989,7 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
         </div>
 
         <button
-          onClick={() => { reload(); reloadHedef(); reloadKisi() }}
+          onClick={() => { reload(); reloadHedef(); reloadKisi(); loadTahsilat() }}
           disabled={loading || hedefLoading}
           className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-50"
           title="Yenile"
