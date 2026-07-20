@@ -1744,8 +1744,36 @@ export default function AppPage() {
     else setMonth(m => m + 1)
   }
 
+  // BSY: yalnızca kendi Carilerine ait görevler görünsün
+  const [bsyCariSet, setBsyCariSet] = useState<Set<string> | null>(null)
+
+  useEffect(() => {
+    if (!isBsy || !currentProfile) { setBsyCariSet(null); return }
+    fetch('/api/merch-detay')
+      .then(r => r.json())
+      .then(json => {
+        const data: { cari_adi: string; sube_adi: string; bsy_adi: string }[] = json.data ?? []
+        const name = currentProfile.full_name?.trim() ?? ''
+        const allowed = new Set(
+          data
+            .filter(r => r.bsy_adi?.trim() === name)
+            .map(r => `${r.cari_adi?.trim() || ''} / ${r.sube_adi?.trim() || ''}`)
+        )
+        setBsyCariSet(allowed)
+      })
+      .catch(() => setBsyCariSet(null))
+  }, [isBsy, currentProfile])
+
+  const filteredTasks = useMemo(() => {
+    if (!isBsy || !bsyCariSet) return tasks
+    return tasks.filter(t => {
+      if (!t.customer) return true // İzin, Toplantı vb. — müşterisiz görevler görünsün
+      return bsyCariSet.has(t.customer)
+    })
+  }, [tasks, isBsy, bsyCariSet])
+
   const taskCounts: Record<string, number> = {}
-  tasks.forEach(t => {
+  filteredTasks.forEach(t => {
     taskCounts[t.pid] = (taskCounts[t.pid] ?? 0) + 1
   })
 
@@ -2109,30 +2137,30 @@ export default function AppPage() {
         <>
           {tab === 'month' && (
             <MonthView
-              year={year} month={month} tasks={tasks} team={team}
+              year={year} month={month} tasks={filteredTasks} team={team}
               filterPid={filterPid} onDayClick={handleDayClick} onTaskClick={handleTaskClick}
             />
           )}
           {tab === 'week' && (
             <WeekView
-              date={selectedDate} tasks={tasks} team={team}
+              date={selectedDate} tasks={filteredTasks} team={team}
               filterPid={filterPid} onTaskClick={handleTaskClick}
             />
           )}
           {tab === 'day' && (
             <DayView
-              date={selectedDate} tasks={tasks} team={team}
+              date={selectedDate} tasks={filteredTasks} team={team}
               filterPid={filterPid} onTaskClick={handleTaskClick}
             />
           )}
           {tab === 'visits' && (
             <CompletedVisitsView
-              tasks={tasks} team={team} filterPid={filterPid}
+              tasks={filteredTasks} team={team} filterPid={filterPid}
             />
           )}
           {tab === 'report' && (
             <ReportView
-              tasks={tasks} team={team} year={year} month={month}
+              tasks={filteredTasks} team={team} year={year} month={month}
               filterPid={filterPid} filterName={filterName}
             />
           )}
