@@ -79,7 +79,11 @@ export async function GET(req: Request) {
 
     if (!bsyAdi || !cariKod || !rowStokKodu || !rowYil || !rowAy) continue
     if (gc !== 'C' && gc !== 'G') continue
-    if (rowStokKodu !== stokKod1 && rowStokKodu !== stokKod2) continue
+
+    // Tam eşleşme VEYA prefix eşleşmesi (örn. RHS8900 → RHS8900B, RHS8900P)
+    const isS1 = rowStokKodu === stokKod1 || rowStokKodu.startsWith(stokKod1)
+    const isS2 = rowStokKodu === stokKod2 || rowStokKodu.startsWith(stokKod2)
+    if (!isS1 && !isS2) continue
 
     if (yil         && rowYil !== yil)         continue
     if (ayBaslangic && rowAy < ayBaslangic)    continue
@@ -92,8 +96,8 @@ export async function GET(req: Request) {
     if (!cariMap.has(cariKod)) cariMap.set(cariKod, { s1: 0, s2: 0 })
     const entry = cariMap.get(cariKod)!
 
-    if (rowStokKodu === stokKod1) entry.s1 += adet
-    else                          entry.s2 += adet
+    if (isS1) entry.s1 += adet
+    else      entry.s2 += adet
   }
 
   const rows: EslesmeRow[] = []
