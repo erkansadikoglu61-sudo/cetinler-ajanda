@@ -433,7 +433,7 @@ function SubeDetail({ sube, onClose, currentProfile, onRefresh }: SubeDetailProp
                     />
                     <button
                       onClick={handleAdd}
-                      disabled={adding || !newMerchName.trim()}
+                      disabled={adding}
                       className="px-2 sm:px-3 py-1.5 bg-sky-600 text-white rounded-lg hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium transition-colors whitespace-nowrap"
                     >
                       {adding ? <RefreshCw size={12} className="animate-spin" /> : <Plus size={12} />}
