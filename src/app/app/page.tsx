@@ -133,25 +133,31 @@ function TaskSheet({
         const res = await fetch('/api/merch-detay')
         if (!res.ok) throw new Error('merch-detay API hatası')
         const json = await res.json()
-        const data: { cari_adi: string; sube_adi: string; bsy_adi: string; sup_adi: string; jr_adi: string }[] = json.data ?? []
+        const data: { cari_adi: string; sube_adi: string; bsy_adi: string; bsy_kod: string; sup_adi: string; jr_adi: string }[] = json.data ?? []
 
         const name = selectedProfile.full_name?.trim() ?? ''
+        const nameLower = name.toLocaleLowerCase('tr')
 
         // Rol bazlı filtreleme
         let filtered = data
         if (selectedProfile.role === 'jr') {
-          filtered = data.filter(r => r.jr_adi?.trim() === name)
+          filtered = data.filter(r => r.jr_adi?.trim().toLocaleLowerCase('tr') === nameLower)
         } else if (selectedProfile.role === 'sup') {
-          // Hem kendi sup_adi'na hem altındaki jr'ların jr_adi'na göre filtrele
           const jrNames = team
             .filter(p => p.role === 'jr' && p.manager_id === selectedProfile.id)
-            .map(p => p.full_name?.trim() ?? '')
+            .map(p => p.full_name?.trim().toLocaleLowerCase('tr') ?? '')
           filtered = data.filter(r =>
-            r.sup_adi?.trim() === name ||
-            (r.jr_adi && jrNames.includes(r.jr_adi.trim()))
+            r.sup_adi?.trim().toLocaleLowerCase('tr') === nameLower ||
+            (r.jr_adi && jrNames.includes(r.jr_adi.trim().toLocaleLowerCase('tr')))
           )
         } else if (selectedProfile.role === 'bsy') {
-          filtered = data.filter(r => r.bsy_adi?.trim() === name)
+          // Önce BSY kodu ile eşleştir (daha güvenilir), yoksa isme göre
+          const bsyKod = BSY_NAME_TO_KOD[nameLower] ?? null
+          if (bsyKod) {
+            filtered = data.filter(r => r.bsy_kod?.trim().toUpperCase() === bsyKod.toUpperCase())
+          } else {
+            filtered = data.filter(r => r.bsy_adi?.trim().toLocaleLowerCase('tr') === nameLower)
+          }
         }
         // admin → tümü
 
