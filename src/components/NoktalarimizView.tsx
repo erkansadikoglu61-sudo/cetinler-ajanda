@@ -265,7 +265,7 @@ function SubeDetail({ sube, onClose, currentProfile, onRefresh }: SubeDetailProp
   const [deleting, setDeleting] = useState<string | null>(null)
   const [msg, setMsg] = useState('')
 
-  const canEdit = currentProfile.role === 'admin' || currentProfile.role === 'sup' || currentProfile.role === 'jr'
+  const canEdit = currentProfile.role === 'admin' || currentProfile.role === 'bsy' || currentProfile.role === 'sup' || currentProfile.role === 'jr'
 
   // Yeni destek personeli ekle
   const handleAdd = async () => {
