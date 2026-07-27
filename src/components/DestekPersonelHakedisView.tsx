@@ -111,7 +111,7 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
       // Satırları oluştur — (cari, sube, merch_adi) tekilleştir
       const seen = new Set<string>()
       const built: HakedisRow[] = []
-      const destekRows: Array<{ merch_adi: string; sube_adi: string; cari_adi: string; cetinler_merch: string }> =
+      const destekRows: Array<{ merch_adi: string; sube_adi: string; cari_adi: string; cetinler_merch: string; sup_adi: string }> =
         destekData.rows ?? []
 
       for (const dp of destekRows) {
@@ -124,7 +124,7 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
         built.push({
           cari_adi:               dp.cari_adi,
           sube_adi:               dp.sube_adi,
-          sup_adi:                currentUserRole === 'sup' ? currentUserName : '',
+          sup_adi:                dp.sup_adi || (currentUserRole === 'sup' ? currentUserName : ''),
           cetinler_merch:         dp.cetinler_merch,
           cetinler_merch_hakedis: satisMap.get(mk) ?? 0,
           merch_adi:              dp.merch_adi,

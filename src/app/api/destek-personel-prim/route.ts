@@ -13,6 +13,7 @@ interface DestekPersonelRow {
   sube_adi:            string
   cari_adi:            string
   cetinler_merch:      string
+  sup_adi:             string
   kategori:            string
   hedef_gerceklesme:   number   // %
   satis_adedi:         number
@@ -113,6 +114,7 @@ export async function GET(req: Request) {
         sube_adi:            dp.sube_adi,
         cari_adi:            dp.cari_adi,
         cetinler_merch:      cetinlerMerch,
+        sup_adi:             subeCariSupMap.get(subeKey) ?? '',
         kategori:            '-',
         hedef_gerceklesme:   0,
         satis_adedi:         0,
