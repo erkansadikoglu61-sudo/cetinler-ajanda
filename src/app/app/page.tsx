@@ -2103,7 +2103,7 @@ export default function AppPage() {
                 { key: 'adet-prim' as const,      label: 'Adet Prim Tablosu',         roles: ['admin','bsy','sup'] },
                 { key: 'bayi-merch' as const,      label: 'Bayi Merch Prim Hakedişleri', roles: ['admin','bsy','sup'] },
                 { key: 'destek-personel' as const, label: 'Destek Personeli Prim Dağıtım', roles: ['admin','bsy','sup'] },
-                { key: 'destek-hakedis' as const,  label: 'Destek Personelleri Hakediş',  roles: ['sup'] },
+                { key: 'destek-hakedis' as const,  label: 'Destek Personelleri Hakediş',  roles: ['admin','sup'] },
               ] as const).filter(({ roles }) => (roles as readonly string[]).includes(currentProfile?.role ?? '')).map(({ key, label }) => (
                 <button key={key} onClick={() => setTab(key)}
                   className={clsx(
@@ -2276,7 +2276,7 @@ export default function AppPage() {
               />
             </div>
           )}
-          {tab === 'destek-hakedis' && isSup && (
+          {tab === 'destek-hakedis' && (isSup || currentProfile?.role === 'admin') && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
               <DestekPersonelHakedisView
                 currentUserName={currentProfile.full_name}
