@@ -31,9 +31,10 @@ import { AdetPrimTablosu, BayiMerchHakdis } from '@/components/AdetPrimView'
 import { AnalizView } from '@/components/AnalizView'
 import { AdminDashboardView } from '@/components/AdminDashboardView'
 import { DestekPersoneliPrimView } from '@/components/DestekPersoneliPrimView'
+import { DestekPersonelHakedisView } from '@/components/DestekPersonelHakedisView'
 import { TahsilatTakvimiView } from '@/components/TahsilatTakvimiView'
 import { PersonelliNoktaAnalizView } from '@/components/PersonelliNoktaAnalizView'
-type TabType = 'month' | 'week' | 'day' | 'report' | 'personelli-nokta-analiz' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'destek-personel' | 'analiz' | 'tahsilat-planim' | 'tahsilat-takvimi' | 'dashboard'
+type TabType = 'month' | 'week' | 'day' | 'report' | 'personelli-nokta-analiz' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'destek-personel' | 'destek-hakedis' | 'analiz' | 'tahsilat-planim' | 'tahsilat-takvimi' | 'dashboard'
 
 // Renk hex'ine alpha ekle
 function hexWithAlpha(hex: string, alpha: string) {
@@ -1980,10 +1981,10 @@ export default function AppPage() {
               {/* Primler — admin + BSY + Süpervizör */}
               {(currentProfile?.role === 'admin' || isBsy || isSup) && (
                 <button
-                  onClick={() => { if (!['adet-prim','bayi-merch'].includes(tab)) setTab('adet-prim') }}
+                  onClick={() => { if (!['adet-prim','bayi-merch','destek-personel','destek-hakedis'].includes(tab)) setTab('adet-prim') }}
                   className={clsx(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                    ['adet-prim','bayi-merch'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                    ['adet-prim','bayi-merch','destek-personel','destek-hakedis'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
                   )}
                 >
                   <Activity size={15} /> Primler
@@ -2095,14 +2096,15 @@ export default function AppPage() {
               ))}
             </div>
           )}
-          {/* Primler alt sekmeleri (admin) */}
-          {(currentProfile?.role === 'admin' || isBsy || isSup) && ['adet-prim','bayi-merch','destek-personel'].includes(tab) && (
+          {/* Primler alt sekmeleri */}
+          {(currentProfile?.role === 'admin' || isBsy || isSup) && ['adet-prim','bayi-merch','destek-personel','destek-hakedis'].includes(tab) && (
             <div className="flex overflow-x-auto items-center gap-1 px-3 pb-1.5 scrollbar-none">
               {([
-                { key: 'adet-prim' as const,  label: 'Adet Prim Tablosu' },
-                { key: 'bayi-merch' as const,  label: 'Bayi Merch Prim Hakedişleri' },
-                { key: 'destek-personel' as const,  label: 'Destek Personeli Prim Dağıtım' },
-              ] as const).map(({ key, label }) => (
+                { key: 'adet-prim' as const,      label: 'Adet Prim Tablosu',         roles: ['admin','bsy','sup'] },
+                { key: 'bayi-merch' as const,      label: 'Bayi Merch Prim Hakedişleri', roles: ['admin','bsy','sup'] },
+                { key: 'destek-personel' as const, label: 'Destek Personeli Prim Dağıtım', roles: ['admin','bsy','sup'] },
+                { key: 'destek-hakedis' as const,  label: 'Destek Personelleri Hakediş',  roles: ['sup'] },
+              ] as const).filter(({ roles }) => (roles as readonly string[]).includes(currentProfile?.role ?? '')).map(({ key, label }) => (
                 <button key={key} onClick={() => setTab(key)}
                   className={clsx(
                     'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
@@ -2274,11 +2276,18 @@ export default function AppPage() {
               />
             </div>
           )}
+          {tab === 'destek-hakedis' && isSup && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <DestekPersonelHakedisView
+                currentUserName={currentProfile.full_name}
+              />
+            </div>
+          )}
         </>
       )}
 
       {/* FAB — sadece takvim erişimi olan kullanıcılar takvim sekmelerinde görünür */}
-      {hasCalendarAccess && tab !== 'report' && tab !== 'personelli-nokta-analiz' && tab !== 'visits' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && tab !== 'tahsilat-planim' && tab !== 'dashboard' && tab !== 'destek-personel' && (
+      {hasCalendarAccess && tab !== 'report' && tab !== 'personelli-nokta-analiz' && tab !== 'visits' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && tab !== 'tahsilat-planim' && tab !== 'dashboard' && tab !== 'destek-personel' && tab !== 'destek-hakedis' && (
         <button
           onClick={handleAddTask}
           className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
@@ -2323,7 +2332,7 @@ export default function AppPage() {
                   (key === 'report' && tab === 'personelli-nokta-analiz') ||
                   (key === 'bsy' && ['bsy','kpi','genel-raporlar'].includes(tab)) ||
                   (key === 'noktalar' && tab === 'kullanicilar') ||
-                  (key === 'adet-prim' && ['bayi-merch','destek-personel'].includes(tab)))
+                  (key === 'adet-prim' && ['bayi-merch','destek-personel','destek-hakedis'].includes(tab)))
                   ? 'text-brand-500' : 'text-gray-400'
               )}
             >
