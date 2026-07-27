@@ -2280,6 +2280,7 @@ export default function AppPage() {
             <div className="flex-1 overflow-hidden flex flex-col h-full">
               <DestekPersonelHakedisView
                 currentUserName={currentProfile.full_name}
+                currentUserRole={currentProfile.role}
               />
             </div>
           )}
