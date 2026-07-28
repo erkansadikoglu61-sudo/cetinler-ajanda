@@ -840,9 +840,17 @@ export function PrimOdemeListesi({
       ['', '', 'TOPLAM', toplamPrim, '', '', ''],
     ]
     const ws = XLSX.utils.aoa_to_sheet(wsData)
-    // Kolon genişlikleri
+
+    // Hakediş kolonu (D) için 1.000 ayraçlı ve 2 ondalık basamaklı format uygula
+    const numFmt = '#,##0.00'
+    const dataRowCount = filtered.length + 2  // başlık + veri + toplam
+    for (let row = 1; row < dataRowCount; row++) {
+      const cellRef = XLSX.utils.encode_cell({ r: row, c: 3 })
+      if (ws[cellRef]) ws[cellRef].z = numFmt
+    }
+
     ws['!cols'] = [
-      { wch: 5 }, { wch: 16 }, { wch: 22 }, { wch: 14 },
+      { wch: 5 }, { wch: 16 }, { wch: 22 }, { wch: 16 },
       { wch: 50 }, { wch: 22 }, { wch: 20 },
     ]
     const wb = XLSX.utils.book_new()
