@@ -1149,7 +1149,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                       const mk = (r.merch_personel || '').toLowerCase()
                       const kat = GRUP_NORMALIZE[r.grup_aciklama || ''] || r.grup_aciklama || ''
                       const oran = merchKategoriPerformans.get(mk)?.get(kat)?.oran || 0
-                      return s + (oran / 100) * p * (r.satilan_adet || 0)
+                      const adet = r.satilan_adet || 0
+                      return s + (oran >= 100 ? p * adet : (oran / 100) * p * adet)
                     }, 0)
                     return (
                       <tr className="bg-gray-700 text-white text-[11px] font-semibold">
@@ -1200,7 +1201,12 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                       const cetinlerMerchGercOran = merchKategoriData?.oran || 0
 
                       // 5. Çetinler Merch Gerç.Oranına Göre Adet Primi
-                      const cetinlerMerchPrim = (cetinlerMerchGercOran / 100) * destekPrimAdet * satisAdedi
+                      // >=100% → tam destek prim, <100% → oran × destek prim
+                      const cetinlerMerchPrim = destekPrimAdet > 0
+                        ? (cetinlerMerchGercOran >= 100
+                            ? destekPrimAdet * satisAdedi
+                            : (cetinlerMerchGercOran / 100) * destekPrimAdet * satisAdedi)
+                        : 0
 
                       return (
                         <tr
@@ -1271,7 +1277,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                       const mk = (r.merch_personel || '').toLowerCase()
                       const kat = GRUP_NORMALIZE[r.grup_aciklama || ''] || r.grup_aciklama || ''
                       const oran = merchKategoriPerformans.get(mk)?.get(kat)?.oran || 0
-                      return s + (oran / 100) * p * (r.satilan_adet || 0)
+                      const adet = r.satilan_adet || 0
+                      return s + (oran >= 100 ? p * adet : (oran / 100) * p * adet)
                     }, 0)
                     return (
                       <tr className="bg-gray-800 text-white font-semibold">
