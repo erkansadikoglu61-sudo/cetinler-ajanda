@@ -1132,34 +1132,42 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                     <th className="px-3 py-2.5 text-right font-semibold min-w-[160px] bg-green-800">Çet. Merch Gerç.Oranına Göre Prim</th>
                   </tr>
                   {/* ── Üst toplam satırı ── */}
-                  <tr className="bg-gray-700 text-white text-[11px] font-semibold">
-                    <td colSpan={6} className="px-3 py-1.5 text-right text-gray-300">TOPLAM</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">
-                      {satislarRows.reduce((s, r) => s + (r.satilan_adet || 0), 0).toLocaleString('tr-TR')}
-                    </td>
-                    <td colSpan={3} className="px-3 py-1.5 text-center text-gray-300 text-[10px]">
-                      {satislarRows.length.toLocaleString('tr-TR')} kayıt
-                    </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums bg-blue-800">—</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums bg-blue-800">
-                      {satislarRows.reduce((s, r) => {
-                        const prim = adetPrimMap.get(r.stok_kodu || '')?.bayiMerch || 0
-                        return s + prim * (r.satilan_adet || 0)
-                      }, 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
-                    </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums bg-purple-800">—</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums bg-green-800">—</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums bg-green-800">
-                      {satislarRows.reduce((s, r) => {
-                        if (r.merch_tipi !== 'Çetinler Merch' || !destekFlags[r.merch_personel || '']) return s
-                        const p = adetPrimMap.get(r.stok_kodu || '')?.kosulluDestek || 0
-                        const mk = (r.merch_personel || '').toLowerCase()
-                        const kat = GRUP_NORMALIZE[r.grup_aciklama || ''] || r.grup_aciklama || ''
-                        const oran = merchKategoriPerformans.get(mk)?.get(kat)?.oran || 0
-                        return s + (oran / 100) * p * (r.satilan_adet || 0)
-                      }, 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
-                    </td>
-                  </tr>
+                  {(() => {
+                    const fmt2 = (n: number) => n > 0 ? `${n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺` : '—'
+                    const topBayiHakedis = satislarRows.reduce((s, r) => {
+                      const p = adetPrimMap.get(r.stok_kodu || '')?.bayiMerch || 0
+                      return s + p * (r.satilan_adet || 0)
+                    }, 0)
+                    const topDestekHakedis = satislarRows.reduce((s, r) => {
+                      if (r.merch_tipi !== 'Çetinler Merch' || !destekFlags[r.merch_personel || '']) return s
+                      const p = adetPrimMap.get(r.stok_kodu || '')?.kosulluDestek || 0
+                      return s + p * (r.satilan_adet || 0)
+                    }, 0)
+                    const topCetinlerPrim = satislarRows.reduce((s, r) => {
+                      if (r.merch_tipi !== 'Çetinler Merch' || !destekFlags[r.merch_personel || '']) return s
+                      const p = adetPrimMap.get(r.stok_kodu || '')?.kosulluDestek || 0
+                      const mk = (r.merch_personel || '').toLowerCase()
+                      const kat = GRUP_NORMALIZE[r.grup_aciklama || ''] || r.grup_aciklama || ''
+                      const oran = merchKategoriPerformans.get(mk)?.get(kat)?.oran || 0
+                      return s + (oran / 100) * p * (r.satilan_adet || 0)
+                    }, 0)
+                    return (
+                      <tr className="bg-gray-700 text-white text-[11px] font-semibold">
+                        <td colSpan={6} className="px-3 py-1.5 text-right text-gray-300">TOPLAM</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums">
+                          {satislarRows.reduce((s, r) => s + (r.satilan_adet || 0), 0).toLocaleString('tr-TR')}
+                        </td>
+                        <td colSpan={3} className="px-3 py-1.5 text-center text-gray-300 text-[10px]">
+                          {satislarRows.length.toLocaleString('tr-TR')} kayıt
+                        </td>
+                        <td className="px-3 py-1.5 text-right tabular-nums bg-blue-800">—</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums bg-blue-800">{fmt2(topBayiHakedis)}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums bg-purple-800">{fmt2(topDestekHakedis)}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums bg-green-800">—</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums bg-green-800">{fmt2(topCetinlerPrim)}</td>
+                      </tr>
+                    )
+                  })()}
                 </thead>
                 <tbody>
                   {satislarRows.length === 0 ? (
@@ -1246,34 +1254,42 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                   )}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-gray-800 text-white font-semibold">
-                    <td colSpan={6} className="px-3 py-2.5 text-right">TOPLAM</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">
-                      {satislarRows.reduce((sum, r) => sum + (r.satilan_adet || 0), 0).toLocaleString('tr-TR')}
-                    </td>
-                    <td colSpan={3} className="px-3 py-2.5 text-center text-[10px]">
-                      {satislarRows.length.toLocaleString('tr-TR')} kayıt
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums bg-blue-900">—</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums bg-blue-900">
-                      {satislarRows.reduce((sum, r) => {
-                        const prim = adetPrimMap.get(r.stok_kodu || '')?.bayiMerch || 0
-                        return sum + (prim * (r.satilan_adet || 0))
-                      }, 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums bg-purple-900">—</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums bg-green-900">—</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums bg-green-900">
-                      {satislarRows.reduce((sum, r) => {
-                        if (r.merch_tipi !== 'Çetinler Merch' || !destekFlags[r.merch_personel || '']) return sum
-                        const primData = adetPrimMap.get(r.stok_kodu || '') || { kosulluDestek: 0 }
-                        const mk = (r.merch_personel || '').toLowerCase()
-                        const kat = GRUP_NORMALIZE[r.grup_aciklama || ''] || r.grup_aciklama || ''
-                        const oran = merchKategoriPerformans.get(mk)?.get(kat)?.oran || 0
-                        return sum + ((oran / 100) * primData.kosulluDestek * (r.satilan_adet || 0))
-                      }, 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
-                    </td>
-                  </tr>
+                  {(() => {
+                    const fmt2 = (n: number) => n > 0 ? `${n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺` : '—'
+                    const botBayiHakedis = satislarRows.reduce((s, r) => {
+                      const p = adetPrimMap.get(r.stok_kodu || '')?.bayiMerch || 0
+                      return s + p * (r.satilan_adet || 0)
+                    }, 0)
+                    const botDestekHakedis = satislarRows.reduce((s, r) => {
+                      if (r.merch_tipi !== 'Çetinler Merch' || !destekFlags[r.merch_personel || '']) return s
+                      const p = adetPrimMap.get(r.stok_kodu || '')?.kosulluDestek || 0
+                      return s + p * (r.satilan_adet || 0)
+                    }, 0)
+                    const botCetinlerPrim = satislarRows.reduce((s, r) => {
+                      if (r.merch_tipi !== 'Çetinler Merch' || !destekFlags[r.merch_personel || '']) return s
+                      const p = adetPrimMap.get(r.stok_kodu || '')?.kosulluDestek || 0
+                      const mk = (r.merch_personel || '').toLowerCase()
+                      const kat = GRUP_NORMALIZE[r.grup_aciklama || ''] || r.grup_aciklama || ''
+                      const oran = merchKategoriPerformans.get(mk)?.get(kat)?.oran || 0
+                      return s + (oran / 100) * p * (r.satilan_adet || 0)
+                    }, 0)
+                    return (
+                      <tr className="bg-gray-800 text-white font-semibold">
+                        <td colSpan={6} className="px-3 py-2.5 text-right">TOPLAM</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">
+                          {satislarRows.reduce((s, r) => s + (r.satilan_adet || 0), 0).toLocaleString('tr-TR')}
+                        </td>
+                        <td colSpan={3} className="px-3 py-2.5 text-center text-[10px]">
+                          {satislarRows.length.toLocaleString('tr-TR')} kayıt
+                        </td>
+                        <td className="px-3 py-2.5 text-right tabular-nums bg-blue-900">—</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums bg-blue-900">{fmt2(botBayiHakedis)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums bg-purple-900">{fmt2(botDestekHakedis)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums bg-green-900">—</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums bg-green-900">{fmt2(botCetinlerPrim)}</td>
+                      </tr>
+                    )
+                  })()}
                 </tfoot>
               </table>
             </div>
