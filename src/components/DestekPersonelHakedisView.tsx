@@ -99,7 +99,8 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
         let toplam = 0
         for (const [kat, { satis_adedi, kosullu_prim_toplam }] of km) {
           const hedef = hedefMap.get(mk)?.get(kat) ?? 0
-          const gerceklesme = hedef > 0 ? (satis_adedi / hedef) * 100 : 100
+          // Sellout view ile aynı mantık: hedef=0 ise gerceklesme=0 (Sellout: data.hedef>0 ? ... : 0)
+          const gerceklesme = hedef > 0 ? (satis_adedi / hedef) * 100 : 0
           toplam += gerceklesme >= 100 ? kosullu_prim_toplam : (gerceklesme / 100) * kosullu_prim_toplam
         }
         satisMap.set(mk, toplam)
