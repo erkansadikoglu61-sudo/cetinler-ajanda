@@ -1108,19 +1108,19 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
                           {/* YENİ KOLONLAR */}
                           <td className="px-3 py-2 text-right tabular-nums text-blue-700 font-medium bg-blue-50">
-                            {bayiMerchPrimAdet > 0 ? `${bayiMerchPrimAdet.toLocaleString('tr-TR')} ₺` : '—'}
+                            {bayiMerchPrimAdet > 0 ? `${bayiMerchPrimAdet.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺` : '—'}
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums text-blue-800 font-bold bg-blue-100">
-                            {bayiMerchHakedis > 0 ? `${bayiMerchHakedis.toLocaleString('tr-TR')} ₺` : '—'}
+                            {bayiMerchHakedis > 0 ? `${bayiMerchHakedis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺` : '—'}
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums text-purple-700 font-medium bg-purple-50">
-                            {destekPrimAdet > 0 ? `${destekPrimAdet.toLocaleString('tr-TR')} ₺` : '—'}
+                            {destekPrimAdet > 0 ? `${destekPrimAdet.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺` : '—'}
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums text-green-700 font-medium bg-green-50">
                             {cetinlerMerchGercOran > 0 ? `%${cetinlerMerchGercOran.toFixed(1)}` : '—'}
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums text-green-800 font-bold bg-green-100">
-                            {cetinlerMerchPrim > 0 ? `${cetinlerMerchPrim.toLocaleString('tr-TR')} ₺` : '—'}
+                            {cetinlerMerchPrim > 0 ? `${cetinlerMerchPrim.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺` : '—'}
                           </td>
                         </tr>
                       )
