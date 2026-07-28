@@ -13,8 +13,8 @@ interface DestekPersonelRow {
   sube_adi:            string
   cari_adi:            string
   cetinler_merch:      string
-  sup_adi:             string   // Jr. Sup ise Jr. adı, değilse doğrudan Sup adı
-  parent_sup_adi:      string   // Jr. Sup'ın bağlı olduğu Sup adı (yoksa '')
+  sup_adi:             string   // Jr. Sup varsa Jr. adı, yoksa doğrudan Sup adı
+  parent_sup_adi:      string   // Jr. Sup'ın üstündeki Sup adı (yoksa '')
   kategori:            string
   hedef_gerceklesme:   number
   satis_adedi:         number
@@ -31,104 +31,79 @@ function decodeHtml(text: string): string {
 
 function normalize(str: string): string {
   return str.trim().toLowerCase()
-    .replace(/i̇/g, 'i').replace(/ı/g, 'i').replace(/ğ/g, 'g')
+    .replace(/İ/g, 'i').replace(/i̇/g, 'i').replace(/ı/g, 'i').replace(/ğ/g, 'g')
     .replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c')
-    .replace(/\s+/g, ' ')
+    .replace(/\bsv\b/gi, '').replace(/\s+/g, ' ').trim()
 }
 
 export async function GET(req: Request) {
-  const sp    = new URL(req.url).searchParams
-  const yil   = sp.get('yil') ? parseInt(sp.get('yil')!) : new Date().getFullYear()
-  const ay    = sp.get('ay')  ? parseInt(sp.get('ay')!)  : new Date().getMonth() + 1
+  const sp     = new URL(req.url).searchParams
+  const yil    = sp.get('yil') ? parseInt(sp.get('yil')!) : new Date().getFullYear()
+  const ay     = sp.get('ay')  ? parseInt(sp.get('ay')!)  : new Date().getMonth() + 1
   const bsyKod = sp.get('bsyKod') || null
   const supAdi = sp.get('supAdi') || null
 
   try {
     const sb = getAdmin()
 
-    // 1. Destek personelleri (jr_profile_id dahil) + profiles
-    const [fpRes, profilesRes] = await Promise.all([
-      sb.from('field_personnel').select('merch_adi, sube_adi, cari_adi, merch_grubu, jr_profile_id').eq('merch_grubu', 'Destek Personeli'),
-      sb.from('profiles').select('id, full_name, role, manager_id'),
-    ])
+    // 1. Destek personelleri
+    const { data: destekPersonel, error: fpError } = await sb
+      .from('field_personnel')
+      .select('merch_adi, sube_adi, cari_adi, merch_grubu')
+      .eq('merch_grubu', 'Destek Personeli')
 
-    if (fpRes.error) return NextResponse.json({ error: fpRes.error.message }, { status: 500 })
-    const destekPersonel = fpRes.data ?? []
-    if (!destekPersonel.length) return NextResponse.json({ rows: [] })
+    if (fpError) return NextResponse.json({ error: fpError.message }, { status: 500 })
+    if (!destekPersonel?.length) return NextResponse.json({ rows: [] })
 
-    // Jr. Sup ismi → parent Sup ismi haritası (UI gösterimi için)
-    const profiles = profilesRes.data ?? []
-    const profileById = new Map<string, { name: string; role: string; manager_id: string | null }>(
-      profiles.map((p: { id: string; full_name: string; role: string; manager_id: string | null }) => [p.id, { name: p.full_name, role: p.role, manager_id: p.manager_id }])
-    )
-    const jrToParentSup = new Map<string, string>()
-    for (const p of profiles) {
-      if (p.role === 'jr' && p.manager_id) {
-        const parentName = profileById.get(p.manager_id)?.name ?? ''
-        if (parentName) jrToParentSup.set(normalize(p.full_name), parentName)
-      }
-    }
-
-    // supAdi filtresi için: Sup'ın profile ID'si + Jr. Sup ID'leri (field_personnel.jr_profile_id ile eşleştirme)
-    let allowedJrIds: Set<string> | null = null
-    let allowedSupNorms: Set<string> | null = null
-    if (supAdi) {
-      const normalizedSupAdi = normalize(supAdi)
-      const supProfile = profiles.find((p: { full_name: string }) => normalize(p.full_name) === normalizedSupAdi)
-      if (supProfile) {
-        const jrProfiles = profiles.filter((p: { role: string; manager_id: string | null }) => p.role === 'jr' && p.manager_id === supProfile.id)
-        // ID bazlı set: field_personnel.jr_profile_id ile eşleştirme (güvenilir yol)
-        allowedJrIds = new Set([supProfile.id, ...jrProfiles.map((p: { id: string }) => p.id)])
-        // İsim bazlı set: PHP supervisor adı ile fallback eşleştirme
-        allowedSupNorms = new Set([normalizedSupAdi, ...jrProfiles.map((p: { full_name: string }) => normalize(p.full_name))])
-      } else {
-        // Profile bulunamadıysa sadece adla dene
-        allowedSupNorms = new Set([normalizedSupAdi])
-      }
-    }
-
-    const phpUrl = process.env.PHP_API_URL
-    if (!phpUrl) return NextResponse.json({ rows: [] })
-
-    // 2. PHP'den şube+cari → Çetinler Merch / BSY / Supervisor mapping
+    // 2. export_merch_detay.php — kolon mapping:
+    //   [0] MERCH_ADI  [1] MERCH_ID  [2] MERCH_TIPI
+    //   [3] CARI_KODU  [4] CARI_ISIM [5] SUBE_KODU  [6] SUBE_ADI
+    //   [7] IBAN  [8] BSY_KODU  [9] BSY_ADI
+    //   [10] SUPERVIZOR  (K kolonu — doğrudan Supervisor: Sinem Bektaş, Songül Durukan…)
+    //   [11] JR_SUPERVIZOR
     const phpRes = await fetch(
-      'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php',
+      'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_detay.php',
       { cache: 'no-store' }
     )
     if (!phpRes.ok) return NextResponse.json({ rows: [] })
 
     const html = await phpRes.text()
 
-    const subeCarimierchMap = new Map<string, string>()
-    const subeCariBsyMap    = new Map<string, string>()
-    const subeCariSupMap    = new Map<string, string>()
+    // subeKey = normalize(sube_adi)||normalize(cari_adi)
+    const subeCarimierchMap = new Map<string, string>()  // → Çetinler Merch adı
+    const subeCariBsyMap    = new Map<string, string>()  // → BSY kodu
+    const subeCariSupMap    = new Map<string, string>()  // → SUPERVIZOR (K)
+    const subeCariJrMap     = new Map<string, string>()  // → JR_SUPERVIZOR (L)
 
     const trMatches = [...html.matchAll(/<tr>([\s\S]*?)<\/tr>/gi)]
     for (let i = 1; i < trMatches.length; i++) {
       const cells = [...trMatches[i][1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)]
         .map(m => decodeHtml(m[1].replace(/<[^>]+>/g, '')).trim())
-      if (cells.length < 15) continue
+      if (cells.length < 10) continue
 
-      // [0] MERCH_PERSONEL, [1] CARI_ISIM, [2] SUBE_ADI
-      // [9] SUPERVISOR_ADI, [14] MERCH_TIPI, [16] BSY
-      const merchAdi     = cells[0]
-      const cariAdi      = cells[1]
-      const subeAdi      = cells[2]
-      const supervisorAdi = cells[9]  ?? ''
-      const merchTipi    = cells[14] ?? ''
-      const bsy          = cells[16] ?? ''
+      const cariAdi   = cells[4] ?? ''
+      const subeAdi   = cells[6] ?? ''
+      const bsy       = cells[8] ?? ''
+      const supAdiPHP = cells[10] ?? ''
+      const jrAdi     = cells[11] ?? ''
+      const merchAdi  = cells[0]  ?? ''
+      const merchTipi = cells[2]  ?? ''
 
       if (!subeAdi || !cariAdi) continue
       const key = `${normalize(subeAdi)}||${normalize(cariAdi)}`
 
-      if (merchAdi && merchTipi === 'Çetinler Merch' && !subeCarimierchMap.has(key)) {
+      // Çetinler Merch adı (cetinler_merch_hakedis hesabı için)
+      if (merchAdi && merchTipi === 'Çetinler Merch' && !subeCarimierchMap.has(key))
         subeCarimierchMap.set(key, merchAdi)
-      }
-      if (bsy)           subeCariBsyMap.set(key, bsy)
-      if (supervisorAdi) subeCariSupMap.set(key, supervisorAdi)
+
+      if (bsy)       subeCariBsyMap.set(key, bsy)
+      if (supAdiPHP) subeCariSupMap.set(key, supAdiPHP)
+      if (jrAdi)     subeCariJrMap.set(key, jrAdi)
     }
 
-    // 3. Her destek personeli → satır oluştur (son 4 kolon boş)
+    const normalizedSupAdi = supAdi ? normalize(supAdi) : null
+
+    // 3. Her destek personeli → satır oluştur
     const rows: DestekPersonelRow[] = []
 
     for (const dp of destekPersonel) {
@@ -136,29 +111,27 @@ export async function GET(req: Request) {
 
       if (bsyKod) {
         if (subeCariBsyMap.get(subeKey) !== bsyKod) continue
-      } else if (allowedJrIds || allowedSupNorms) {
-        // Öncelik: field_personnel.jr_profile_id bazlı (güvenilir)
-        const jrId = (dp as { jr_profile_id?: string | null }).jr_profile_id
-        if (jrId) {
-          if (!allowedJrIds?.has(jrId)) continue
-        } else {
-          // Fallback: PHP supervisor adı bazlı
-          const phpSupNorm = normalize(subeCariSupMap.get(subeKey) || '')
-          if (!allowedSupNorms?.has(phpSupNorm)) continue
-        }
+      } else if (normalizedSupAdi) {
+        // K kolonundaki SUPERVIZOR'u doğrudan karşılaştır
+        const phpSup = normalize(subeCariSupMap.get(subeKey) || '')
+        if (phpSup !== normalizedSupAdi) continue
       }
 
       const cetinlerMerch = subeCarimierchMap.get(subeKey) || '-'
-      const supAdiRaw    = subeCariSupMap.get(subeKey) ?? ''
-      const parentSupAdi = jrToParentSup.get(normalize(supAdiRaw)) ?? ''
+      const supAdiRaw     = subeCariSupMap.get(subeKey) ?? ''
+      const jrAdiRaw      = subeCariJrMap.get(subeKey) ?? ''
+
+      // Süpervizör kolonunda Jr. Sup varsa onu göster, üstünde Sup adı küçük
+      const displaySup    = jrAdiRaw || supAdiRaw
+      const displayParent = jrAdiRaw ? supAdiRaw : ''
 
       rows.push({
         merch_adi:           dp.merch_adi,
         sube_adi:            dp.sube_adi,
         cari_adi:            dp.cari_adi,
         cetinler_merch:      cetinlerMerch,
-        sup_adi:             supAdiRaw,
-        parent_sup_adi:      parentSupAdi,
+        sup_adi:             displaySup,
+        parent_sup_adi:      displayParent,
         kategori:            '-',
         hedef_gerceklesme:   0,
         satis_adedi:         0,
