@@ -707,7 +707,8 @@ export function PrimOdemeListesi({
   const [allRows, setAllRows] = useState<PrimOdemeRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
-  const [supFilter, setSupFilter] = useState('')
+  const [supFilter,  setSupFilter]  = useState('')
+  const [cariFilter, setCariFilter] = useState('')
 
   // Jr. adı (normalize) → parent Sup adı haritası (SV stripped)
   const jrToSupRef = useRef(new Map<string, string>())
@@ -818,6 +819,7 @@ export function PrimOdemeListesi({
       if (!match) return false
     }
     if (supFilter && normSupName(r.supAdi) !== normSupName(supFilter)) return false
+    if (cariFilter && !r.cariAdi.toLowerCase().includes(cariFilter.toLowerCase())) return false
     return true
   })
 
@@ -884,6 +886,20 @@ export function PrimOdemeListesi({
             </select>
             <ChevronDown size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
+        )}
+
+        {/* Cari İsmi filtresi */}
+        <input
+          type="text"
+          value={cariFilter}
+          onChange={e => setCariFilter(e.target.value)}
+          placeholder="Cari İsmi ara…"
+          className="pl-2.5 pr-2.5 py-1 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-brand-400 w-44"
+        />
+        {cariFilter && (
+          <button onClick={() => setCariFilter('')} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+            <X size={12} />
+          </button>
         )}
 
         <button onClick={load} disabled={loading}
