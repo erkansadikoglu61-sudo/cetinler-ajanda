@@ -56,15 +56,30 @@ export async function GET(req: Request) {
     const destekPersonel = fpRes.data ?? []
     if (!destekPersonel.length) return NextResponse.json({ rows: [] })
 
-    // Jr. Sup ismi → parent Sup ismi haritası
+    // Jr. Sup ismi → parent Sup ismi haritası (UI gösterimi için)
     const profiles = profilesRes.data ?? []
-    const profileById = new Map<string, string>(profiles.map((p: { id: string; full_name: string }) => [p.id, p.full_name]))
+    const profileById = new Map<string, { name: string; role: string }>(
+      profiles.map((p: { id: string; full_name: string; role: string }) => [p.id, { name: p.full_name, role: p.role }])
+    )
     const jrToParentSup = new Map<string, string>()
     for (const p of profiles) {
       if (p.role === 'jr' && p.manager_id) {
-        const parentName = profileById.get(p.manager_id) ?? ''
+        const parentName = profileById.get(p.manager_id)?.name ?? ''
         if (parentName) jrToParentSup.set(normalize(p.full_name), parentName)
       }
+    }
+
+    // supAdi filtresi için: Sup'ın kendisi + ona bağlı tüm Jr. Sup isimleri
+    let allowedSupNorms: Set<string> | null = null
+    if (supAdi) {
+      const normalizedSupAdi = normalize(supAdi)
+      const supProfile = profiles.find((p: { full_name: string }) => normalize(p.full_name) === normalizedSupAdi)
+      const jrNames = supProfile
+        ? profiles
+            .filter((p: { role: string; manager_id: string | null }) => p.role === 'jr' && p.manager_id === supProfile.id)
+            .map((p: { full_name: string }) => normalize(p.full_name))
+        : []
+      allowedSupNorms = new Set([normalizedSupAdi, ...jrNames])
     }
 
     const phpUrl = process.env.PHP_API_URL
@@ -116,13 +131,9 @@ export async function GET(req: Request) {
 
       if (bsyKod) {
         if (subeCariBsyMap.get(subeKey) !== bsyKod) continue
-      } else if (supAdi) {
+      } else if (allowedSupNorms) {
         const phpSupNorm = normalize(subeCariSupMap.get(subeKey) || '')
-        const normalizedSupAdi = normalize(supAdi)
-        // Doğrudan eşleşme VEYA PHP'deki kişi bir Jr. Sup ve onun parent'ı supAdi ise göster
-        const directMatch = phpSupNorm === normalizedSupAdi
-        const parentMatch = normalize(jrToParentSup.get(phpSupNorm) ?? '') === normalizedSupAdi
-        if (!directMatch && !parentMatch) continue
+        if (!allowedSupNorms.has(phpSupNorm)) continue
       }
 
       const cetinlerMerch = subeCarimierchMap.get(subeKey) || '-'
