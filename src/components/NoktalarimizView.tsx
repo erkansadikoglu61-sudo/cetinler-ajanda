@@ -267,6 +267,18 @@ function SubeDetail({ sube, onClose, currentProfile, onRefresh }: SubeDetailProp
 
   const canEdit = currentProfile.role === 'admin' || currentProfile.role === 'sup' || currentProfile.role === 'jr'
 
+  // Panel açıldığında DB'den güncel listeyi çek (prop stale olabilir)
+  useEffect(() => {
+    fetch(`/api/destek-personel?sube_adi=${encodeURIComponent(sube.subeAdi)}&cari_adi=${encodeURIComponent(sube.cariIsim)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (Array.isArray(d.data)) {
+          setDestekList(d.data.map((x: { merch_adi: string }) => x.merch_adi).sort())
+        }
+      })
+      .catch(() => {/* prop değeri kalır */})
+  }, [sube.subeAdi, sube.cariIsim])
+
   // Yeni destek personeli ekle
   const handleAdd = async () => {
     if (!newMerchName.trim()) return
