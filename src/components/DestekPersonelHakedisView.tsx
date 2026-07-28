@@ -52,7 +52,7 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
         fetch('/api/sellout'),
         fetch(`/api/adet-prim?yil=${yil}&ay=${ay}`),
         fetch(`/api/sellout-targets?donem=${donem}`),
-        fetch(`/api/destek-hakedis?yil=${yil}&ay=${ay}${currentUserRole === 'sup' ? `&supAdi=${encodeURIComponent(currentUserName)}` : ''}`),
+        fetch(`/api/destek-hakedis?yil=${yil}&ay=${ay}`),
         fetch(`/api/merch-destek-flag?donem=${donem}`),
       ])
 

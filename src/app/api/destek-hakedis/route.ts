@@ -22,7 +22,13 @@ export async function GET(req: Request) {
       .eq('yil', yil)
       .eq('ay', ay)
 
-    if (supAdi) query = query.eq('sup_adi', supAdi)
+    if (supAdi) {
+      // PHP K kolonunda "Ad Soyad SV" formatı gelebilir; profil adı "Ad Soyad" formatında.
+      // Her iki varyantı da eşleştirmek için .in() kullan.
+      const base = supAdi.replace(/\s+sv\s*$/i, '').trim()
+      const variants = Array.from(new Set([supAdi, base, `${base} SV`, `${base} Sv`].filter(Boolean)))
+      query = query.in('sup_adi', variants)
+    }
 
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
