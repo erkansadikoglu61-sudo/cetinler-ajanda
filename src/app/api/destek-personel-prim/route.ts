@@ -117,7 +117,12 @@ export async function GET(req: Request) {
       if (bsyKod) {
         if (subeCariBsyMap.get(subeKey) !== bsyKod) continue
       } else if (supAdi) {
-        if (normalize(subeCariSupMap.get(subeKey) || '') !== normalize(supAdi)) continue
+        const phpSupNorm = normalize(subeCariSupMap.get(subeKey) || '')
+        const normalizedSupAdi = normalize(supAdi)
+        // Doğrudan eşleşme VEYA PHP'deki kişi bir Jr. Sup ve onun parent'ı supAdi ise göster
+        const directMatch = phpSupNorm === normalizedSupAdi
+        const parentMatch = normalize(jrToParentSup.get(phpSupNorm) ?? '') === normalizedSupAdi
+        if (!directMatch && !parentMatch) continue
       }
 
       const cetinlerMerch = subeCarimierchMap.get(subeKey) || '-'
