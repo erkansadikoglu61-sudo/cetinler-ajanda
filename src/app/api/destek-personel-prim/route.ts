@@ -69,11 +69,18 @@ export async function GET(req: Request) {
 
     const html = await phpRes.text()
 
-    // subeKey = normalize(sube_adi)||normalize(cari_adi)
-    const subeCarimierchMap = new Map<string, string>()  // → Çetinler Merch adı
-    const subeCariBsyMap    = new Map<string, string>()  // → BSY kodu
-    const subeCariSupMap    = new Map<string, string>()  // → SUPERVIZOR (K)
-    const subeCariJrMap     = new Map<string, string>()  // → JR_SUPERVIZOR (L)
+    // Cari adının ilk 2 normalize kelimesi (kısaltma uyumsuzluklarını aşmak için)
+    function shortCari(cari: string): string {
+      return normalize(cari).split(' ').slice(0, 2).join(' ')
+    }
+
+    type PhpEntry = { cari_adi: string; sube_adi: string; merch: string; bsy: string; sup: string; jr: string }
+
+    // İki paralel harita:
+    //   fullMap:  normalize(sube)||normalize(cari)         — tam eşleşme
+    //   shortMap: normalize(sube)||shortCari(cari)         — kısaltma fallback
+    const fullMap  = new Map<string, PhpEntry>()
+    const shortMap = new Map<string, PhpEntry>()
 
     const trMatches = [...html.matchAll(/<tr>([\s\S]*?)<\/tr>/gi)]
     for (let i = 1; i < trMatches.length; i++) {
@@ -90,15 +97,27 @@ export async function GET(req: Request) {
       const merchTipi = cells[2]  ?? ''
 
       if (!subeAdi || !cariAdi) continue
-      const key = `${normalize(subeAdi)}||${normalize(cariAdi)}`
 
-      // Çetinler Merch adı (cetinler_merch_hakedis hesabı için)
-      if (merchAdi && merchTipi === 'Çetinler Merch' && !subeCarimierchMap.has(key))
-        subeCarimierchMap.set(key, merchAdi)
+      const fullKey  = `${normalize(subeAdi)}||${normalize(cariAdi)}`
+      const shortKey = `${normalize(subeAdi)}||${shortCari(cariAdi)}`
 
-      if (bsy)       subeCariBsyMap.set(key, bsy)
-      if (supAdiPHP) subeCariSupMap.set(key, supAdiPHP)
-      if (jrAdi)     subeCariJrMap.set(key, jrAdi)
+      const entry: PhpEntry = {
+        cari_adi: cariAdi,
+        sube_adi: subeAdi,
+        merch:    (merchAdi && merchTipi === 'Çetinler Merch') ? merchAdi : '',
+        bsy,
+        sup:      supAdiPHP,
+        jr:       jrAdi,
+      }
+
+      // Haritaya ekle — Çetinler Merch girdisi varsa tercih et (önce yazılan korunur)
+      if (!fullMap.has(fullKey) || entry.merch)  fullMap.set(fullKey, entry)
+      if (!shortMap.has(shortKey) || entry.merch) shortMap.set(shortKey, entry)
+    }
+
+    // Verilen subeKey için PHP girdisini döndür (tam key → kısa key fallback)
+    function phpEntry(normSube: string, normCari: string, origCari: string): PhpEntry | undefined {
+      return fullMap.get(`${normSube}||${normCari}`) ?? shortMap.get(`${normSube}||${shortCari(origCari)}`)
     }
 
     const normalizedSupAdi = supAdi ? normalize(supAdi) : null
@@ -107,19 +126,24 @@ export async function GET(req: Request) {
     const rows: DestekPersonelRow[] = []
 
     for (const dp of destekPersonel) {
-      const subeKey = `${normalize(dp.sube_adi)}||${normalize(dp.cari_adi)}`
+      const ns = normalize(dp.sube_adi)
+      const nc = normalize(dp.cari_adi)
+      const php = phpEntry(ns, nc, dp.cari_adi)
 
       if (bsyKod) {
-        if (subeCariBsyMap.get(subeKey) !== bsyKod) continue
+        if ((php?.bsy ?? '') !== bsyKod) continue
       } else if (normalizedSupAdi) {
-        // K kolonundaki SUPERVIZOR'u doğrudan karşılaştır
-        const phpSup = normalize(subeCariSupMap.get(subeKey) || '')
+        const phpSup = normalize(php?.sup ?? '')
         if (phpSup !== normalizedSupAdi) continue
       }
 
-      const cetinlerMerch = subeCarimierchMap.get(subeKey) || '-'
-      const supAdiRaw     = subeCariSupMap.get(subeKey) ?? ''
-      const jrAdiRaw      = subeCariJrMap.get(subeKey) ?? ''
+      // Cari/şube adını PHP'den al (daha tutarlı format), yoksa field_personnel'dan
+      const displayCari = php?.cari_adi || dp.cari_adi
+      const displaySube = php?.sube_adi || dp.sube_adi
+
+      const cetinlerMerch = php?.merch || '-'
+      const supAdiRaw     = php?.sup  ?? ''
+      const jrAdiRaw      = php?.jr   ?? ''
 
       // Süpervizör kolonunda Jr. Sup varsa onu göster, üstünde Sup adı küçük
       const displaySup    = jrAdiRaw || supAdiRaw
@@ -127,8 +151,8 @@ export async function GET(req: Request) {
 
       rows.push({
         merch_adi:           dp.merch_adi,
-        sube_adi:            dp.sube_adi,
-        cari_adi:            dp.cari_adi,
+        sube_adi:            displaySube,
+        cari_adi:            displayCari,
         cetinler_merch:      cetinlerMerch,
         sup_adi:             displaySup,
         parent_sup_adi:      displayParent,
