@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom'
 import { RefreshCw, Edit2, Save, X, ChevronDown, Plus, Trash2, FileDown } from 'lucide-react'
 import clsx from 'clsx'
 
+import * as XLSX from 'xlsx'
 import { ADET_PRIM_DEFAULTS } from '@/lib/adet-prim-defaults'
 import { generateAdetPrimPdf } from '@/lib/pdf'
 
@@ -822,6 +823,31 @@ export function PrimOdemeListesi({
 
   const toplamPrim = filtered.reduce((s, r) => s + r.hakedis, 0)
 
+  function exportExcel() {
+    const wsData = [
+      ['#', 'Merch Tipi', 'Merch Adı', 'Hakediş (₺)', 'Cari İsmi', 'Şube Adı', 'Süpervizör'],
+      ...filtered.map((r, i) => [
+        i + 1,
+        r.merchTipi,
+        r.merchAdi,
+        r.hakedis,
+        r.cariAdi,
+        r.subeAdi || '',
+        r.supAdi || '',
+      ]),
+      ['', '', 'TOPLAM', toplamPrim, '', '', ''],
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(wsData)
+    // Kolon genişlikleri
+    ws['!cols'] = [
+      { wch: 5 }, { wch: 16 }, { wch: 22 }, { wch: 14 },
+      { wch: 50 }, { wch: 22 }, { wch: 20 },
+    ]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Prim Ödeme Listesi')
+    XLSX.writeFile(wb, `Prim_Odeme_Listesi_${yil}_${String(ay).padStart(2,'0')}.xlsx`)
+  }
+
   return (
     <div className="flex flex-col h-full bg-gray-50">
       {/* Toolbar */}
@@ -866,9 +892,15 @@ export function PrimOdemeListesi({
         </button>
 
         {!loading && filtered.length > 0 && (
-          <span className="text-[10px] text-gray-400 ml-1">
-            {filtered.length} satır · Toplam: {toplamPrim.toLocaleString('tr-TR')} ₺
-          </span>
+          <>
+            <span className="text-[10px] text-gray-400 ml-1">
+              {filtered.length} satır · Toplam: {toplamPrim.toLocaleString('tr-TR')} ₺
+            </span>
+            <button onClick={exportExcel}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm ml-1">
+              <FileDown size={12} /> Excel
+            </button>
+          </>
         )}
       </div>
 
