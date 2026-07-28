@@ -140,6 +140,7 @@ interface TargetRow {
 
 function TargetEntryModal({
   title, rows, groups, initialValues, donem, enteredBy, onSave, onClose, saving,
+  showDestekCol, destekInitial, onSaveDestek,
 }: {
   title: string
   rows: TargetRow[]
@@ -150,6 +151,9 @@ function TargetEntryModal({
   onSave: (profileTargets: ProfileTarget[], merchTargets: MerchTarget[]) => Promise<void>
   onClose: () => void
   saving: boolean
+  showDestekCol?: boolean
+  destekInitial?: (key: string) => boolean
+  onSaveDestek?: (flags: { merch_name: string; destek_var: boolean }[]) => Promise<void>
 }) {
   const [values, setValues] = useState<Record<string, number>>(() => {
     const init: Record<string, number> = {}
@@ -159,8 +163,17 @@ function TargetEntryModal({
     return init
   })
 
+  const [destekValues, setDestekValues] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {}
+    if (showDestekCol && destekInitial) rows.forEach(r => { init[r.key] = destekInitial(r.key) })
+    return init
+  })
+
   const set = (key: string, grup: string, val: number) =>
     setValues(p => ({ ...p, [`${key}||${grup}`]: val }))
+
+  const setDestek = (key: string, val: boolean) =>
+    setDestekValues(p => ({ ...p, [key]: val }))
 
   const handleSave = async () => {
     const profileRows: ProfileTarget[] = []
@@ -176,6 +189,10 @@ function TargetEntryModal({
       })
     })
     await onSave(profileRows, merchRows)
+    if (showDestekCol && onSaveDestek) {
+      const flags = rows.filter(r => !r.isProfile).map(r => ({ merch_name: r.key, destek_var: destekValues[r.key] ?? false }))
+      await onSaveDestek(flags)
+    }
   }
 
   return (
@@ -208,6 +225,9 @@ function TargetEntryModal({
             <thead>
               <tr className="bg-gray-50">
                 <th className="sticky left-0 z-10 bg-gray-50 text-left px-3 py-2 font-medium text-gray-600 border border-gray-200 min-w-[140px]">Kişi</th>
+                {showDestekCol && (
+                  <th className="text-center px-3 py-2 font-medium text-gray-600 border border-gray-200 min-w-[110px] bg-amber-50">Destek Personeli Var mı?</th>
+                )}
                 {groups.map(g => (
                   <th key={g} className="text-center px-3 py-2 font-medium text-gray-600 border border-gray-200 min-w-[80px]">{g}</th>
                 ))}
@@ -223,6 +243,16 @@ function TargetEntryModal({
                       <p className="font-medium text-gray-800 truncate">{r.label}</p>
                       {r.sublabel && <p className="text-[10px] text-gray-400">{r.sublabel}</p>}
                     </td>
+                    {showDestekCol && (
+                      <td className="border border-gray-200 p-1 text-center bg-amber-50">
+                        <input
+                          type="checkbox"
+                          checked={destekValues[r.key] ?? false}
+                          onChange={e => setDestek(r.key, e.target.checked)}
+                          className="w-4 h-4 accent-amber-500 cursor-pointer"
+                        />
+                      </td>
+                    )}
                     {groups.map(g => (
                       <td key={g} className="border border-gray-200 p-1">
                         <input
@@ -246,6 +276,7 @@ function TargetEntryModal({
                 <td className="sticky left-0 z-10 bg-brand-700 border border-brand-600 px-3 py-2 text-xs">
                   Toplam Dağıtılan
                 </td>
+                {showDestekCol && <td className="border border-brand-600 px-3 py-2" />}
                 {groups.map(g => {
                   const colTotal = rows.reduce((s, r) => s + (values[`${r.key}||${g}`] ?? 0), 0)
                   return (
@@ -288,6 +319,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const [adetPrimData, setAdetPrimData] = useState<{ stokKodu: string; bayiMerch: number | null; kosulluDestek: number | null; kategori: string | null }[]>([])
   const [merchHedefData, setMerchHedefData] = useState<{ merch_name: string; grup: string; hedef: number }[]>([])
   const [merchDetayData, setMerchDetayData] = useState<{ merch_adi: string; merch_grubu: string; sup_adi: string; jr_adi: string; cari_adi: string; sube_adi: string; sube_kod: string }[]>([])
+  const [destekFlags, setDestekFlags] = useState<Record<string, boolean>>({})
 
   const isAdmin = currentProfile.role === 'admin'
   const isSup   = currentProfile.role === 'sup'
@@ -325,6 +357,19 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       .then(d => setMerchDetayData(d.data || []))
       .catch(() => setMerchDetayData([]))
   }, [active])
+
+  // Destek personeli flag verilerini fetch et
+  useEffect(() => {
+    if (!active) return
+    fetch(`/api/merch-destek-flag?donem=${donem}`)
+      .then(r => r.json())
+      .then(d => {
+        const map: Record<string, boolean> = {}
+        for (const f of (d.flags ?? [])) map[f.merch_name] = f.destek_var
+        setDestekFlags(map)
+      })
+      .catch(() => setDestekFlags({}))
+  }, [active, donem])
 
   const {
     getProfileHedef, getMerchHedef,
@@ -1201,6 +1246,18 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
           onSave={handleSave}
           onClose={() => setTargetModal(null)}
           saving={saving}
+          showDestekCol={true}
+          destekInitial={(key) => destekFlags[key] ?? false}
+          onSaveDestek={async (flags) => {
+            await fetch('/api/merch-destek-flag', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ donem, flags }),
+            })
+            const map: Record<string, boolean> = {}
+            flags.forEach(f => { map[f.merch_name] = f.destek_var })
+            setDestekFlags(prev => ({ ...prev, ...map }))
+          }}
         />
       )}
     </div>
