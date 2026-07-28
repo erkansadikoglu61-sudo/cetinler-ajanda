@@ -47,22 +47,17 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
       // Admin: filtre yok (tüm şubeler), Sup: kendi şubeleri
       if (currentUserRole === 'sup') params.append('supAdi', currentUserName)
 
-      const [destekRes, selloutRes, primRes, targetsRes, hakedisRes, flagRes] = await Promise.all([
+      const [destekRes, selloutRes, primRes, targetsRes, hakedisRes] = await Promise.all([
         fetch(`/api/destek-personel-prim?${params}`),
         fetch('/api/sellout'),
         fetch(`/api/adet-prim?yil=${yil}&ay=${ay}`),
         fetch(`/api/sellout-targets?donem=${donem}`),
         fetch(`/api/destek-hakedis?yil=${yil}&ay=${ay}${currentUserRole === 'sup' ? `&supAdi=${encodeURIComponent(currentUserName)}` : ''}`),
-        fetch(`/api/merch-destek-flag?donem=${donem}`),
       ])
 
-      const [destekData, selloutData, primData, targetsData, hakedisData, flagData] = await Promise.all([
-        destekRes.json(), selloutRes.json(), primRes.json(), targetsRes.json(), hakedisRes.json(), flagRes.json(),
+      const [destekData, selloutData, primData, targetsData, hakedisData] = await Promise.all([
+        destekRes.json(), selloutRes.json(), primRes.json(), targetsRes.json(), hakedisRes.json(),
       ])
-
-      // destekFlagMap: merch_name → destek_var
-      const destekFlagMap: Record<string, boolean> = {}
-      for (const f of (flagData.flags ?? [])) destekFlagMap[f.merch_name] = f.destek_var
 
       // stokPrimMap: stokKodu → kosullu destek prim (₺/adet)
       const stokPrimMap = new Map<string, number>()
@@ -96,19 +91,15 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
         hedefMap.get(k)!.set(t.grup as string, (t.hedef as number) ?? 0)
       }
 
-      // satisMap: cetinler_merch.lower → toplam_hak_edis (Satışlar tablosundaki "Çet.Merch Gerç.Oranına Göre Prim" ile aynı kural)
+      // satisMap: cetinler_merch.lower → toplam_hak_edis
+      // Bu view destek personeli şubelerine göre filtrelendiğinden flag kontrolü yapılmıyor.
+      // >=100% → tam prim, <100% → oranlı prim, hedef=0 → tam prim (hedefsiz ay)
       const satisMap = new Map<string, number>()
       for (const [mk, km] of katMap) {
-        // Merch flaglı değilse hakediş sıfır
-        const merchFlagged = Object.entries(destekFlagMap).some(
-          ([name, val]) => val && name.toLowerCase() === mk
-        )
-        if (!merchFlagged) { satisMap.set(mk, 0); continue }
-
         let toplam = 0
         for (const [kat, { satis_adedi, kosullu_prim_toplam }] of km) {
           const hedef = hedefMap.get(mk)?.get(kat) ?? 0
-          const gerceklesme = hedef > 0 ? (satis_adedi / hedef) * 100 : 0
+          const gerceklesme = hedef > 0 ? (satis_adedi / hedef) * 100 : 100
           toplam += gerceklesme >= 100 ? kosullu_prim_toplam : (gerceklesme / 100) * kosullu_prim_toplam
         }
         satisMap.set(mk, toplam)
