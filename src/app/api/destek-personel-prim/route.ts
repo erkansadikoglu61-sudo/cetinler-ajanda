@@ -13,12 +13,13 @@ interface DestekPersonelRow {
   sube_adi:            string
   cari_adi:            string
   cetinler_merch:      string
-  sup_adi:             string
+  sup_adi:             string   // Jr. Sup ise Jr. adı, değilse doğrudan Sup adı
+  parent_sup_adi:      string   // Jr. Sup'ın bağlı olduğu Sup adı (yoksa '')
   kategori:            string
-  hedef_gerceklesme:   number   // %
+  hedef_gerceklesme:   number
   satis_adedi:         number
-  kosullu_destek_prim: number   // ₺/adet
-  hak_edis:            number   // ₺
+  kosullu_destek_prim: number
+  hak_edis:            number
 }
 
 function decodeHtml(text: string): string {
@@ -45,14 +46,26 @@ export async function GET(req: Request) {
   try {
     const sb = getAdmin()
 
-    // 1. Destek personelleri
-    const { data: destekPersonel, error: fpError } = await sb
-      .from('field_personnel')
-      .select('merch_adi, sube_adi, cari_adi, merch_grubu')
-      .eq('merch_grubu', 'Destek Personeli')
+    // 1. Destek personelleri + profiles (Jr → Sup mapping için)
+    const [fpRes, profilesRes] = await Promise.all([
+      sb.from('field_personnel').select('merch_adi, sube_adi, cari_adi, merch_grubu').eq('merch_grubu', 'Destek Personeli'),
+      sb.from('profiles').select('id, full_name, role, manager_id'),
+    ])
 
-    if (fpError) return NextResponse.json({ error: fpError.message }, { status: 500 })
-    if (!destekPersonel?.length) return NextResponse.json({ rows: [] })
+    if (fpRes.error) return NextResponse.json({ error: fpRes.error.message }, { status: 500 })
+    const destekPersonel = fpRes.data ?? []
+    if (!destekPersonel.length) return NextResponse.json({ rows: [] })
+
+    // Jr. Sup ismi → parent Sup ismi haritası
+    const profiles = profilesRes.data ?? []
+    const profileById = new Map<string, string>(profiles.map((p: { id: string; full_name: string }) => [p.id, p.full_name]))
+    const jrToParentSup = new Map<string, string>()
+    for (const p of profiles) {
+      if (p.role === 'jr' && p.manager_id) {
+        const parentName = profileById.get(p.manager_id) ?? ''
+        if (parentName) jrToParentSup.set(normalize(p.full_name), parentName)
+      }
+    }
 
     const phpUrl = process.env.PHP_API_URL
     if (!phpUrl) return NextResponse.json({ rows: [] })
@@ -108,13 +121,16 @@ export async function GET(req: Request) {
       }
 
       const cetinlerMerch = subeCarimierchMap.get(subeKey) || '-'
+      const supAdiRaw    = subeCariSupMap.get(subeKey) ?? ''
+      const parentSupAdi = jrToParentSup.get(normalize(supAdiRaw)) ?? ''
 
       rows.push({
         merch_adi:           dp.merch_adi,
         sube_adi:            dp.sube_adi,
         cari_adi:            dp.cari_adi,
         cetinler_merch:      cetinlerMerch,
-        sup_adi:             subeCariSupMap.get(subeKey) ?? '',
+        sup_adi:             supAdiRaw,
+        parent_sup_adi:      parentSupAdi,
         kategori:            '-',
         hedef_gerceklesme:   0,
         satis_adedi:         0,

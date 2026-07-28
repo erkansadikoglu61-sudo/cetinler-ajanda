@@ -11,6 +11,7 @@ interface HakedisRow {
   cari_adi:               string
   sube_adi:               string
   sup_adi:                string
+  parent_sup_adi:         string   // Jr. Sup'ın üstündeki Sup adı (yoksa '')
   cetinler_merch:         string
   cetinler_merch_hakedis: number
   merch_adi:              string   // Destek Personeli
@@ -46,17 +47,22 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
       // Admin: filtre yok (tüm şubeler), Sup: kendi şubeleri
       if (currentUserRole === 'sup') params.append('supAdi', currentUserName)
 
-      const [destekRes, selloutRes, primRes, targetsRes, hakedisRes] = await Promise.all([
+      const [destekRes, selloutRes, primRes, targetsRes, hakedisRes, flagRes] = await Promise.all([
         fetch(`/api/destek-personel-prim?${params}`),
         fetch('/api/sellout'),
         fetch(`/api/adet-prim?yil=${yil}&ay=${ay}`),
         fetch(`/api/sellout-targets?donem=${donem}`),
         fetch(`/api/destek-hakedis?yil=${yil}&ay=${ay}${currentUserRole === 'sup' ? `&supAdi=${encodeURIComponent(currentUserName)}` : ''}`),
+        fetch(`/api/merch-destek-flag?donem=${donem}`),
       ])
 
-      const [destekData, selloutData, primData, targetsData, hakedisData] = await Promise.all([
-        destekRes.json(), selloutRes.json(), primRes.json(), targetsRes.json(), hakedisRes.json(),
+      const [destekData, selloutData, primData, targetsData, hakedisData, flagData] = await Promise.all([
+        destekRes.json(), selloutRes.json(), primRes.json(), targetsRes.json(), hakedisRes.json(), flagRes.json(),
       ])
+
+      // destekFlagMap: merch_name → destek_var
+      const destekFlagMap: Record<string, boolean> = {}
+      for (const f of (flagData.flags ?? [])) destekFlagMap[f.merch_name] = f.destek_var
 
       // stokPrimMap: stokKodu → kosullu destek prim (₺/adet)
       const stokPrimMap = new Map<string, number>()
@@ -90,14 +96,20 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
         hedefMap.get(k)!.set(t.grup as string, (t.hedef as number) ?? 0)
       }
 
-      // satisMap: cetinler_merch.lower → toplam_hak_edis
+      // satisMap: cetinler_merch.lower → toplam_hak_edis (Satışlar tablosundaki "Çet.Merch Gerç.Oranına Göre Prim" ile aynı kural)
       const satisMap = new Map<string, number>()
       for (const [mk, km] of katMap) {
+        // Merch flaglı değilse hakediş sıfır
+        const merchFlagged = Object.entries(destekFlagMap).some(
+          ([name, val]) => val && name.toLowerCase() === mk
+        )
+        if (!merchFlagged) { satisMap.set(mk, 0); continue }
+
         let toplam = 0
         for (const [kat, { satis_adedi, kosullu_prim_toplam }] of km) {
           const hedef = hedefMap.get(mk)?.get(kat) ?? 0
           const gerceklesme = hedef > 0 ? (satis_adedi / hedef) * 100 : 0
-          toplam += kosullu_prim_toplam * (gerceklesme / 100)
+          toplam += gerceklesme >= 100 ? kosullu_prim_toplam : (gerceklesme / 100) * kosullu_prim_toplam
         }
         satisMap.set(mk, toplam)
       }
@@ -125,6 +137,7 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
           cari_adi:               dp.cari_adi,
           sube_adi:               dp.sube_adi,
           sup_adi:                dp.sup_adi || (currentUserRole === 'sup' ? currentUserName : ''),
+          parent_sup_adi:         dp.parent_sup_adi || '',
           cetinler_merch:         dp.cetinler_merch,
           cetinler_merch_hakedis: satisMap.get(mk) ?? 0,
           merch_adi:              dp.merch_adi,
@@ -222,6 +235,19 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
     : rows
 
   const toplamHakedis = visibleRows.reduce((s, r) => s + (r.hakedis || 0), 0)
+
+  // Her Çetinler Merch tutarını yalnızca 1 kez topla
+  const toplamCetinlerMerchPrim = (() => {
+    const seen = new Set<string>()
+    let sum = 0
+    for (const r of visibleRows) {
+      const key = r.cetinler_merch
+      if (seen.has(key)) continue
+      seen.add(key)
+      sum += r.cetinler_merch_hakedis || 0
+    }
+    return sum
+  })()
   const fmt = (n: number) =>
     n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -302,7 +328,7 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
                 <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">Cari ve Şube</th>
                 <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">Süpervizör</th>
                 <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">Çetinler Merch</th>
-                <th className="px-3 py-2 text-right font-semibold text-gray-600 whitespace-nowrap">Çetinler Merch Prim Hakedişi</th>
+                <th className="px-3 py-2 text-right font-semibold text-gray-600 whitespace-nowrap">Destek Personeli için Oluşan Prim</th>
                 <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">Destek Personeli</th>
                 <th className="px-3 py-2 text-right font-semibold text-gray-600 whitespace-nowrap">Destek Personeli Hakedişi</th>
               </tr>
@@ -319,7 +345,16 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
                       <span className="text-gray-400 ml-1">/ {row.sube_adi}</span>
                     )}
                   </td>
-                  <td className="px-3 py-1.5 text-gray-600 whitespace-nowrap">{row.sup_adi || '-'}</td>
+                  <td className="px-3 py-1.5 whitespace-nowrap">
+                    {row.sup_adi ? (
+                      <div>
+                        <span className="text-gray-700">{row.sup_adi}</span>
+                        {row.parent_sup_adi && (
+                          <div className="text-[10px] text-brand-500 font-medium">{row.parent_sup_adi}</div>
+                        )}
+                      </div>
+                    ) : '-'}
+                  </td>
                   <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{row.cetinler_merch}</td>
                   <td className="px-3 py-1.5 text-right font-mono text-gray-700 whitespace-nowrap">
                     {row.cetinler_merch_hakedis > 0 ? `${fmt(row.cetinler_merch_hakedis)} ₺` : '-'}
@@ -355,7 +390,11 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
             </tbody>
             <tfoot>
               <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold">
-                <td colSpan={5} className="px-3 py-2 text-right text-gray-600 text-xs">Toplam</td>
+                <td colSpan={3} className="px-3 py-2 text-right text-gray-600 text-xs">Toplam</td>
+                <td className="px-3 py-2 text-right font-mono text-gray-800 whitespace-nowrap">
+                  {toplamCetinlerMerchPrim > 0 ? `${fmt(toplamCetinlerMerchPrim)} ₺` : '-'}
+                </td>
+                <td className="px-3 py-2" />
                 <td className="px-3 py-2 text-right font-mono text-gray-800 whitespace-nowrap">
                   {fmt(toplamHakedis)} ₺
                 </td>
