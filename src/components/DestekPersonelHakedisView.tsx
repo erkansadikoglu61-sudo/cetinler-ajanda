@@ -47,17 +47,24 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
       // Admin: filtre yok (tüm şubeler), Sup: kendi şubeleri
       if (currentUserRole === 'sup') params.append('supAdi', currentUserName)
 
-      const [destekRes, selloutRes, primRes, targetsRes, hakedisRes] = await Promise.all([
+      const [destekRes, selloutRes, primRes, targetsRes, hakedisRes, flagRes] = await Promise.all([
         fetch(`/api/destek-personel-prim?${params}`),
         fetch('/api/sellout'),
         fetch(`/api/adet-prim?yil=${yil}&ay=${ay}`),
         fetch(`/api/sellout-targets?donem=${donem}`),
         fetch(`/api/destek-hakedis?yil=${yil}&ay=${ay}${currentUserRole === 'sup' ? `&supAdi=${encodeURIComponent(currentUserName)}` : ''}`),
+        fetch(`/api/merch-destek-flag?donem=${donem}`),
       ])
 
-      const [destekData, selloutData, primData, targetsData, hakedisData] = await Promise.all([
-        destekRes.json(), selloutRes.json(), primRes.json(), targetsRes.json(), hakedisRes.json(),
+      const [destekData, selloutData, primData, targetsData, hakedisData, flagData] = await Promise.all([
+        destekRes.json(), selloutRes.json(), primRes.json(), targetsRes.json(), hakedisRes.json(), flagRes.json(),
       ])
+
+      // destekFlagMap: merch_name.lower → destek_var (true/false)
+      const destekFlagMap = new Map<string, boolean>()
+      for (const f of (flagData.flags ?? [])) {
+        destekFlagMap.set((f.merch_name as string).toLowerCase(), !!(f.destek_var))
+      }
 
       // stokPrimMap: stokKodu → kosullu destek prim (₺/adet)
       const stokPrimMap = new Map<string, number>()
@@ -119,19 +126,25 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
         if (!merchMap.has(mk2)) merchMap.set(mk2, h.hakedis ?? 0)
       }
 
-      // Satırları oluştur — (cari, merch_adi) tekilleştir
+      // Satırları oluştur
+      // Dedup key: cari_adi + sube_adi + cetinler_merch + merch_adi (kullanıcı isteği)
       const seen = new Set<string>()
       const built: HakedisRow[] = []
       const destekRows: Array<{ merch_adi: string; sube_adi: string; cari_adi: string; cetinler_merch: string; sup_adi: string; parent_sup_adi: string }> =
         destekData.rows ?? []
 
       for (const dp of destekRows) {
-        const dedup = `${dp.cari_adi.toLowerCase()}||${dp.merch_adi.toLowerCase()}`
+        const mk = (dp.cetinler_merch || '').toLowerCase()
+
+        // Merch Hedefleri'nde "Destek Personeli var mı?" = true olmayanları filtrele
+        if (destekFlagMap.size > 0 && !destekFlagMap.get(mk)) continue
+
+        // Cari + Şube + Çetinler Merch + Destek Personeli aynıysa tek satır
+        const dedup = `${nk(dp.cari_adi)}||${nk(dp.sube_adi)}||${mk}||${nk(dp.merch_adi)}`
         if (seen.has(dedup)) continue
         seen.add(dedup)
 
-        const mk  = (dp.cetinler_merch || '').toLowerCase()
-        const fk  = `${nk(dp.cari_adi)}||${nk(dp.sube_adi)}||${nk(dp.cetinler_merch)}||${nk(dp.merch_adi)}`
+        const fk  = dedup
         // Önce tam eşleşme, yoksa sadece merch_adi ile fallback
         const savedHakedis = fullMap.get(fk) ?? merchMap.get(nk(dp.merch_adi)) ?? 0
         built.push({
