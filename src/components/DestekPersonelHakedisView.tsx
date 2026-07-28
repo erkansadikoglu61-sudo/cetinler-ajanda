@@ -106,13 +106,20 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
         satisMap.set(mk, toplam)
       }
 
-      // Kaydedilen hakedis değerleri
-      const savedMap = new Map<string, number>()
+      // Kaydedilen hakedis değerleri — 2 harita:
+      // 1. fullMap: tam key (cari||sube||cetinler||merch) — lowercase eşleşme
+      // 2. merchMap: sadece merch_adi — fallback (cari/sube adı değişmişse yedek)
+      const nk = (s: string) => (s || '').trim().toLowerCase()
+      const fullMap  = new Map<string, number>()
+      const merchMap = new Map<string, number>()
       for (const h of (hakedisData.rows ?? [])) {
-        savedMap.set(`${h.cari_adi}||${h.sube_adi}||${h.cetinler_merch}||${h.merch_adi}`, h.hakedis ?? 0)
+        const fk = `${nk(h.cari_adi)}||${nk(h.sube_adi)}||${nk(h.cetinler_merch)}||${nk(h.merch_adi)}`
+        fullMap.set(fk, h.hakedis ?? 0)
+        const mk2 = nk(h.merch_adi)
+        if (!merchMap.has(mk2)) merchMap.set(mk2, h.hakedis ?? 0)
       }
 
-      // Satırları oluştur — (cari, sube, merch_adi) tekilleştir
+      // Satırları oluştur — (cari, merch_adi) tekilleştir
       const seen = new Set<string>()
       const built: HakedisRow[] = []
       const destekRows: Array<{ merch_adi: string; sube_adi: string; cari_adi: string; cetinler_merch: string; sup_adi: string; parent_sup_adi: string }> =
@@ -124,7 +131,9 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
         seen.add(dedup)
 
         const mk  = (dp.cetinler_merch || '').toLowerCase()
-        const key = `${dp.cari_adi}||${dp.sube_adi}||${dp.cetinler_merch}||${dp.merch_adi}`
+        const fk  = `${nk(dp.cari_adi)}||${nk(dp.sube_adi)}||${nk(dp.cetinler_merch)}||${nk(dp.merch_adi)}`
+        // Önce tam eşleşme, yoksa sadece merch_adi ile fallback
+        const savedHakedis = fullMap.get(fk) ?? merchMap.get(nk(dp.merch_adi)) ?? 0
         built.push({
           cari_adi:               dp.cari_adi,
           sube_adi:               dp.sube_adi,
@@ -133,7 +142,7 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
           cetinler_merch:         dp.cetinler_merch,
           cetinler_merch_hakedis: satisMap.get(mk) ?? 0,
           merch_adi:              dp.merch_adi,
-          hakedis:                savedMap.get(key) ?? 0,
+          hakedis:                savedHakedis,
           dirty:                  false,
           saving:                 false,
         })
