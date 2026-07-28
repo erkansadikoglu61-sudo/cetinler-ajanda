@@ -320,6 +320,9 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const [merchHedefData, setMerchHedefData] = useState<{ merch_name: string; grup: string; hedef: number }[]>([])
   const [merchDetayData, setMerchDetayData] = useState<{ merch_adi: string; merch_grubu: string; sup_adi: string; jr_adi: string; cari_adi: string; sube_adi: string; sube_kod: string }[]>([])
   const [destekFlags, setDestekFlags] = useState<Record<string, boolean>>({})
+  const [satMerchTipi, setSatMerchTipi] = useState('')
+  const [satMerch,     setSatMerch]     = useState('')
+  const [satCari,      setSatCari]      = useState('')
 
   const isAdmin = currentProfile.role === 'admin'
   const isSup   = currentProfile.role === 'sup'
@@ -578,6 +581,19 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       return allSupNames.some(n => normalizeName(n) === normApi)
     })
   }, [periodRows, allSupNames, isBsy, bsyKod])
+
+  // ── Satışlar tablosu ek filtreleri ──
+  const satislarRows = useMemo(() => {
+    return filteredPeriodRows.filter(r => {
+      if (satMerchTipi && r.merch_tipi !== satMerchTipi) return false
+      if (satMerch && r.merch_personel !== satMerch) return false
+      if (satCari) {
+        const label = r.sube_adi ? `${r.cari_isim} – ${r.sube_adi}` : r.cari_isim
+        if (label !== satCari) return false
+      }
+      return true
+    })
+  }, [filteredPeriodRows, satMerchTipi, satMerch, satCari])
 
   // ── Adet prim lookup ──
   const adetPrimMap = useMemo(() => {
@@ -1065,9 +1081,36 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
         {/* ── Satışlar Tablosu ── */}
         {!selloutLoading && subTab === 'satislar' && (
           <div className="p-2">
-            <div className="mb-3 text-[10px] text-gray-400">
-              Seçilen dönem için satış kayıtları (sadece bağlı şubeler)
-            </div>
+            {/* Filtreler */}
+            {(() => {
+              const tipiOptions = [...new Set(filteredPeriodRows.map(r => r.merch_tipi).filter(Boolean))].sort()
+              const merchOptions = [...new Set(filteredPeriodRows.map(r => r.merch_personel).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'))
+              const cariOptions  = [...new Set(filteredPeriodRows.map(r => r.sube_adi ? `${r.cari_isim} – ${r.sube_adi}` : r.cari_isim).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'))
+              return (
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <select value={satMerchTipi} onChange={e => setSatMerchTipi(e.target.value)}
+                    className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:border-brand-400 max-w-[160px]">
+                    <option value="">Merch Tipi (Tümü)</option>
+                    {tipiOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <select value={satMerch} onChange={e => setSatMerch(e.target.value)}
+                    className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:border-brand-400 max-w-[200px]">
+                    <option value="">Merch (Tümü)</option>
+                    {merchOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  <select value={satCari} onChange={e => setSatCari(e.target.value)}
+                    className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:border-brand-400 max-w-[260px]">
+                    <option value="">Cari ve Şube (Tümü)</option>
+                    {cariOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  {(satMerchTipi || satMerch || satCari) && (
+                    <button onClick={() => { setSatMerchTipi(''); setSatMerch(''); setSatCari('') }}
+                      className="text-xs text-gray-400 hover:text-gray-600 underline">Sıfırla</button>
+                  )}
+                  <span className="ml-auto text-[10px] text-gray-400">{satislarRows.length.toLocaleString('tr-TR')} kayıt</span>
+                </div>
+              )
+            })()}
             <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
               <table className="text-xs border-collapse w-full bg-white">
                 <thead className="sticky top-0 z-10">
@@ -1088,16 +1131,45 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                     <th className="px-3 py-2.5 text-right font-semibold min-w-[140px] bg-green-700">Çet. Merch Kat. Gerç. %</th>
                     <th className="px-3 py-2.5 text-right font-semibold min-w-[160px] bg-green-800">Çet. Merch Gerç.Oranına Göre Prim</th>
                   </tr>
+                  {/* ── Üst toplam satırı ── */}
+                  <tr className="bg-gray-700 text-white text-[11px] font-semibold">
+                    <td colSpan={6} className="px-3 py-1.5 text-right text-gray-300">TOPLAM</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">
+                      {satislarRows.reduce((s, r) => s + (r.satilan_adet || 0), 0).toLocaleString('tr-TR')}
+                    </td>
+                    <td colSpan={3} className="px-3 py-1.5 text-center text-gray-300 text-[10px]">
+                      {satislarRows.length.toLocaleString('tr-TR')} kayıt
+                    </td>
+                    <td className="px-3 py-1.5 text-right tabular-nums bg-blue-800">—</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums bg-blue-800">
+                      {satislarRows.reduce((s, r) => {
+                        const prim = adetPrimMap.get(r.stok_kodu || '')?.bayiMerch || 0
+                        return s + prim * (r.satilan_adet || 0)
+                      }, 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                    </td>
+                    <td className="px-3 py-1.5 text-right tabular-nums bg-purple-800">—</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums bg-green-800">—</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums bg-green-800">
+                      {satislarRows.reduce((s, r) => {
+                        if (r.merch_tipi !== 'Çetinler Merch' || !destekFlags[r.merch_personel || '']) return s
+                        const p = adetPrimMap.get(r.stok_kodu || '')?.kosulluDestek || 0
+                        const mk = (r.merch_personel || '').toLowerCase()
+                        const kat = GRUP_NORMALIZE[r.grup_aciklama || ''] || r.grup_aciklama || ''
+                        const oran = merchKategoriPerformans.get(mk)?.get(kat)?.oran || 0
+                        return s + (oran / 100) * p * (r.satilan_adet || 0)
+                      }, 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                    </td>
+                  </tr>
                 </thead>
                 <tbody>
-                  {filteredPeriodRows.length === 0 ? (
+                  {satislarRows.length === 0 ? (
                     <tr>
                       <td colSpan={15} className="px-4 py-8 text-center text-gray-400 text-[11px]">
                         Bu dönem için satış verisi yok
                       </td>
                     </tr>
                   ) : (
-                    filteredPeriodRows.map((row, idx) => {
+                    satislarRows.map((row, idx) => {
                       // Hesaplamalar
                       const primData = adetPrimMap.get(row.stok_kodu || '') || { bayiMerch: 0, kosulluDestek: 0, kategori: '' }
                       const satisAdedi = row.satilan_adet || 0
@@ -1177,29 +1249,29 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                   <tr className="bg-gray-800 text-white font-semibold">
                     <td colSpan={6} className="px-3 py-2.5 text-right">TOPLAM</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">
-                      {filteredPeriodRows.reduce((sum, r) => sum + (r.satilan_adet || 0), 0).toLocaleString('tr-TR')}
+                      {satislarRows.reduce((sum, r) => sum + (r.satilan_adet || 0), 0).toLocaleString('tr-TR')}
                     </td>
                     <td colSpan={3} className="px-3 py-2.5 text-center text-[10px]">
-                      {filteredPeriodRows.length.toLocaleString('tr-TR')} kayıt
+                      {satislarRows.length.toLocaleString('tr-TR')} kayıt
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums bg-blue-900">—</td>
                     <td className="px-3 py-2.5 text-right tabular-nums bg-blue-900">
-                      {filteredPeriodRows.reduce((sum, r) => {
+                      {satislarRows.reduce((sum, r) => {
                         const prim = adetPrimMap.get(r.stok_kodu || '')?.bayiMerch || 0
                         return sum + (prim * (r.satilan_adet || 0))
-                      }, 0).toLocaleString('tr-TR')} ₺
+                      }, 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums bg-purple-900">—</td>
                     <td className="px-3 py-2.5 text-right tabular-nums bg-green-900">—</td>
                     <td className="px-3 py-2.5 text-right tabular-nums bg-green-900">
-                      {filteredPeriodRows.reduce((sum, r) => {
+                      {satislarRows.reduce((sum, r) => {
+                        if (r.merch_tipi !== 'Çetinler Merch' || !destekFlags[r.merch_personel || '']) return sum
                         const primData = adetPrimMap.get(r.stok_kodu || '') || { kosulluDestek: 0 }
-                        const merchKey = (r.merch_personel || '').toLowerCase()
-                        const kategoriRaw = r.grup_aciklama || ''
-                        const kategoriNormalized = GRUP_NORMALIZE[kategoriRaw] || kategoriRaw
-                        const oran = merchKategoriPerformans.get(merchKey)?.get(kategoriNormalized)?.oran || 0
+                        const mk = (r.merch_personel || '').toLowerCase()
+                        const kat = GRUP_NORMALIZE[r.grup_aciklama || ''] || r.grup_aciklama || ''
+                        const oran = merchKategoriPerformans.get(mk)?.get(kat)?.oran || 0
                         return sum + ((oran / 100) * primData.kosulluDestek * (r.satilan_adet || 0))
-                      }, 0).toLocaleString('tr-TR')} ₺
+                      }, 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
                     </td>
                   </tr>
                 </tfoot>
