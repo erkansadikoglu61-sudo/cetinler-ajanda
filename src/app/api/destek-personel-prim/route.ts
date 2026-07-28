@@ -138,10 +138,12 @@ export async function GET(req: Request) {
       }
 
       // Cari/şube adını PHP'den al (daha tutarlı format), yoksa field_personnel'dan
+      // PHP eşleşmesi yoksa veya Çetinler Merch atanmamışsa bu satırı gösterme
+      const cetinlerMerch = php?.merch || ''
+      if (!cetinlerMerch) continue
+
       const displayCari = php?.cari_adi || dp.cari_adi
       const displaySube = php?.sube_adi || dp.sube_adi
-
-      const cetinlerMerch = php?.merch || '-'
       const supAdiRaw     = php?.sup  ?? ''
       const jrAdiRaw      = php?.jr   ?? ''
 
@@ -153,7 +155,7 @@ export async function GET(req: Request) {
         merch_adi:           dp.merch_adi,
         sube_adi:            displaySube,
         cari_adi:            displayCari,
-        cetinler_merch:      cetinlerMerch,
+        cetinler_merch:      cetinlerMerch || '-',
         sup_adi:             displaySup,
         parent_sup_adi:      displayParent,
         kategori:            '-',
@@ -164,9 +166,21 @@ export async function GET(req: Request) {
       })
     }
 
-    rows.sort((a, b) => a.merch_adi.localeCompare(b.merch_adi, 'tr'))
+    // Aynı kişi birden fazla şubede kayıtlıysa (ör. "ADAPAZARI" + "ADAPAZARI 4")
+    // → cari + merch_adi bazında dedup; supervisor verisi olan satırı tercih et
+    const dedupMap = new Map<string, DestekPersonelRow>()
+    for (const row of rows) {
+      const mk = `${normalize(row.cari_adi)}||${row.merch_adi.toLowerCase()}`
+      const existing = dedupMap.get(mk)
+      if (!existing || (!existing.sup_adi && row.sup_adi)) {
+        dedupMap.set(mk, row)
+      }
+    }
 
-    return NextResponse.json({ rows })
+    const finalRows = [...dedupMap.values()]
+    finalRows.sort((a, b) => a.merch_adi.localeCompare(b.merch_adi, 'tr'))
+
+    return NextResponse.json({ rows: finalRows })
   } catch (e: unknown) {
     const err = e as Error
     return NextResponse.json({ error: err.message }, { status: 500 })

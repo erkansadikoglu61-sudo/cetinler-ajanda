@@ -118,7 +118,7 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
         destekData.rows ?? []
 
       for (const dp of destekRows) {
-        const dedup = `${dp.cari_adi}||${dp.sube_adi}||${dp.merch_adi}`
+        const dedup = `${dp.cari_adi.toLowerCase()}||${dp.merch_adi.toLowerCase()}`
         if (seen.has(dedup)) continue
         seen.add(dedup)
 
