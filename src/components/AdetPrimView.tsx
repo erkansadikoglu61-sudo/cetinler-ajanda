@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { supabase } from '@/lib/supabase'
 import { createPortal } from 'react-dom'
 import { RefreshCw, Edit2, Save, X, ChevronDown, Plus, Trash2, FileDown } from 'lucide-react'
 import clsx from 'clsx'
@@ -683,11 +684,11 @@ interface PrimOdemeRow {
   hakedis:   number
   cariAdi:   string
   subeAdi:   string
-  supAdi:    string
+  supAdi:    string   // çözümlenmiş supervisor adı (Jr.→parent, SV stripped)
   bsyKod:    string
 }
 
-// "Ad Soyad SV" → "ad soyad" (karşılaştırma için)
+// "Ad Soyad SV" → "ad soyad" (normalize for comparison)
 function normSupName(s: string): string {
   return (s || '').trim().replace(/\s+sv\s*$/i, '').trim().toLowerCase()
 }
@@ -706,6 +707,40 @@ export function PrimOdemeListesi({
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
   const [supFilter, setSupFilter] = useState('')
+
+  // Jr. adı (normalize) → parent Sup adı haritası (SV stripped)
+  const jrToSupRef = useRef(new Map<string, string>())
+
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('id, full_name, role, manager_id')
+      .in('role', ['sup', 'jr'])
+      .then(({ data }) => {
+        if (!data) return
+        const idToName = new Map<string, string>()
+        for (const p of data) idToName.set(p.id as string, p.full_name as string)
+        const map = new Map<string, string>()
+        for (const p of data) {
+          if (p.role === 'jr' && p.manager_id) {
+            const parentName = idToName.get(p.manager_id as string) ?? ''
+            if (parentName) {
+              // key: normalized jr name → value: parent sup name (SV stripped)
+              map.set(normSupName(p.full_name as string), parentName.replace(/\s+sv\s*$/i, '').trim())
+            }
+          }
+        }
+        jrToSupRef.current = map
+      })
+  }, [])
+
+  // Jr. adını parent Sup adına çözümle; SV suffix'ini temizle
+  function resolveSupName(rawName: string): string {
+    const norm = normSupName(rawName)
+    const parent = jrToSupRef.current.get(norm)
+    if (parent) return parent
+    return rawName.replace(/\s+sv\s*$/i, '').trim()
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -729,12 +764,12 @@ export function PrimOdemeListesi({
           hakedis:   r.primHakdis,
           cariAdi:   r.cariAdi,
           subeAdi:   r.subeAdi,
-          supAdi:    r.supervizor,
+          supAdi:    resolveSupName(r.supervizor ?? ''),
           bsyKod:    r.bsyKod ?? '',
         })
       }
 
-      // Destek Personeli — bsyKod filtreli kullanıcılar (BSY rolü) destek hakedişini görmez
+      // Destek Personeli — BSY rolü destek hakedişini görmez
       if (bsyKodFilter === null) {
         for (const h of (destekData.rows ?? [])) {
           if ((h.hakedis ?? 0) <= 0) continue
@@ -744,7 +779,7 @@ export function PrimOdemeListesi({
             hakedis:   h.hakedis,
             cariAdi:   h.cari_adi,
             subeAdi:   h.sube_adi ?? '',
-            supAdi:    h.sup_adi ?? '',
+            supAdi:    resolveSupName(h.sup_adi ?? ''),
             bsyKod:    '',
           })
         }
@@ -756,11 +791,12 @@ export function PrimOdemeListesi({
     } finally {
       setLoading(false)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [yil, ay, bsyKodFilter])
 
   useEffect(() => { load() }, [load])
 
-  // Süpervizör dropdown seçenekleri (admin/BSY için)
+  // Dropdown seçenekleri: supAdi zaten çözümlenmiş; dedup by normalized name
   const supOptions = useMemo(() => {
     const seen = new Set<string>()
     const opts: string[] = []
@@ -775,14 +811,11 @@ export function PrimOdemeListesi({
   }, [allRows])
 
   const filtered = allRows.filter(r => {
-    // BSY kod filtresi (sadece Bayi Merch için geçerli)
     if (bsyKodFilter !== null && r.bsyKod !== bsyKodFilter) return false
-    // Rol bazlı süpervizör filtresi (prop'tan gelen)
     if (supervisorFilter !== null) {
-      const match = supervisorFilter.some(sf => normSupName(sf) === normSupName(r.supAdi) || sf === r.supAdi)
+      const match = supervisorFilter.some(sf => normSupName(sf) === normSupName(r.supAdi))
       if (!match) return false
     }
-    // Dropdown süpervizör filtresi (kullanıcı seçimi)
     if (supFilter && normSupName(r.supAdi) !== normSupName(supFilter)) return false
     return true
   })
@@ -863,6 +896,7 @@ export function PrimOdemeListesi({
                   <th className="text-right px-3 py-2.5 font-semibold min-w-[130px]">Hakediş</th>
                   <th className="text-left px-3 py-2.5 font-semibold min-w-[200px]">Cari İsmi</th>
                   <th className="text-left px-3 py-2.5 font-semibold min-w-[130px]">Şube Adı</th>
+                  <th className="text-left px-3 py-2.5 font-semibold min-w-[140px]">Süpervizör</th>
                 </tr>
               </thead>
               <tbody>
@@ -890,6 +924,7 @@ export function PrimOdemeListesi({
                     </td>
                     <td className="px-3 py-2 text-gray-800">{row.cariAdi}</td>
                     <td className="px-3 py-2 text-gray-700">{row.subeAdi || '—'}</td>
+                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{row.supAdi || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -899,7 +934,7 @@ export function PrimOdemeListesi({
                   <td className="px-3 py-2 text-right tabular-nums font-bold">
                     {toplamPrim.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
                   </td>
-                  <td colSpan={2} />
+                  <td colSpan={3} />
                 </tr>
               </tfoot>
             </table>
