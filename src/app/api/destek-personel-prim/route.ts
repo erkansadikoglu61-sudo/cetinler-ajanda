@@ -46,9 +46,9 @@ export async function GET(req: Request) {
   try {
     const sb = getAdmin()
 
-    // 1. Destek personelleri + profiles (Jr → Sup mapping için)
+    // 1. Destek personelleri (jr_profile_id dahil) + profiles
     const [fpRes, profilesRes] = await Promise.all([
-      sb.from('field_personnel').select('merch_adi, sube_adi, cari_adi, merch_grubu').eq('merch_grubu', 'Destek Personeli'),
+      sb.from('field_personnel').select('merch_adi, sube_adi, cari_adi, merch_grubu, jr_profile_id').eq('merch_grubu', 'Destek Personeli'),
       sb.from('profiles').select('id, full_name, role, manager_id'),
     ])
 
@@ -58,8 +58,8 @@ export async function GET(req: Request) {
 
     // Jr. Sup ismi → parent Sup ismi haritası (UI gösterimi için)
     const profiles = profilesRes.data ?? []
-    const profileById = new Map<string, { name: string; role: string }>(
-      profiles.map((p: { id: string; full_name: string; role: string }) => [p.id, { name: p.full_name, role: p.role }])
+    const profileById = new Map<string, { name: string; role: string; manager_id: string | null }>(
+      profiles.map((p: { id: string; full_name: string; role: string; manager_id: string | null }) => [p.id, { name: p.full_name, role: p.role, manager_id: p.manager_id }])
     )
     const jrToParentSup = new Map<string, string>()
     for (const p of profiles) {
@@ -69,17 +69,22 @@ export async function GET(req: Request) {
       }
     }
 
-    // supAdi filtresi için: Sup'ın kendisi + ona bağlı tüm Jr. Sup isimleri
+    // supAdi filtresi için: Sup'ın profile ID'si + Jr. Sup ID'leri (field_personnel.jr_profile_id ile eşleştirme)
+    let allowedJrIds: Set<string> | null = null
     let allowedSupNorms: Set<string> | null = null
     if (supAdi) {
       const normalizedSupAdi = normalize(supAdi)
       const supProfile = profiles.find((p: { full_name: string }) => normalize(p.full_name) === normalizedSupAdi)
-      const jrNames = supProfile
-        ? profiles
-            .filter((p: { role: string; manager_id: string | null }) => p.role === 'jr' && p.manager_id === supProfile.id)
-            .map((p: { full_name: string }) => normalize(p.full_name))
-        : []
-      allowedSupNorms = new Set([normalizedSupAdi, ...jrNames])
+      if (supProfile) {
+        const jrProfiles = profiles.filter((p: { role: string; manager_id: string | null }) => p.role === 'jr' && p.manager_id === supProfile.id)
+        // ID bazlı set: field_personnel.jr_profile_id ile eşleştirme (güvenilir yol)
+        allowedJrIds = new Set([supProfile.id, ...jrProfiles.map((p: { id: string }) => p.id)])
+        // İsim bazlı set: PHP supervisor adı ile fallback eşleştirme
+        allowedSupNorms = new Set([normalizedSupAdi, ...jrProfiles.map((p: { full_name: string }) => normalize(p.full_name))])
+      } else {
+        // Profile bulunamadıysa sadece adla dene
+        allowedSupNorms = new Set([normalizedSupAdi])
+      }
     }
 
     const phpUrl = process.env.PHP_API_URL
@@ -131,9 +136,16 @@ export async function GET(req: Request) {
 
       if (bsyKod) {
         if (subeCariBsyMap.get(subeKey) !== bsyKod) continue
-      } else if (allowedSupNorms) {
-        const phpSupNorm = normalize(subeCariSupMap.get(subeKey) || '')
-        if (!allowedSupNorms.has(phpSupNorm)) continue
+      } else if (allowedJrIds || allowedSupNorms) {
+        // Öncelik: field_personnel.jr_profile_id bazlı (güvenilir)
+        const jrId = (dp as { jr_profile_id?: string | null }).jr_profile_id
+        if (jrId) {
+          if (!allowedJrIds?.has(jrId)) continue
+        } else {
+          // Fallback: PHP supervisor adı bazlı
+          const phpSupNorm = normalize(subeCariSupMap.get(subeKey) || '')
+          if (!allowedSupNorms?.has(phpSupNorm)) continue
+        }
       }
 
       const cetinlerMerch = subeCarimierchMap.get(subeKey) || '-'
