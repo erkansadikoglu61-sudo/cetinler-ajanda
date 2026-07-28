@@ -141,6 +141,7 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
 
       built.sort((a, b) =>
         a.cari_adi.localeCompare(b.cari_adi, 'tr') ||
+        a.sube_adi.localeCompare(b.sube_adi, 'tr') ||
         a.cetinler_merch.localeCompare(b.cetinler_merch, 'tr') ||
         a.merch_adi.localeCompare(b.merch_adi, 'tr')
       )
@@ -228,12 +229,12 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
 
   const toplamHakedis = visibleRows.reduce((s, r) => s + (r.hakedis || 0), 0)
 
-  // Her Çetinler Merch tutarını yalnızca 1 kez topla
+  // Her Cari+Şube+Çetinler Merch grubu yalnızca 1 kez toplanır (rowspan gruplarıyla eşleşir)
   const toplamCetinlerMerchPrim = (() => {
     const seen = new Set<string>()
     let sum = 0
     for (const r of visibleRows) {
-      const key = r.cetinler_merch
+      const key = `${r.cari_adi}||${r.sube_adi}||${r.cetinler_merch}`
       if (seen.has(key)) continue
       seen.add(key)
       sum += r.cetinler_merch_hakedis || 0
@@ -326,59 +327,84 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
               </tr>
             </thead>
             <tbody>
-              {visibleRows.map((row, idx) => (
-                <tr key={idx} className={clsx(
-                  'border-b border-gray-100 hover:bg-gray-50 transition-colors',
-                  row.dirty ? 'bg-yellow-50' : ''
-                )}>
-                  <td className="px-3 py-1.5 text-gray-700 font-medium whitespace-nowrap">
-                    {row.cari_adi}
-                    {row.sube_adi && row.sube_adi !== row.cari_adi && (
-                      <span className="text-gray-400 ml-1">/ {row.sube_adi}</span>
+              {(() => {
+                // Her satır için grup bilgisi hesapla (aynı cari+sube+cetinler_merch = grup)
+                const grouped = visibleRows.map((row, idx) => {
+                  const gk = `${row.cari_adi}||${row.sube_adi}||${row.cetinler_merch}`
+                  const prevGk = idx > 0
+                    ? `${visibleRows[idx-1].cari_adi}||${visibleRows[idx-1].sube_adi}||${visibleRows[idx-1].cetinler_merch}`
+                    : null
+                  const isFirst = prevGk !== gk
+                  let span = 1
+                  if (isFirst) {
+                    for (let j = idx + 1; j < visibleRows.length; j++) {
+                      const nextGk = `${visibleRows[j].cari_adi}||${visibleRows[j].sube_adi}||${visibleRows[j].cetinler_merch}`
+                      if (nextGk === gk) span++; else break
+                    }
+                  }
+                  return { row, isFirst, span }
+                })
+
+                return grouped.map(({ row, isFirst, span }, idx) => (
+                  <tr key={idx} className={clsx(
+                    'border-b border-gray-100 hover:bg-gray-50 transition-colors',
+                    row.dirty ? 'bg-yellow-50' : ''
+                  )}>
+                    {isFirst && (
+                      <>
+                        <td rowSpan={span} className="px-3 py-1.5 text-gray-700 font-medium whitespace-nowrap align-top border-b-2 border-gray-200">
+                          {row.cari_adi}
+                          {row.sube_adi && row.sube_adi !== row.cari_adi && (
+                            <span className="text-gray-400 ml-1">/ {row.sube_adi}</span>
+                          )}
+                        </td>
+                        <td rowSpan={span} className="px-3 py-1.5 whitespace-nowrap align-top border-b-2 border-gray-200">
+                          {row.sup_adi ? (
+                            <div>
+                              <span className="text-gray-700">{row.sup_adi}</span>
+                              {row.parent_sup_adi && (
+                                <div className="text-[10px] text-brand-500 font-medium">{row.parent_sup_adi}</div>
+                              )}
+                            </div>
+                          ) : '-'}
+                        </td>
+                        <td rowSpan={span} className="px-3 py-1.5 text-gray-700 whitespace-nowrap align-top border-b-2 border-gray-200">
+                          {row.cetinler_merch}
+                        </td>
+                        <td rowSpan={span} className="px-3 py-1.5 text-right font-mono text-gray-700 whitespace-nowrap align-top border-b-2 border-gray-200">
+                          {row.cetinler_merch_hakedis > 0 ? `${fmt(row.cetinler_merch_hakedis)} ₺` : '-'}
+                        </td>
+                      </>
                     )}
-                  </td>
-                  <td className="px-3 py-1.5 whitespace-nowrap">
-                    {row.sup_adi ? (
-                      <div>
-                        <span className="text-gray-700">{row.sup_adi}</span>
-                        {row.parent_sup_adi && (
-                          <div className="text-[10px] text-brand-500 font-medium">{row.parent_sup_adi}</div>
+                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{row.merch_adi}</td>
+                    <td className="px-3 py-1.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={row.hakedis || ''}
+                          placeholder="0.00"
+                          onChange={e => handleHakedisChange(
+                            rows.indexOf(visibleRows[idx]),
+                            e.target.value
+                          )}
+                          className={clsx(
+                            'w-28 text-right px-2 py-0.5 rounded border text-xs font-mono focus:outline-none focus:ring-1 focus:ring-brand-400',
+                            row.dirty ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200 bg-white'
+                          )}
+                        />
+                        {row.saving && (
+                          <div className="w-3 h-3 border border-brand-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                        )}
+                        {!row.dirty && !row.saving && row.hakedis > 0 && (
+                          <span className="text-green-500 text-[10px]">✓</span>
                         )}
                       </div>
-                    ) : '-'}
-                  </td>
-                  <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{row.cetinler_merch}</td>
-                  <td className="px-3 py-1.5 text-right font-mono text-gray-700 whitespace-nowrap">
-                    {row.cetinler_merch_hakedis > 0 ? `${fmt(row.cetinler_merch_hakedis)} ₺` : '-'}
-                  </td>
-                  <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{row.merch_adi}</td>
-                  <td className="px-3 py-1.5 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={row.hakedis || ''}
-                        placeholder="0.00"
-                        onChange={e => handleHakedisChange(
-                          rows.indexOf(visibleRows[idx]),
-                          e.target.value
-                        )}
-                        className={clsx(
-                          'w-28 text-right px-2 py-0.5 rounded border text-xs font-mono focus:outline-none focus:ring-1 focus:ring-brand-400',
-                          row.dirty ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200 bg-white'
-                        )}
-                      />
-                      {row.saving && (
-                        <div className="w-3 h-3 border border-brand-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                      )}
-                      {!row.dirty && !row.saving && row.hakedis > 0 && (
-                        <span className="text-green-500 text-[10px]">✓</span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                ))
+              })()}
             </tbody>
             <tfoot>
               <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold">
