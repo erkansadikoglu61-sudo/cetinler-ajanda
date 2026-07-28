@@ -771,20 +771,18 @@ export function PrimOdemeListesi({
         })
       }
 
-      // Destek Personeli — BSY rolü destek hakedişini görmez
-      if (bsyKodFilter === null) {
-        for (const h of (destekData.rows ?? [])) {
-          if ((h.hakedis ?? 0) <= 0) continue
-          combined.push({
-            merchTipi: 'Destek Personeli',
-            merchAdi:  h.merch_adi,
-            hakedis:   h.hakedis,
-            cariAdi:   h.cari_adi,
-            subeAdi:   h.sube_adi ?? '',
-            supAdi:    resolveSupName(h.sup_adi ?? ''),
-            bsyKod:    '',
-          })
-        }
+      // Destek Personeli
+      for (const h of (destekData.rows ?? [])) {
+        if ((h.hakedis ?? 0) <= 0) continue
+        combined.push({
+          merchTipi: 'Destek Personeli',
+          merchAdi:  h.merch_adi,
+          hakedis:   h.hakedis,
+          cariAdi:   h.cari_adi,
+          subeAdi:   h.sube_adi ?? '',
+          supAdi:    resolveSupName(h.sup_adi ?? ''),
+          bsyKod:    '',
+        })
       }
 
       setAllRows(combined)
