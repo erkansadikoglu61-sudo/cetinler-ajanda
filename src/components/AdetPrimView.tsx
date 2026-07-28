@@ -677,6 +677,21 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
 }
 
 // ─── Prim Ödeme Listesi ───────────────────────────────────────────
+interface PrimOdemeRow {
+  merchTipi: string
+  merchAdi:  string
+  hakedis:   number
+  cariAdi:   string
+  subeAdi:   string
+  supAdi:    string
+  bsyKod:    string
+}
+
+// "Ad Soyad SV" → "ad soyad" (karşılaştırma için)
+function normSupName(s: string): string {
+  return (s || '').trim().replace(/\s+sv\s*$/i, '').trim().toLowerCase()
+}
+
 export function PrimOdemeListesi({
   supervisorFilter = null,
   bsyKodFilter = null,
@@ -685,9 +700,9 @@ export function PrimOdemeListesi({
   bsyKodFilter?: string | null
 }) {
   const now = new Date()
-  const [yil, setYil]       = useState(now.getFullYear())
-  const [ay,  setAy]        = useState(now.getMonth() + 1)
-  const [rows,    setRows]  = useState<HakdisRow[]>([])
+  const [yil, setYil]         = useState(now.getFullYear())
+  const [ay,  setAy]          = useState(now.getMonth() + 1)
+  const [allRows, setAllRows] = useState<PrimOdemeRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
   const [supFilter, setSupFilter] = useState('')
@@ -696,41 +711,83 @@ export function PrimOdemeListesi({
     setLoading(true)
     setError(null)
     try {
-      const res  = await fetch(`/api/bayi-merch-prim?yil=${yil}&ay=${ay}`)
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Yükleme hatası')
-      setRows(data.rows ?? [])
+      const [bayiRes, destekRes] = await Promise.all([
+        fetch(`/api/bayi-merch-prim?yil=${yil}&ay=${ay}`),
+        fetch(`/api/destek-hakedis?yil=${yil}&ay=${ay}`),
+      ])
+      const [bayiData, destekData] = await Promise.all([bayiRes.json(), destekRes.json()])
+      if (!bayiRes.ok) throw new Error(bayiData.error ?? 'Bayi Merch yükleme hatası')
+
+      const combined: PrimOdemeRow[] = []
+
+      // Bayi Merch
+      for (const r of (bayiData.rows ?? [])) {
+        if ((r.primHakdis ?? 0) <= 0) continue
+        combined.push({
+          merchTipi: 'Bayi Merch',
+          merchAdi:  r.bayiMerch,
+          hakedis:   r.primHakdis,
+          cariAdi:   r.cariAdi,
+          subeAdi:   r.subeAdi,
+          supAdi:    r.supervizor,
+          bsyKod:    r.bsyKod ?? '',
+        })
+      }
+
+      // Destek Personeli — bsyKod filtreli kullanıcılar (BSY rolü) destek hakedişini görmez
+      if (bsyKodFilter === null) {
+        for (const h of (destekData.rows ?? [])) {
+          if ((h.hakedis ?? 0) <= 0) continue
+          combined.push({
+            merchTipi: 'Destek Personeli',
+            merchAdi:  h.merch_adi,
+            hakedis:   h.hakedis,
+            cariAdi:   h.cari_adi,
+            subeAdi:   h.sube_adi ?? '',
+            supAdi:    h.sup_adi ?? '',
+            bsyKod:    '',
+          })
+        }
+      }
+
+      setAllRows(combined)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
-  }, [yil, ay])
+  }, [yil, ay, bsyKodFilter])
 
   useEffect(() => { load() }, [load])
 
-  // Süpervizör seçenekleri (yalnızca admin/BSY için dropdown)
+  // Süpervizör dropdown seçenekleri (admin/BSY için)
   const supOptions = useMemo(() => {
     const seen = new Set<string>()
     const opts: string[] = []
-    for (const r of rows) {
-      if (r.supervizor && !seen.has(r.supervizor)) {
-        seen.add(r.supervizor)
-        opts.push(r.supervizor)
+    for (const r of allRows) {
+      const key = normSupName(r.supAdi)
+      if (r.supAdi && !seen.has(key)) {
+        seen.add(key)
+        opts.push(r.supAdi)
       }
     }
     return opts.sort((a, b) => a.localeCompare(b, 'tr'))
-  }, [rows])
+  }, [allRows])
 
-  const filtered = rows.filter(r => {
-    if (r.primHakdis <= 0) return false
+  const filtered = allRows.filter(r => {
+    // BSY kod filtresi (sadece Bayi Merch için geçerli)
     if (bsyKodFilter !== null && r.bsyKod !== bsyKodFilter) return false
-    if (supervisorFilter !== null && !supervisorFilter.includes(r.supervizor)) return false
-    if (supFilter && r.supervizor !== supFilter) return false
+    // Rol bazlı süpervizör filtresi (prop'tan gelen)
+    if (supervisorFilter !== null) {
+      const match = supervisorFilter.some(sf => normSupName(sf) === normSupName(r.supAdi) || sf === r.supAdi)
+      if (!match) return false
+    }
+    // Dropdown süpervizör filtresi (kullanıcı seçimi)
+    if (supFilter && normSupName(r.supAdi) !== normSupName(supFilter)) return false
     return true
   })
 
-  const toplamPrim = filtered.reduce((s, r) => s + r.primHakdis, 0)
+  const toplamPrim = filtered.reduce((s, r) => s + r.hakedis, 0)
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -758,7 +815,7 @@ export function PrimOdemeListesi({
           <ChevronDown size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
         </div>
 
-        {/* Süpervizör filtresi — yalnızca admin/BSY görür */}
+        {/* Süpervizör filtresi — admin ve BSY için dropdown */}
         {supervisorFilter === null && supOptions.length > 0 && (
           <div className="relative">
             <select value={supFilter} onChange={e => setSupFilter(e.target.value)}
@@ -801,7 +858,7 @@ export function PrimOdemeListesi({
               <thead>
                 <tr className="bg-gray-800 text-white">
                   <th className="text-left px-3 py-2.5 font-semibold w-8">#</th>
-                  <th className="text-left px-3 py-2.5 font-semibold min-w-[100px]">Merch Tipi</th>
+                  <th className="text-left px-3 py-2.5 font-semibold min-w-[120px]">Merch Tipi</th>
                   <th className="text-left px-3 py-2.5 font-semibold min-w-[150px]">Merch Adı</th>
                   <th className="text-right px-3 py-2.5 font-semibold min-w-[130px]">Hakediş</th>
                   <th className="text-left px-3 py-2.5 font-semibold min-w-[200px]">Cari İsmi</th>
@@ -812,13 +869,24 @@ export function PrimOdemeListesi({
                 {filtered.map((row, idx) => (
                   <tr key={idx} className={clsx(
                     'border-b border-gray-100 last:border-0',
-                    idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                    row.merchTipi === 'Destek Personeli'
+                      ? (idx % 2 === 0 ? 'bg-violet-50/40' : 'bg-violet-50/70')
+                      : (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40')
                   )}>
                     <td className="px-3 py-2 text-gray-400 font-mono">{idx + 1}</td>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">Bayi Merch</td>
-                    <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{row.bayiMerch}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <span className={clsx(
+                        'text-[10px] px-1.5 py-0.5 rounded-full font-medium',
+                        row.merchTipi === 'Destek Personeli'
+                          ? 'bg-violet-100 text-violet-700'
+                          : 'bg-blue-100 text-blue-700'
+                      )}>
+                        {row.merchTipi}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{row.merchAdi}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-bold text-gray-900">
-                      {row.primHakdis.toLocaleString('tr-TR')} ₺
+                      {row.hakedis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
                     </td>
                     <td className="px-3 py-2 text-gray-800">{row.cariAdi}</td>
                     <td className="px-3 py-2 text-gray-700">{row.subeAdi || '—'}</td>
@@ -829,7 +897,7 @@ export function PrimOdemeListesi({
                 <tr className="bg-gray-800 text-white text-[10px] font-semibold">
                   <td className="px-3 py-2" colSpan={3}>Toplam</td>
                   <td className="px-3 py-2 text-right tabular-nums font-bold">
-                    {toplamPrim.toLocaleString('tr-TR')} ₺
+                    {toplamPrim.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
                   </td>
                   <td colSpan={2} />
                 </tr>
