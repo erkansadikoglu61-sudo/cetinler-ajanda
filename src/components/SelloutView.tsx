@@ -1108,8 +1108,9 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                       // 2. Bayi Merch Prim Hakedişi
                       const bayiMerchHakedis = bayiMerchPrimAdet * satisAdedi
 
-                      // 3. Destek Personeli Adet Primi
-                      const destekPrimAdet = primData.kosulluDestek
+                      // 3. Destek Personeli Adet Primi — yalnızca o dönem için flag'li Merch'ler
+                      const destekVarMi = row.merch_tipi === 'Çetinler Merch' && !!destekFlags[row.merch_personel || '']
+                      const destekPrimAdet = destekVarMi ? primData.kosulluDestek : 0
 
                       // 4. Çetinler Merch Kategori Gerçekleşme Oranı
                       const merchKey = (row.merch_personel || '').toLowerCase()
