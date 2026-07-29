@@ -1716,8 +1716,7 @@ export default function AppPage() {
     if (!currentProfile) return { primSupervisorFilter: [] as string[], primBsyKod: null as string | null }
     if (currentProfile.role === 'admin') return { primSupervisorFilter: null, primBsyKod: null }
     if (currentProfile.role === 'sup') return { primSupervisorFilter: [currentProfile.full_name], primBsyKod: null }
-    if (currentProfile.role === 'jr')  return { primSupervisorFilter: [currentProfile.full_name], primBsyKod: null }
-    if (currentProfile.role === 'bsy') {
+if (currentProfile.role === 'bsy') {
       // BSY_NAME_TO_KOD: lowercase isim → kod (KB1, IB1, vb.)
       const bsyKod = BSY_NAME_TO_KOD[currentProfile.full_name.toLocaleLowerCase('tr')] ?? null
       return { primSupervisorFilter: null, primBsyKod: bsyKod }
@@ -1979,8 +1978,8 @@ export default function AppPage() {
                   <BarChart2 size={15} /> Analiz
                 </button>
               )}
-              {/* Primler — admin + BSY + Süpervizör + Jr. Süpervizör */}
-              {(currentProfile?.role === 'admin' || isBsy || isSup || isJr) && (
+              {/* Primler — admin + BSY + Süpervizör */}
+              {(currentProfile?.role === 'admin' || isBsy || isSup) && (
                 <button
                   onClick={() => { if (!['adet-prim','bayi-merch','destek-hakedis','prim-odeme'].includes(tab)) setTab('adet-prim') }}
                   className={clsx(
@@ -2098,13 +2097,13 @@ export default function AppPage() {
             </div>
           )}
           {/* Primler alt sekmeleri */}
-          {(currentProfile?.role === 'admin' || isBsy || isSup || isJr) && ['adet-prim','bayi-merch','destek-hakedis','prim-odeme'].includes(tab) && (
+          {(currentProfile?.role === 'admin' || isBsy || isSup) && ['adet-prim','bayi-merch','destek-hakedis','prim-odeme'].includes(tab) && (
             <div className="flex overflow-x-auto items-center gap-1 px-3 pb-1.5 scrollbar-none">
               {([
-                { key: 'adet-prim' as const,      label: 'Adet Prim Tablosu',           roles: ['admin','bsy','sup','jr'] },
-                { key: 'bayi-merch' as const,      label: 'Bayi Merch Prim Hakedişleri', roles: ['admin','bsy','sup','jr'] },
-                { key: 'destek-hakedis' as const,  label: 'Destek Personelleri Hakediş', roles: ['admin','sup','jr'] },
-                { key: 'prim-odeme' as const,      label: 'Prim Ödeme Listesi',          roles: ['admin','bsy','sup','jr'] },
+                { key: 'adet-prim' as const,      label: 'Adet Prim Tablosu',           roles: ['admin','bsy','sup'] },
+                { key: 'bayi-merch' as const,      label: 'Bayi Merch Prim Hakedişleri', roles: ['admin','bsy','sup'] },
+                { key: 'destek-hakedis' as const,  label: 'Destek Personelleri Hakediş', roles: ['admin','sup'] },
+                { key: 'prim-odeme' as const,      label: 'Prim Ödeme Listesi',          roles: ['admin','bsy','sup'] },
               ] as const).filter(({ roles }) => (roles as readonly string[]).includes(currentProfile?.role ?? '')).map(({ key, label }) => (
                 <button key={key} onClick={() => setTab(key)}
                   className={clsx(
@@ -2254,12 +2253,12 @@ export default function AppPage() {
               <AnalizView currentProfile={currentProfile} active={tab === 'analiz'} />
             </div>
           )}
-          {tab === 'adet-prim' && (currentProfile?.role === 'admin' || isBsy || isSup || isJr) && (
+          {tab === 'adet-prim' && (currentProfile?.role === 'admin' || isBsy || isSup) && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
               <AdetPrimTablosu isAdmin={currentProfile?.role === 'admin'} />
             </div>
           )}
-          {tab === 'bayi-merch' && (currentProfile?.role === 'admin' || isBsy || isSup || isJr) && (
+          {tab === 'bayi-merch' && (currentProfile?.role === 'admin' || isBsy || isSup) && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
               <BayiMerchHakdis
                 supervisorFilter={primSupervisorFilter}
@@ -2267,7 +2266,7 @@ export default function AppPage() {
               />
             </div>
           )}
-          {tab === 'destek-hakedis' && (isSup || isJr || currentProfile?.role === 'admin') && (
+          {tab === 'destek-hakedis' && (isSup || currentProfile?.role === 'admin') && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
               <DestekPersonelHakedisView
                 currentUserName={currentProfile.full_name}
@@ -2275,7 +2274,7 @@ export default function AppPage() {
               />
             </div>
           )}
-          {tab === 'prim-odeme' && (currentProfile?.role === 'admin' || isBsy || isSup || isJr) && (
+          {tab === 'prim-odeme' && (currentProfile?.role === 'admin' || isBsy || isSup) && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
               <PrimOdemeListesi
                 supervisorFilter={primSupervisorFilter}
@@ -2319,7 +2318,7 @@ export default function AppPage() {
             { key: 'sellout' as const, icon: TrendingUp, label: 'Sellout' },
             ...(isBsyOrAdmin ? [{ key: 'analiz'   as const, icon: BarChart2, label: 'Analiz'  }] : []),
             { key: 'noktalar' as const, icon: Store, label: 'Noktalar' },
-            ...((currentProfile?.role === 'admin' || isBsy || isSup || isJr)
+            ...((currentProfile?.role === 'admin' || isBsy || isSup)
               ? [{ key: 'adet-prim' as const, icon: Activity, label: 'Primler' }] : []),
           ] as const).map(({ key, icon: Icon, label }) => (
             <button

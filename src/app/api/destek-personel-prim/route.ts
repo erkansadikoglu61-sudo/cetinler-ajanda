@@ -133,10 +133,8 @@ export async function GET(req: Request) {
       if (bsyKod) {
         if ((php?.bsy ?? '') !== bsyKod) continue
       } else if (normalizedSupAdi) {
-        const phpSup = normalize(php?.sup ?? '')  // K kolonu — doğrudan Süpervizör
-        const phpJr  = normalize(php?.jr  ?? '')  // L kolonu — Jr. Süpervizör
-        // İsim K veya L kolonunda eşleşiyorsa dahil et
-        if (phpSup !== normalizedSupAdi && phpJr !== normalizedSupAdi) continue
+        const phpSup = normalize(php?.sup ?? '')
+        if (phpSup !== normalizedSupAdi) continue
       }
 
       // Cari/şube adını PHP'den al (daha tutarlı format), yoksa field_personnel'dan

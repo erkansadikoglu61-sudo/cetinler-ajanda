@@ -44,8 +44,8 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
     try {
       const donem  = `${yil}-${String(ay).padStart(2, '0')}`
       const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
-      // Admin: filtre yok (tüm şubeler), Sup/Jr: kendi şubeleri
-      if (currentUserRole === 'sup' || currentUserRole === 'jr') params.append('supAdi', currentUserName)
+      // Admin: filtre yok (tüm şubeler), Sup: kendi şubeleri
+      if (currentUserRole === 'sup') params.append('supAdi', currentUserName)
 
       const [destekRes, selloutRes, primRes, targetsRes, hakedisRes, flagRes] = await Promise.all([
         fetch(`/api/destek-personel-prim?${params}`),
