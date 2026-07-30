@@ -240,16 +240,12 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
     }
   }
 
-  // Cari/Şube filtresi seçenekleri
-  const cariOptions = [...new Set(
-    rows.map(r => r.sube_adi ? `${r.cari_adi} - ${r.sube_adi}` : r.cari_adi)
-  )].sort((a, b) => a.localeCompare(b, 'tr'))
+  // Cari filtresi seçenekleri (sadece cari_adi)
+  const cariOptions = [...new Set(rows.map(r => r.cari_adi))]
+    .sort((a, b) => a.localeCompare(b, 'tr'))
 
   const visibleRows = cariFilter
-    ? rows.filter(r => {
-        const label = r.sube_adi ? `${r.cari_adi} - ${r.sube_adi}` : r.cari_adi
-        return label === cariFilter
-      })
+    ? rows.filter(r => r.cari_adi === cariFilter)
     : rows
 
   const toplamHakedis = visibleRows.reduce((s, r) => s + (r.hakedis || 0), 0)
@@ -343,7 +339,8 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
           <table className="min-w-full text-xs border-collapse">
             <thead className="sticky top-0 z-10">
               <tr className="bg-gray-100 border-b border-gray-200">
-                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">Cari ve Şube</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">Cari</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">Şube</th>
                 <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">Süpervizör</th>
                 <th className="px-3 py-2 text-left font-semibold text-gray-600 whitespace-nowrap">Çetinler Merch</th>
                 <th className="px-3 py-2 text-right font-semibold text-gray-600 whitespace-nowrap">Destek Personeli için Oluşan Prim</th>
@@ -357,12 +354,8 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
                   'border-b border-gray-100 hover:bg-gray-50 transition-colors',
                   row.dirty ? 'bg-yellow-50' : ''
                 )}>
-                  <td className="px-3 py-1.5 text-gray-700 font-medium whitespace-nowrap">
-                    {row.cari_adi}
-                    {row.sube_adi && row.sube_adi !== row.cari_adi && (
-                      <span className="text-gray-400 ml-1">/ {row.sube_adi}</span>
-                    )}
-                  </td>
+                  <td className="px-3 py-1.5 text-gray-700 font-medium whitespace-nowrap">{row.cari_adi}</td>
+                  <td className="px-3 py-1.5 text-gray-500 whitespace-nowrap">{row.sube_adi || '-'}</td>
                   <td className="px-3 py-1.5 whitespace-nowrap">
                     {row.sup_adi ? (
                       <div>
@@ -413,7 +406,7 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
             </tbody>
             <tfoot>
               <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold">
-                <td colSpan={3} className="px-3 py-2 text-right text-gray-600 text-xs">Toplam</td>
+                <td colSpan={4} className="px-3 py-2 text-right text-gray-600 text-xs">Toplam</td>
                 <td className="px-3 py-2 text-right font-mono text-gray-800 whitespace-nowrap">
                   {toplamCetinlerMerchPrim > 0 ? `${fmt(toplamCetinlerMerchPrim)} ₺` : '-'}
                 </td>
