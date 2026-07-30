@@ -35,6 +35,7 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
   const [saveError, setSaveError]   = useState<string | null>(null)
   const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const [focusedKey, setFocusedKey] = useState<string | null>(null)
+  const [editValues, setEditValues] = useState<Map<string, string>>(new Map())
 
   const rowKey = (r: HakedisRow) =>
     `${r.cari_adi}||${r.sube_adi}||${r.cetinler_merch}||${r.merch_adi}`
@@ -380,14 +381,26 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
                         inputMode="decimal"
                         value={
                           focusedKey === rowKey(row)
-                            ? (row.hakedis > 0 ? row.hakedis.toFixed(2) : '')
+                            ? (editValues.get(rowKey(row)) ?? '')
                             : (row.hakedis > 0 ? row.hakedis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '')
                         }
                         placeholder="0,00"
-                        onFocus={() => setFocusedKey(rowKey(row))}
-                        onBlur={() => setFocusedKey(null)}
+                        onFocus={() => {
+                          const k = rowKey(row)
+                          setFocusedKey(k)
+                          const initVal = row.hakedis > 0
+                            ? (Number.isInteger(row.hakedis) ? row.hakedis.toString() : row.hakedis.toFixed(2).replace('.', ','))
+                            : ''
+                          setEditValues(prev => new Map(prev).set(k, initVal))
+                        }}
+                        onBlur={() => {
+                          setFocusedKey(null)
+                          setEditValues(prev => { const next = new Map(prev); next.delete(rowKey(row)); return next })
+                        }}
                         onChange={e => {
-                          const raw = e.target.value.replace(/\./g, '').replace(',', '.')
+                          const val = e.target.value
+                          setEditValues(prev => new Map(prev).set(rowKey(row), val))
+                          const raw = val.replace(/\./g, '').replace(',', '.')
                           handleHakedisChange(rows.indexOf(visibleRows[idx]), raw)
                         }}
                         className={clsx(
