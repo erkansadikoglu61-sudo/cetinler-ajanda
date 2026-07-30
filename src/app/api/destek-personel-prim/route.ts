@@ -138,9 +138,7 @@ export async function GET(req: Request) {
       }
 
       // Cari/şube adını PHP'den al (daha tutarlı format), yoksa field_personnel'dan
-      // PHP eşleşmesi yoksa veya Çetinler Merch atanmamışsa bu satırı gösterme
       const cetinlerMerch = php?.merch || ''
-      if (!cetinlerMerch) continue
 
       const displayCari = php?.cari_adi || dp.cari_adi
       const displaySube = php?.sube_adi || dp.sube_adi

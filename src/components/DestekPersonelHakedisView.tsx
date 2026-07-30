@@ -137,10 +137,12 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
         destekData.rows ?? []
 
       for (const dp of destekRows) {
-        const mk = (dp.cetinler_merch || '').toLowerCase()
+        const mk = (dp.cetinler_merch === '-' ? '' : dp.cetinler_merch || '').toLowerCase()
 
         // Merch Hedefleri'nde "Destek Personeli var mı?" = true olmayanları filtrele
-        if (destekFlagMap.size > 0 && !destekFlagMap.get(mk)) continue
+        // Admin/Manager/BSY rolleri için flag kontrolü uygulanmaz — tüm satırları göster
+        const applyFlagFilter = currentUserRole === 'sup' || currentUserRole === 'jr'
+        if (applyFlagFilter && destekFlagMap.size > 0 && mk && !destekFlagMap.get(mk)) continue
 
         // Cari + Şube + Çetinler Merch + Destek Personeli aynıysa tek satır
         const dedup = `${nk(dp.cari_adi)}||${nk(dp.sube_adi)}||${mk}||${nk(dp.merch_adi)}`
