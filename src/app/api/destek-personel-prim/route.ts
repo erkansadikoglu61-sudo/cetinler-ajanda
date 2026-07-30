@@ -63,7 +63,7 @@ export async function GET(req: Request) {
     //   [11] JR_SUPERVIZOR
     const phpRes = await fetch(
       'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_detay.php',
-      { cache: 'no-store' }
+      { next: { revalidate: 900 } }
     )
     if (!phpRes.ok) return NextResponse.json({ rows: [] })
 
@@ -170,7 +170,7 @@ export async function GET(req: Request) {
     // → cari + merch_adi bazında dedup; supervisor verisi olan satırı tercih et
     const dedupMap = new Map<string, DestekPersonelRow>()
     for (const row of rows) {
-      const mk = `${normalize(row.cari_adi)}||${row.merch_adi.toLowerCase()}`
+      const mk = `${normalize(row.cari_adi)}||${normalize(row.sube_adi)}||${row.merch_adi.toLowerCase()}`
       const existing = dedupMap.get(mk)
       if (!existing || (!existing.sup_adi && row.sup_adi)) {
         dedupMap.set(mk, row)

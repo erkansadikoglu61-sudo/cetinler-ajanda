@@ -457,6 +457,7 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft,   setDraft]   = useState<PrimRow[]>([])
+  const [newRows, setNewRows] = useState<{ stokKodu: string; kategori: string; bayiMerch: string; kosulluDestek: string }[]>([])
   const [saving,  setSaving]  = useState(false)
   const [msg,     setMsg]     = useState<string | null>(null)
 
@@ -476,12 +477,26 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
 
   function startEdit() {
     setDraft(rows.map(r => ({ ...r })))
+    setNewRows([])
     setEditing(true)
   }
 
   function cancelEdit() {
     setEditing(false)
     setDraft([])
+    setNewRows([])
+  }
+
+  function addNewRow() {
+    setNewRows(prev => [...prev, { stokKodu: '', kategori: '', bayiMerch: '', kosulluDestek: '' }])
+  }
+
+  function updateNewRow(idx: number, field: 'stokKodu' | 'kategori' | 'bayiMerch' | 'kosulluDestek', val: string) {
+    setNewRows(prev => prev.map((r, i) => i !== idx ? r : { ...r, [field]: val }))
+  }
+
+  function removeNewRow(idx: number) {
+    setNewRows(prev => prev.filter((_, i) => i !== idx))
   }
 
   function updateDraft(idx: number, field: 'bayiMerch' | 'kosulluDestek', val: string) {
@@ -494,15 +509,25 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
     setSaving(true)
     setMsg(null)
     try {
+      const validNew = newRows
+        .filter(r => r.stokKodu.trim())
+        .map(r => ({
+          stokKodu:      r.stokKodu.trim().toUpperCase(),
+          kategori:      r.kategori.trim() || null,
+          bayiMerch:     r.bayiMerch !== '' ? parseInt(r.bayiMerch) || null : null,
+          kosulluDestek: r.kosulluDestek !== '' ? parseInt(r.kosulluDestek) || null : null,
+        }))
+      const allRows = [...draft, ...validNew]
       const res = await fetch('/api/adet-prim', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ yil, ay, rows: draft }),
+        body: JSON.stringify({ yil, ay, rows: allRows }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Kayıt hatası')
-      setRows(draft)
+      await load()
       setEditing(false)
+      setNewRows([])
       setMsg('✓ Kaydedildi')
     } catch (e) {
       setMsg('✗ ' + (e instanceof Error ? e.message : String(e)))
@@ -668,8 +693,65 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
                     )}
                   </tr>
                 ))}
+                {editing && newRows.map((nr, idx) => (
+                  <tr key={`new-${idx}`} className="border-b border-blue-100 bg-blue-50/40">
+                    <td className="px-4 py-2 text-blue-300 font-mono">+</td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="text"
+                        value={nr.stokKodu}
+                        onChange={e => updateNewRow(idx, 'stokKodu', e.target.value.toUpperCase())}
+                        placeholder="Stok Kodu"
+                        className="w-full border border-blue-300 rounded-lg px-3 py-1.5 text-xs font-mono focus:outline-none focus:border-brand-400"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <select
+                        value={nr.kategori}
+                        onChange={e => updateNewRow(idx, 'kategori', e.target.value)}
+                        className="w-full border border-blue-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-brand-400 bg-white"
+                      >
+                        <option value="">— Seç —</option>
+                        {[...new Set(displayRows.map(r => r.kategori).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, 'tr')).map(k => (
+                          <option key={k} value={k}>{k}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="number"
+                        value={nr.bayiMerch}
+                        onChange={e => updateNewRow(idx, 'bayiMerch', e.target.value)}
+                        placeholder="—"
+                        className="w-full text-right border border-blue-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-brand-400"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          value={nr.kosulluDestek}
+                          onChange={e => updateNewRow(idx, 'kosulluDestek', e.target.value)}
+                          placeholder="—"
+                          className="flex-1 text-right border border-blue-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-brand-400"
+                        />
+                        <button onClick={() => removeNewRow(idx)} className="p-1 text-red-400 hover:text-red-600">
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
+            {editing && (
+              <button
+                onClick={addNewRow}
+                className="w-full mt-2 flex items-center justify-center gap-1.5 py-2 text-xs text-brand-600 hover:text-brand-700 border border-dashed border-brand-300 rounded-xl hover:bg-brand-50 transition-colors"
+              >
+                <Plus size={13} /> Yeni Satır Ekle
+              </button>
+            )}
           </div>
         )}
         </>}
@@ -1182,6 +1264,294 @@ export function BayiMerchHakdis({
             </div>
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Prim Analiz ─────────────────────────────────────────────────────────────
+
+interface PrimAnalizRow {
+  stokKodu:   string
+  stokAdi:    string
+  cariAdi:    string
+  subeAdi:    string
+  bsyKod:     string
+  supervizor: string
+  prim:       number
+  marka:      'Electrolux' | 'Relux'
+}
+
+function fmtTL(n: number) {
+  return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+export function PrimAnalizView({
+  supervisorFilter = null,
+  bsyKodFilter = null,
+}: {
+  supervisorFilter?: string[] | null
+  bsyKodFilter?: string | null
+}) {
+  const now = new Date()
+  const [yil, setYil] = useState(now.getFullYear())
+  const [ay,  setAy]  = useState(now.getMonth() + 1)
+  const [rows, setRows] = useState<PrimAnalizRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null)
+    try {
+      const res  = await fetch(`/api/prim-analiz?yil=${yil}&ay=${ay}`)
+      const data = await res.json()
+      setRows(data.rows ?? [])
+    } catch { setError('Veriler alınamadı') }
+    finally  { setLoading(false) }
+  }, [yil, ay])
+
+  useEffect(() => { load() }, [load])
+
+  const filtered = useMemo(() => {
+    return rows.filter(r => {
+      if (bsyKodFilter !== null && r.bsyKod !== bsyKodFilter) return false
+      if (supervisorFilter !== null) {
+        const norm = (s: string) => (s || '').trim().replace(/\s+sv\s*$/i, '').trim().toLowerCase()
+        if (!supervisorFilter.some(sf => norm(sf) === norm(r.supervizor))) return false
+      }
+      return true
+    })
+  }, [rows, supervisorFilter, bsyKodFilter])
+
+  // Cari bazında grupla
+  const cariMap = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const r of filtered) m.set(r.cariAdi, (m.get(r.cariAdi) ?? 0) + r.prim)
+    return [...m.entries()].sort((a, b) => b[1] - a[1])
+  }, [filtered])
+
+  // BSY bazında grupla
+  const bsyMap = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const r of filtered) {
+      const k = r.bsyKod || '—'
+      m.set(k, (m.get(k) ?? 0) + r.prim)
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1])
+  }, [filtered])
+
+  // Stok bazında grupla — Electrolux
+  const elxMap = useMemo(() => {
+    const m = new Map<string, { stokAdi: string; prim: number }>()
+    for (const r of filtered.filter(r => r.marka === 'Electrolux')) {
+      const ex = m.get(r.stokKodu)
+      if (ex) ex.prim += r.prim
+      else m.set(r.stokKodu, { stokAdi: r.stokAdi, prim: r.prim })
+    }
+    return [...m.entries()].sort((a, b) => b[1].prim - a[1].prim)
+  }, [filtered])
+
+  // Stok bazında grupla — Relux
+  const reluxMap = useMemo(() => {
+    const m = new Map<string, { stokAdi: string; prim: number }>()
+    for (const r of filtered.filter(r => r.marka === 'Relux')) {
+      const ex = m.get(r.stokKodu)
+      if (ex) ex.prim += r.prim
+      else m.set(r.stokKodu, { stokAdi: r.stokAdi, prim: r.prim })
+    }
+    return [...m.entries()].sort((a, b) => b[1].prim - a[1].prim)
+  }, [filtered])
+
+  const elxTotal   = elxMap.reduce((s, [, v]) => s + v.prim, 0)
+  const reluxTotal = reluxMap.reduce((s, [, v]) => s + v.prim, 0)
+  const cariTotal  = cariMap.reduce((s, [, v]) => s + v, 0)
+  const bsyTotal   = bsyMap.reduce((s, [, v]) => s + v, 0)
+
+  const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
+
+  return (
+    <div className="space-y-6">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={yil}
+          onChange={e => setYil(Number(e.target.value))}
+          className="border rounded-lg px-2 py-1.5 text-sm"
+        >
+          {[now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1].map(y => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+        <select
+          value={ay}
+          onChange={e => setAy(Number(e.target.value))}
+          className="border rounded-lg px-2 py-1.5 text-sm"
+        >
+          {MONTHS_TR.map((m, i) => (
+            <option key={i+1} value={i+1}>{m}</option>
+          ))}
+        </select>
+        <button
+          onClick={load}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 hover:bg-gray-200 transition-colors"
+        >
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          Yenile
+        </button>
+        {loading && <span className="text-xs text-gray-400">Yükleniyor…</span>}
+        {error   && <span className="text-xs text-red-500">{error}</span>}
+      </div>
+
+      {/* Row 1: Cari + BSY */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Cari bazında */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Cari Bazında Prim</h3>
+          <div className="rounded-xl border border-gray-200 overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-3 py-2 text-gray-500 font-medium">#</th>
+                  <th className="text-left px-3 py-2 text-gray-500 font-medium">Cari İsmi</th>
+                  <th className="text-right px-3 py-2 text-gray-500 font-medium">Hakediş (₺)</th>
+                  <th className="text-right px-3 py-2 text-gray-500 font-medium">Oran</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cariMap.map(([cari, prim], i) => (
+                  <tr key={cari} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-3 py-2 text-gray-400">{i + 1}</td>
+                    <td className="px-3 py-2 text-gray-700">{cari}</td>
+                    <td className="px-3 py-2 text-right font-mono text-gray-800">{fmtTL(prim)}</td>
+                    <td className="px-3 py-2 text-right text-gray-600">
+                      {cariTotal > 0 ? `%${((prim / cariTotal) * 100).toFixed(1)}` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-gray-200 bg-gray-100 font-semibold">
+                  <td colSpan={2} className="px-3 py-2 text-gray-700">Toplam</td>
+                  <td className="px-3 py-2 text-right font-mono text-gray-900">{fmtTL(cariTotal)}</td>
+                  <td className="px-3 py-2 text-right text-gray-600">%100</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        {/* BSY bazında */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">BSY Bazında Prim</h3>
+          <div className="rounded-xl border border-gray-200 overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-3 py-2 text-gray-500 font-medium">#</th>
+                  <th className="text-left px-3 py-2 text-gray-500 font-medium">BSY Kodu</th>
+                  <th className="text-right px-3 py-2 text-gray-500 font-medium">Hakediş (₺)</th>
+                  <th className="text-right px-3 py-2 text-gray-500 font-medium">Oran</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bsyMap.map(([bsy, prim], i) => (
+                  <tr key={bsy} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-3 py-2 text-gray-400">{i + 1}</td>
+                    <td className="px-3 py-2 text-gray-700">{bsy}</td>
+                    <td className="px-3 py-2 text-right font-mono text-gray-800">{fmtTL(prim)}</td>
+                    <td className="px-3 py-2 text-right text-gray-600">
+                      {bsyTotal > 0 ? `%${((prim / bsyTotal) * 100).toFixed(1)}` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-gray-200 bg-gray-100 font-semibold">
+                  <td colSpan={2} className="px-3 py-2 text-gray-700">Toplam</td>
+                  <td className="px-3 py-2 text-right font-mono text-gray-900">{fmtTL(bsyTotal)}</td>
+                  <td className="px-3 py-2 text-right text-gray-600">%100</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Row 2: Electrolux + Relux stok bazında */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Electrolux */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Electrolux — Stok Bazında Prim</h3>
+          <div className="rounded-xl border border-gray-200 overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-3 py-2 text-gray-500 font-medium">Stok Kodu</th>
+                  <th className="text-right px-3 py-2 text-gray-500 font-medium">Hakediş (₺)</th>
+                  <th className="text-right px-3 py-2 text-gray-500 font-medium">Oran</th>
+                </tr>
+              </thead>
+              <tbody>
+                {elxMap.map(([kod, { stokAdi, prim }], i) => (
+                  <tr key={kod} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-3 py-2 text-gray-700">
+                      <span className="font-mono font-medium">{kod}</span>
+                      {stokAdi && <span className="text-gray-400 block text-[10px] leading-tight">{stokAdi}</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono text-gray-800">{fmtTL(prim)}</td>
+                    <td className="px-3 py-2 text-right text-gray-600">
+                      {elxTotal > 0 ? `%${((prim / elxTotal) * 100).toFixed(1)}` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-gray-200 bg-gray-100 font-semibold">
+                  <td className="px-3 py-2 text-gray-700">Toplam</td>
+                  <td className="px-3 py-2 text-right font-mono text-gray-900">{fmtTL(elxTotal)}</td>
+                  <td className="px-3 py-2 text-right text-gray-600">%100</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        {/* Relux */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Relux — Stok Bazında Prim</h3>
+          <div className="rounded-xl border border-gray-200 overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-3 py-2 text-gray-500 font-medium">Stok Kodu</th>
+                  <th className="text-right px-3 py-2 text-gray-500 font-medium">Hakediş (₺)</th>
+                  <th className="text-right px-3 py-2 text-gray-500 font-medium">Oran</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reluxMap.map(([kod, { stokAdi, prim }], i) => (
+                  <tr key={kod} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-3 py-2 text-gray-700">
+                      <span className="font-mono font-medium">{kod}</span>
+                      {stokAdi && <span className="text-gray-400 block text-[10px] leading-tight">{stokAdi}</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono text-gray-800">{fmtTL(prim)}</td>
+                    <td className="px-3 py-2 text-right text-gray-600">
+                      {reluxTotal > 0 ? `%${((prim / reluxTotal) * 100).toFixed(1)}` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-gray-200 bg-gray-100 font-semibold">
+                  <td className="px-3 py-2 text-gray-700">Toplam</td>
+                  <td className="px-3 py-2 text-right font-mono text-gray-900">{fmtTL(reluxTotal)}</td>
+                  <td className="px-3 py-2 text-right text-gray-600">%100</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   )

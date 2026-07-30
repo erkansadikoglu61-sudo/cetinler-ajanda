@@ -79,7 +79,7 @@ export async function GET(req: Request) {
       const bayiMerch = cols['bayiMerch'] >= 0 ? parseFloat(String(row[cols['bayiMerch']] ?? '0')) || null : null
       const kosulluDestek = cols['kosulluDestek'] >= 0 ? parseFloat(String(row[cols['kosulluDestek']] ?? '0')) || null : null
 
-      if (stokKodu) {
+      if (stokKodu && stokKodu.toLowerCase() !== 'stok kodu' && stokKodu.toLowerCase() !== 'stok_kodu') {
         primData[stokKodu] = {
           stokKodu,
           kategori: kategori || null,

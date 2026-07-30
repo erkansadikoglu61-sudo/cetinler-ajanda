@@ -33,7 +33,7 @@ export async function GET() {
     const phpUrl = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_detay.php'
 
     const response = await fetch(phpUrl, {
-      next: { revalidate: 900 }, // 15 dakika cache
+      next: { revalidate: 900 }, // 15 dakika
     })
 
     if (!response.ok) {
@@ -82,8 +82,8 @@ export async function GET() {
 
         if (!merchAdi) continue
 
-        // Unique key: merch_adi + cari_kod
-        const key = `${merchAdi}||${cariKod}`
+        // Unique key: merch_adi + cari_kod + sube_kod
+        const key = `${merchAdi}||${cariKod}||${subeKod}`
 
         if (!merchMap.has(key)) {
           merchMap.set(key, {

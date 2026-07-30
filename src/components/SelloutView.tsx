@@ -317,6 +317,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const [targetModal, setTargetModal] = useState<SubTab | null>(null)
   const [merchSearch, setMerchSearch] = useState('')
   const [adetPrimData, setAdetPrimData] = useState<{ stokKodu: string; bayiMerch: number | null; kosulluDestek: number | null; kategori: string | null }[]>([])
+  const [ozelPrimData, setOzelPrimData] = useState<{ stok_kodu: string[] | null; grup_kodu: string[] | null; cari_adi: string[] | null; sube_adi: string[] | null; bayi_merch: number | null; prim_carpan: number | null; tarih_baslangic: string | null; tarih_bitis: string | null }[]>([])
   const [merchHedefData, setMerchHedefData] = useState<{ merch_name: string; grup: string; hedef: number }[]>([])
   const [merchDetayData, setMerchDetayData] = useState<{ merch_adi: string; merch_grubu: string; sup_adi: string; jr_adi: string; cari_adi: string; sube_adi: string; sube_kod: string }[]>([])
   const [destekFlags, setDestekFlags] = useState<Record<string, boolean>>({})
@@ -341,6 +342,10 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       .then(r => r.json())
       .then(d => setAdetPrimData(d.rows || []))
       .catch(() => setAdetPrimData([]))
+    fetch(`/api/prim-ozel?yil=${yil}`)
+      .then(r => r.json())
+      .then(d => setOzelPrimData(d.rows || []))
+      .catch(() => setOzelPrimData([]))
   }, [active, donem])
 
   // Merch hedef verilerini fetch et
@@ -607,6 +612,30 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     })
     return map
   }, [adetPrimData])
+
+  const normStr = (s: string) => (s || '').trim().toLowerCase()
+    .replace(/İ/g, 'i').replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ü/g, 'u')
+    .replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c').replace(/\s+/g, ' ')
+
+  // Satış satırı için özel bayi merch prim oranını hesapla (standart + özel ek)
+  const getEffectiveBayiMerch = useCallback((stokKodu: string, grupKodu: string, cariIsim: string, subeAdi: string): number => {
+    const standardRate = adetPrimMap.get(stokKodu)?.bayiMerch ?? 0
+    const rule = ozelPrimData.find(r => {
+      const stokOk = !r.stok_kodu || r.stok_kodu.some(s => s.toUpperCase() === stokKodu.toUpperCase())
+      const grupOk = !r.grup_kodu || (r.stok_kodu?.length ? stokOk : r.grup_kodu.some(g => g.toUpperCase() === grupKodu.toUpperCase()))
+      const cariOk = !r.cari_adi  || r.cari_adi.some(c => normStr(c) === normStr(cariIsim))
+      const subeOk = !r.sube_adi  || r.sube_adi.some(s => normStr(s) === normStr(subeAdi))
+      const from   = r.tarih_baslangic ? r.tarih_baslangic.slice(0, 7) : null
+      const to     = r.tarih_bitis     ? r.tarih_bitis.slice(0, 7)     : null
+      const basOk  = !from || from <= donem
+      const bitOk  = !to   || to   >= donem
+      return stokOk && grupOk && cariOk && subeOk && basOk && bitOk
+    })
+    if (!rule) return standardRate
+    if (rule.prim_carpan != null) return standardRate * rule.prim_carpan
+    if (rule.bayi_merch  != null) return standardRate + rule.bayi_merch
+    return standardRate
+  }, [adetPrimMap, ozelPrimData, donem, normStr])
 
   // ── Merch kategori performans hesapla ──
   const merchKategoriPerformans = useMemo(() => {
@@ -1183,8 +1212,10 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                       const primData = adetPrimMap.get(row.stok_kodu || '') || { bayiMerch: 0, kosulluDestek: 0, kategori: '' }
                       const satisAdedi = row.satilan_adet || 0
 
-                      // 1. Bayi Merch Adet Primi
-                      const bayiMerchPrimAdet = primData.bayiMerch
+                      // 1. Bayi Merch Adet Primi (özel prim kuralı varsa uygula)
+                      const bayiMerchPrimAdet = row.merch_tipi === 'Bayi Merch'
+                        ? getEffectiveBayiMerch(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '')
+                        : primData.bayiMerch
 
                       // 2. Bayi Merch Prim Hakedişi
                       const bayiMerchHakedis = bayiMerchPrimAdet * satisAdedi

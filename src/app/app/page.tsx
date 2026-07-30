@@ -27,13 +27,13 @@ import { KpiView } from '@/components/KpiView'
 import { NoktalarimizView } from '@/components/NoktalarimizView'
 import { KullanicilarView } from '@/components/KullanicilarView'
 import { SellinSelloutView } from '@/components/SellinSelloutView'
-import { AdetPrimTablosu, BayiMerchHakdis, PrimOdemeListesi } from '@/components/AdetPrimView'
+import { AdetPrimTablosu, BayiMerchHakdis, PrimOdemeListesi, PrimAnalizView } from '@/components/AdetPrimView'
 import { AnalizView } from '@/components/AnalizView'
 import { AdminDashboardView } from '@/components/AdminDashboardView'
 import { DestekPersonelHakedisView } from '@/components/DestekPersonelHakedisView'
 import { TahsilatTakvimiView } from '@/components/TahsilatTakvimiView'
 import { PersonelliNoktaAnalizView } from '@/components/PersonelliNoktaAnalizView'
-type TabType = 'month' | 'week' | 'day' | 'report' | 'personelli-nokta-analiz' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'destek-hakedis' | 'prim-odeme' | 'analiz' | 'tahsilat-planim' | 'tahsilat-takvimi' | 'dashboard'
+type TabType = 'month' | 'week' | 'day' | 'report' | 'personelli-nokta-analiz' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'destek-hakedis' | 'prim-odeme' | 'prim-analiz' | 'analiz' | 'tahsilat-planim' | 'tahsilat-takvimi' | 'dashboard'
 
 // Renk hex'ine alpha ekle
 function hexWithAlpha(hex: string, alpha: string) {
@@ -1522,7 +1522,7 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
           {/* Hedef Ziyaret Noktası Tablosu */}
           {(() => {
             const targetRows = team
-              .filter(p => VISIT_TARGETS[p.full_name] !== undefined && visibleIds.includes(p.id))
+              .filter(p => VISIT_TARGETS[p.full_name] !== undefined && visibleIds.includes(p.id) && (p.role === 'sup' || p.role === 'jr'))
               .map(p => ({
                 profile: p,
                 target: VISIT_TARGETS[p.full_name],
@@ -1701,6 +1701,7 @@ export default function AppPage() {
   const isBsy = currentProfile?.role === 'bsy'
   const isSup = currentProfile?.role === 'sup'
   const isJr  = currentProfile?.role === 'jr'
+  const isIk  = currentProfile?.role === 'ik'
 
   // Süpervizör ve Jr. Süpervizör → sadece Sellout + Noktalarımız
   const isSupOrJr = currentProfile?.role === 'sup' || currentProfile?.role === 'jr'
@@ -1716,6 +1717,7 @@ export default function AppPage() {
     if (!currentProfile) return { primSupervisorFilter: [] as string[], primBsyKod: null as string | null }
     if (currentProfile.role === 'admin') return { primSupervisorFilter: null, primBsyKod: null }
     if (currentProfile.role === 'sup') return { primSupervisorFilter: [currentProfile.full_name], primBsyKod: null }
+    if (currentProfile.role === 'ik')  return { primSupervisorFilter: null, primBsyKod: null }  // IK tüm verileri görür
 if (currentProfile.role === 'bsy') {
       // BSY_NAME_TO_KOD: lowercase isim → kod (KB1, IB1, vb.)
       const bsyKod = BSY_NAME_TO_KOD[currentProfile.full_name.toLocaleLowerCase('tr')] ?? null
@@ -1736,6 +1738,7 @@ if (currentProfile.role === 'bsy') {
     if (!currentProfile || tab !== null) return
 
     if (currentProfile.role === 'manager') setTab('dashboard')
+    else if (currentProfile.role === 'ik') setTab('prim-odeme')
     else if (hasCalendarAccess) setTab('month')
     else if (isSupOrJr) setTab('sellout')
     else if (isBsy) setTab('bsy')
@@ -1946,6 +1949,7 @@ if (currentProfile.role === 'bsy') {
                 </button>
               )}
               {/* Sellout */}
+              {!isIk && (
               <button
                 onClick={() => setTab('sellout')}
                 className={clsx(
@@ -1955,7 +1959,9 @@ if (currentProfile.role === 'bsy') {
               >
                 <TrendingUp size={15} /> Sellout
               </button>
+              )}
               {/* Noktalarımız grubu */}
+              {!isIk && (
               <button
                 onClick={() => { if (!['noktalar','kullanicilar'].includes(tab)) setTab('noktalar') }}
                 className={clsx(
@@ -1965,6 +1971,7 @@ if (currentProfile.role === 'bsy') {
               >
                 <Store size={15} /> Noktalarımız
               </button>
+              )}
 
               {/* Satış Analizi — admin + BSY */}
               {isBsyOrAdmin && (
@@ -1978,19 +1985,31 @@ if (currentProfile.role === 'bsy') {
                   <BarChart2 size={15} /> Analiz
                 </button>
               )}
-              {/* Primler — admin + BSY + Süpervizör */}
-              {(currentProfile?.role === 'admin' || isBsy || isSup) && (
+              {/* Primler — admin + BSY + Süpervizör + İnsan Kaynakları */}
+              {(currentProfile?.role === 'admin' || isBsy || isSup || isIk) && (
                 <button
-                  onClick={() => { if (!['adet-prim','bayi-merch','destek-hakedis','prim-odeme'].includes(tab)) setTab('adet-prim') }}
+                  onClick={() => { if (!['adet-prim','bayi-merch','destek-hakedis','prim-odeme','prim-analiz'].includes(tab)) setTab(isIk ? 'prim-odeme' : 'adet-prim') }}
                   className={clsx(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                    ['adet-prim','bayi-merch','destek-hakedis','prim-odeme'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                    ['adet-prim','bayi-merch','destek-hakedis','prim-odeme','prim-analiz'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
                   )}
                 >
                   <Activity size={15} /> Primler
                 </button>
               )}
               </>
+              )}
+              {/* Primler — manager (sadece Prim Analiz görür) */}
+              {isManager && (
+                <button
+                  onClick={() => { if (tab !== 'prim-analiz') setTab('prim-analiz') }}
+                  className={clsx(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                    tab === 'prim-analiz' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                  )}
+                >
+                  <Activity size={15} /> Primler
+                </button>
               )}
             </div>
 
@@ -2097,13 +2116,14 @@ if (currentProfile.role === 'bsy') {
             </div>
           )}
           {/* Primler alt sekmeleri */}
-          {(currentProfile?.role === 'admin' || isBsy || isSup) && ['adet-prim','bayi-merch','destek-hakedis','prim-odeme'].includes(tab) && (
+          {(currentProfile?.role === 'admin' || isBsy || isSup || isIk || isManager) && ['adet-prim','bayi-merch','destek-hakedis','prim-odeme','prim-analiz'].includes(tab) && (
             <div className="flex overflow-x-auto items-center gap-1 px-3 pb-1.5 scrollbar-none">
               {([
                 { key: 'adet-prim' as const,      label: 'Adet Prim Tablosu',           roles: ['admin','bsy','sup'] },
                 { key: 'bayi-merch' as const,      label: 'Bayi Merch Prim Hakedişleri', roles: ['admin','bsy','sup'] },
                 { key: 'destek-hakedis' as const,  label: 'Destek Personelleri Hakediş', roles: ['admin','sup'] },
-                { key: 'prim-odeme' as const,      label: 'Prim Ödeme Listesi',          roles: ['admin','bsy','sup'] },
+                { key: 'prim-odeme' as const,      label: 'Prim Ödeme Listesi',          roles: ['admin','bsy','sup','ik'] },
+                { key: 'prim-analiz' as const,     label: 'Prim Analiz',                 roles: ['admin','manager'] },
               ] as const).filter(({ roles }) => (roles as readonly string[]).includes(currentProfile?.role ?? '')).map(({ key, label }) => (
                 <button key={key} onClick={() => setTab(key)}
                   className={clsx(
@@ -2274,9 +2294,17 @@ if (currentProfile.role === 'bsy') {
               />
             </div>
           )}
-          {tab === 'prim-odeme' && (currentProfile?.role === 'admin' || isBsy || isSup) && (
+          {tab === 'prim-odeme' && (currentProfile?.role === 'admin' || isBsy || isSup || isIk) && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
               <PrimOdemeListesi
+                supervisorFilter={primSupervisorFilter}
+                bsyKodFilter={primBsyKod}
+              />
+            </div>
+          )}
+          {tab === 'prim-analiz' && (currentProfile?.role === 'admin' || currentProfile?.role === 'manager') && (
+            <div className="flex-1 overflow-auto p-4">
+              <PrimAnalizView
                 supervisorFilter={primSupervisorFilter}
                 bsyKodFilter={primBsyKod}
               />
@@ -2286,7 +2314,7 @@ if (currentProfile.role === 'bsy') {
       )}
 
       {/* FAB — sadece takvim erişimi olan kullanıcılar takvim sekmelerinde görünür */}
-      {hasCalendarAccess && tab !== 'report' && tab !== 'personelli-nokta-analiz' && tab !== 'visits' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && tab !== 'tahsilat-planim' && tab !== 'dashboard' && tab !== 'destek-hakedis' && tab !== 'prim-odeme' && (
+      {hasCalendarAccess && tab !== 'report' && tab !== 'personelli-nokta-analiz' && tab !== 'visits' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && tab !== 'tahsilat-planim' && tab !== 'dashboard' && tab !== 'destek-hakedis' && tab !== 'prim-odeme' && tab !== 'prim-analiz' && (
         <button
           onClick={handleAddTask}
           className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
@@ -2303,6 +2331,7 @@ if (currentProfile.role === 'bsy') {
           currentProfile?.role === 'admin' ? 'grid-cols-9' :
           isBsy                            ? 'grid-cols-8'  :
           isSup                            ? 'grid-cols-5'  :
+          isIk                             ? 'grid-cols-1'  :
                                              'grid-cols-4'
         )}>
           {([
@@ -2315,15 +2344,15 @@ if (currentProfile.role === 'bsy') {
             ...(currentProfile?.role === 'admin' ? [{ key: 'dashboard' as const, icon: BarChart2, label: 'Dashboard' }] : []),
             ...(isBsyOrAdmin ? [{ key: 'bsy'      as const, icon: Target,    label: 'BSY'     }] : []),
             ...(isBsyOrAdmin ? [{ key: 'sellinout' as const, icon: BarChart2, label: 'S.In/Out'}] : []),
-            { key: 'sellout' as const, icon: TrendingUp, label: 'Sellout' },
+            ...(!isIk ? [{ key: 'sellout'  as const, icon: TrendingUp, label: 'Sellout' }] : []),
             ...(isBsyOrAdmin ? [{ key: 'analiz'   as const, icon: BarChart2, label: 'Analiz'  }] : []),
-            { key: 'noktalar' as const, icon: Store, label: 'Noktalar' },
-            ...((currentProfile?.role === 'admin' || isBsy || isSup)
+            ...(!isIk ? [{ key: 'noktalar' as const, icon: Store, label: 'Noktalar' }] : []),
+            ...((currentProfile?.role === 'admin' || isBsy || isSup || isIk)
               ? [{ key: 'adet-prim' as const, icon: Activity, label: 'Primler' }] : []),
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
-              onClick={() => key === 'month' ? (!['month','week','day'].includes(tab) && setTab('month')) : key === 'report' ? (!['report','personelli-nokta-analiz'].includes(tab) && setTab('report')) : setTab(key)}
+              onClick={() => key === 'month' ? (!['month','week','day'].includes(tab) && setTab('month')) : key === 'report' ? (!['report','personelli-nokta-analiz'].includes(tab) && setTab('report')) : key === 'adet-prim' ? setTab(isIk ? 'prim-odeme' : 'adet-prim') : setTab(key)}
               className={clsx(
                 'flex flex-col items-center justify-center gap-0.5 transition-colors',
                 (tab === key ||
@@ -2331,7 +2360,7 @@ if (currentProfile.role === 'bsy') {
                   (key === 'report' && tab === 'personelli-nokta-analiz') ||
                   (key === 'bsy' && ['bsy','kpi','genel-raporlar'].includes(tab)) ||
                   (key === 'noktalar' && tab === 'kullanicilar') ||
-                  (key === 'adet-prim' && ['bayi-merch','destek-personel','destek-hakedis','prim-odeme'].includes(tab)))
+                  (key === 'adet-prim' && ['bayi-merch','destek-personel','destek-hakedis','prim-odeme','prim-analiz'].includes(tab)))
                   ? 'text-brand-500' : 'text-gray-400'
               )}
             >

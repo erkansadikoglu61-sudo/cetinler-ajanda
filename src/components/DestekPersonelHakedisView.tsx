@@ -34,6 +34,7 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
   const [cariFilter, setCariFilter] = useState('')
   const [saveError, setSaveError]   = useState<string | null>(null)
   const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const [focusedKey, setFocusedKey] = useState<string | null>(null)
 
   const rowKey = (r: HakedisRow) =>
     `${r.cari_adi}||${r.sube_adi}||${r.cetinler_merch}||${r.merch_adi}`
@@ -117,6 +118,8 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
       // 1. fullMap: tam key (cari||sube||cetinler||merch) — lowercase eşleşme
       // 2. merchMap: sadece merch_adi — fallback (cari/sube adı değişmişse yedek)
       const nk = (s: string) => (s || '').trim().toLowerCase()
+        .replace(/İ/g, 'i').replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ü/g, 'u')
+        .replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c').replace(/\s+/g, ' ')
       const fullMap  = new Map<string, number>()
       const merchMap = new Map<string, number>()
       for (const h of (hakedisData.rows ?? [])) {
@@ -378,15 +381,20 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
                   <td className="px-3 py-1.5 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={row.hakedis || ''}
-                        placeholder="0.00"
-                        onChange={e => handleHakedisChange(
-                          rows.indexOf(visibleRows[idx]),
-                          e.target.value
-                        )}
+                        type="text"
+                        inputMode="decimal"
+                        value={
+                          focusedKey === rowKey(row)
+                            ? (row.hakedis > 0 ? row.hakedis.toFixed(2) : '')
+                            : (row.hakedis > 0 ? row.hakedis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '')
+                        }
+                        placeholder="0,00"
+                        onFocus={() => setFocusedKey(rowKey(row))}
+                        onBlur={() => setFocusedKey(null)}
+                        onChange={e => {
+                          const raw = e.target.value.replace(/\./g, '').replace(',', '.')
+                          handleHakedisChange(rows.indexOf(visibleRows[idx]), raw)
+                        }}
                         className={clsx(
                           'w-28 text-right px-2 py-0.5 rounded border text-xs font-mono focus:outline-none focus:ring-1 focus:ring-brand-400',
                           row.dirty ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200 bg-white'

@@ -79,8 +79,7 @@ function parseHtmlTable(html: string): SelloutRow[] {
 export async function GET() {
   try {
     const res = await fetch(SOURCE_URL, {
-      // Vercel Data Cache – 30 dakika boyunca önbellekle
-      next: { revalidate: 1800 },
+      next: { revalidate: 1800 }, // 30 dakika
       headers: { Accept: 'text/html,application/xhtml+xml' },
     })
 

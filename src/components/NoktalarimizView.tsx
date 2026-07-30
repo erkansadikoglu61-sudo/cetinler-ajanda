@@ -3,16 +3,24 @@
 import { useMemo, useState, useEffect } from 'react'
 import { Search, X, ChevronRight, RefreshCw, User, Users, ShoppingBag, Store, ChevronDown, Plus, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
-import { useSellout, SelloutRow } from '@/hooks/useSellout'
 import { Profile, BsySupervisor, supabase } from '@/lib/supabase'
 import { normalizeName } from '@/lib/sellout'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
+import { useCallback } from 'react'
 
-// field_personnel'dan gelen Jr atama özeti
-interface FpJrEntry {
-  sube_adi:      string | null
-  cari_adi:      string | null
-  jr_profile_id: string | null
+// export_merch_detay.php'den gelen satır
+interface MerchDetayRow {
+  merch_adi:   string
+  merch_id:    string
+  merch_grubu: string
+  cari_kod:    string
+  cari_adi:    string
+  sube_kod:    string
+  sube_adi:    string
+  bsy_kod:     string
+  bsy_adi:     string
+  sup_adi:     string
+  jr_adi:      string
 }
 
 // field_personnel'dan gelen Destek Personeli
@@ -42,197 +50,111 @@ interface Props {
   bsyLinks:       BsySupervisor[]
 }
 
-// ─── Görünür supervisor adlarını hesapla ───────────────────────
-function visibleSupNames(
+// ─── Merch-detay verilerinden şube listesi üret ────────────────
+function buildSubeListFromDetay(
+  data:           MerchDetayRow[],
   currentProfile: Profile,
   team:           Profile[],
   bsyLinks:       BsySupervisor[],
-): Set<string> {
-  const names = new Set<string>()
-  if (currentProfile.role === 'admin') {
-    team.forEach(p => names.add(normalizeName(p.full_name)))
-    return names
-  }
-  if (currentProfile.role === 'bsy') {
-    // BSY: bsyLinks üzerinden de ekle (fallback)
-    const linkedSupIds = bsyLinks
-      .filter(l => l.bsy_id === currentProfile.id)
-      .map(l => l.sup_id)
-    team.filter(p => linkedSupIds.includes(p.id)).forEach(sup => {
-      names.add(normalizeName(sup.full_name))
-      team.filter(p => p.manager_id === sup.id).forEach(jr => names.add(normalizeName(jr.full_name)))
-    })
-    return names
-  }
-  if (currentProfile.role === 'sup') {
-    names.add(normalizeName(currentProfile.full_name))
-    team.filter(p => p.manager_id === currentProfile.id).forEach(jr => names.add(normalizeName(jr.full_name)))
-    return names
-  }
-  names.add(normalizeName(currentProfile.full_name))
-  return names
-}
-
-// ─── Sellout satırlarından şube listesi üret ───────────────────
-// Güncel strateji: Her şube için EN SON tarihli kaydı kullan
-function buildSubeList(
-  rows:           SelloutRow[],
-  currentProfile: Profile,
-  team:           Profile[],
-  bsyLinks:       BsySupervisor[],
-  fpJrMap:        Map<string, Set<string>>,
   fpDestekMap:    Map<string, string[]>,
 ): SubeItem[] {
-  let visible: SelloutRow[]
+  // Rol bazlı görünürlük filtresi
+  let visible: MerchDetayRow[]
 
-  if (currentProfile.role === 'bsy') {
-    // BSY: sellout verisindeki bsy koduna göre filtrele
-    const bsyKod = BSY_NAME_TO_KOD[currentProfile.full_name.toLocaleLowerCase('tr')] ?? ''
-    visible = bsyKod ? rows.filter(r => r.bsy === bsyKod) : []
+  if (currentProfile.role === 'admin') {
+    visible = data
+  } else if (currentProfile.role === 'bsy') {
+    const bsyKod      = BSY_NAME_TO_KOD[currentProfile.full_name.toLocaleLowerCase('tr')] ?? ''
+    const bsyNameNorm = normalizeName(currentProfile.full_name)
+    visible = data.filter(r => {
+      const rNorm = normalizeName(r.bsy_adi || '')
+      const rKod  = (r.bsy_kod || '').toLowerCase()
+      return rNorm === bsyNameNorm || (bsyKod && rKod === bsyKod.toLowerCase())
+    })
+  } else if (currentProfile.role === 'sup') {
+    const supNorm = normalizeName(currentProfile.full_name)
+    visible = data.filter(r => normalizeName(r.sup_adi) === supNorm)
+  } else if (currentProfile.role === 'jr') {
+    const jrNorm = normalizeName(currentProfile.full_name)
+    visible = data.filter(r => normalizeName(r.jr_adi) === jrNorm)
   } else {
-    const allowedNames = visibleSupNames(currentProfile, team, bsyLinks)
-    visible = rows.filter(r => allowedNames.has(normalizeName(r.supervisor_adi)))
+    visible = []
   }
 
-  const findProfile = (name: string): Profile | undefined =>
-    team.find(p => normalizeName(p.full_name) === normalizeName(name))
-
-  // Tarihi parse et (DONEM veya TARIH)
-  const parseDate = (r: SelloutRow): Date => {
-    // Önce tarih kolonunu dene (DD.MM.YYYY, YYYY-MM-DD, etc.)
-    if (r.tarih) {
-      const tryParse = new Date(r.tarih)
-      if (!isNaN(tryParse.getTime())) return tryParse
-
-      // DD.MM.YYYY formatı
-      if (r.tarih.includes('.')) {
-        const parts = r.tarih.split('.')
-        if (parts.length === 3) {
-          const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]))
-          if (!isNaN(d.getTime())) return d
-        }
-      }
-    }
-
-    // Donem'den parse et (YYYY-MM, MM-YYYY gibi)
-    if (r.donem) {
-      if (r.donem.includes('-')) {
-        const parts = r.donem.split('-')
-        if (parts[0].length === 4) {
-          // YYYY-MM
-          return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1)
-        } else if (parts[1].length === 4) {
-          // MM-YYYY
-          return new Date(parseInt(parts[1]), parseInt(parts[0]) - 1, 1)
-        }
-      }
-    }
-
-    return new Date(0) // Fallback
-  }
-
-  // Her şube için tüm kayıtları grupla
-  const map = new Map<string, SelloutRow[]>()
-
-  visible.forEach(r => {
-    const key = r.sube_kod || `${r.sube_adi}||${r.cari_isim}`
-    if (!map.has(key)) map.set(key, [])
-    map.get(key)!.push(r)
-  })
-
-  // Her şube için en son tarihli kaydı bul ve bilgileri topla
-  const subeData = new Map<string, {
+  // Şube bazında grupla
+  const subeMap = new Map<string, {
     subeAdi:       string
     cariIsim:      string
-    latestRow:     SelloutRow
-    supIds:        Set<string>
+    subeKod:       string
     supNames:      Set<string>
     jrNames:       Set<string>
     cetinlerMerch: Set<string>
     bayiMerch:     Set<string>
+    bsyAdis:       Set<string>
   }>()
 
-  map.forEach((subeRows, key) => {
-    // En son tarihli kaydı bul
-    const sorted = subeRows.sort((a, b) => parseDate(b).getTime() - parseDate(a).getTime())
-    const latestRow = sorted[0]
-
-    const entry = {
-      subeAdi:       latestRow.sube_adi,
-      cariIsim:      latestRow.cari_isim,
-      latestRow,
-      supIds:        new Set<string>(),
-      supNames:      new Set<string>(),
-      jrNames:       new Set<string>(),
-      cetinlerMerch: new Set<string>(),
-      bayiMerch:     new Set<string>(),
+  visible.forEach(r => {
+    const key = `${r.sube_adi}||${r.cari_adi}`
+    if (!subeMap.has(key)) {
+      subeMap.set(key, {
+        subeAdi:       r.sube_adi,
+        cariIsim:      r.cari_adi,
+        subeKod:       r.sube_kod || key,
+        supNames:      new Set(),
+        jrNames:       new Set(),
+        cetinlerMerch: new Set(),
+        bayiMerch:     new Set(),
+        bsyAdis:       new Set(),
+      })
     }
-
-    // Supervisor bilgisi (en son kayıttan)
-    const supProfile = findProfile(latestRow.supervisor_adi)
-    if (supProfile) {
-      if (supProfile.role === 'sup') {
-        entry.supNames.add(supProfile.full_name)
-        entry.supIds.add(supProfile.id)
-      } else if (supProfile.role === 'jr') {
-        // Jr. supervisor_adi olarak görünüyorsa → Jr. Supervisor
-        entry.jrNames.add(supProfile.full_name)
-        // Yöneticisi Sup'u da ekle
-        const manager = team.find(p => p.id === supProfile.manager_id)
-        if (manager) {
-          entry.supNames.add(manager.full_name)
-          entry.supIds.add(manager.id)
-        }
-      }
-    } else if (latestRow.supervisor_adi) {
-      // Profile bulunamadı ama isim var
-      // sv_tipi'ne göre karar ver
-      if (latestRow.sv_tipi && latestRow.sv_tipi.toLowerCase().includes('kıdemli')) {
-        entry.supNames.add(latestRow.supervisor_adi)
-      } else {
-        entry.jrNames.add(latestRow.supervisor_adi)
-      }
-    }
-
-    // Merch bilgisi (en son kayıttan)
-    if (latestRow.merch_personel) {
-      if (latestRow.merch_tipi === 'Çetinler Merch') {
-        entry.cetinlerMerch.add(latestRow.merch_personel)
-      } else if (latestRow.merch_tipi === 'Bayi Merch') {
-        entry.bayiMerch.add(latestRow.merch_personel)
-      }
-    }
-
-    subeData.set(key, entry)
+    const e = subeMap.get(key)!
+    if (r.sup_adi)  e.supNames.add(r.sup_adi)
+    if (r.jr_adi)   e.jrNames.add(r.jr_adi)
+    if (r.bsy_adi)  e.bsyAdis.add(r.bsy_adi)
+    if (r.merch_grubu === 'Çetinler Merch' && r.merch_adi) e.cetinlerMerch.add(r.merch_adi)
+    else if (r.merch_grubu === 'Bayi Merch' && r.merch_adi) e.bayiMerch.add(r.merch_adi)
   })
 
-  return [...subeData.entries()]
-    .map(([subeKod, e]) => {
-      // BSY'leri bul
+  const findProfile = (name: string) =>
+    team.find(p => normalizeName(p.full_name) === normalizeName(name))
+
+  return [...subeMap.values()]
+    .map(e => {
+      const sups = [...e.supNames].map(n =>
+        findProfile(n) ?? { id: '', full_name: n, role: 'sup' as const, color: '#888', manager_id: null, email: null, push_token: null }
+      )
+      const jrs = [...e.jrNames].map(n =>
+        findProfile(n) ?? { id: '', full_name: n, role: 'jr' as const, color: '#888', manager_id: null, email: null, push_token: null }
+      )
+
+      // BSY ID'leri: bsy_adi → profil eşleştirmesi
       const bsyIds: string[] = []
-      e.supIds.forEach(supId => {
-        bsyLinks.filter(l => l.sup_id === supId).forEach(l => {
-          if (!bsyIds.includes(l.bsy_id)) bsyIds.push(l.bsy_id)
-        })
+      e.bsyAdis.forEach(bsyAdi => {
+        const p = team.find(t => t.role === 'bsy' && normalizeName(t.full_name) === normalizeName(bsyAdi))
+        if (p && !bsyIds.includes(p.id)) bsyIds.push(p.id)
       })
+      // Fallback: bsyLinks üzerinden sup'tan bul
+      if (bsyIds.length === 0) {
+        sups.forEach(sup => {
+          if (sup.id) {
+            bsyLinks.filter(l => l.sup_id === sup.id).forEach(l => {
+              if (!bsyIds.includes(l.bsy_id)) bsyIds.push(l.bsy_id)
+            })
+          }
+        })
+      }
 
-      // Jr. Supervisor'ler → PHP'den (en son kayıt)
-      const jrs = [...e.jrNames]
-        .map(name => team.find(p => p.full_name === name) ?? { id: '', full_name: name, role: 'jr', color: '#888', manager_id: null, email: null } as Profile)
-
-      // Destek personeli → field_personnel'dan (bu veri ayrı yönetiliyor)
       const fpKey = e.subeAdi.trim() + '||' + e.cariIsim.trim()
-      const destekPersoneli = fpDestekMap.get(fpKey) ?? []
 
       return {
-        subeKod,
-        subeAdi:          e.subeAdi,
-        cariIsim:         e.cariIsim,
-        sups:             [...e.supNames].map(n => team.find(p => p.full_name === n) ?? { id: '', full_name: n, role: 'sup', color: '#888', manager_id: null, email: null } as Profile),
+        subeKod:         e.subeKod,
+        subeAdi:         e.subeAdi,
+        cariIsim:        e.cariIsim,
+        sups,
         jrs,
-        cetinlerMerch:    [...e.cetinlerMerch].sort(),
-        bayiMerch:        [...e.bayiMerch].sort(),
-        destekPersoneli:  destekPersoneli.sort(),
+        cetinlerMerch:   [...e.cetinlerMerch].sort(),
+        bayiMerch:       [...e.bayiMerch].sort(),
+        destekPersoneli: (fpDestekMap.get(fpKey) ?? []).sort(),
         bsyIds,
       }
     })
@@ -499,27 +421,47 @@ function FilterSelect({
 
 // ─── Ana Bileşen ───────────────────────────────────────────────
 export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
-  const { rows, loading, error, reload } = useSellout(true)
+  const [detayRows,    setDetayRows]    = useState<MerchDetayRow[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [error,        setError]        = useState<string | null>(null)
 
   const [search,       setSearch]       = useState('')
   const [filterTip,   setFilterTip]    = useState('')   // '' | 'cetinler' | 'bayi'
   const [filterMerch, setFilterMerch]  = useState('')   // merch adı
   const [filterBsy,   setFilterBsy]    = useState('')   // bsy profile id
   const [filterSup,   setFilterSup]    = useState('')   // sup profile id
+  const [filterCari,  setFilterCari]   = useState('')   // cari isim
   const [selected,     setSelected]    = useState<SubeItem | null>(null)
   const [importing,    setImporting]   = useState(false)
   const [importMsg,    setImportMsg]   = useState('')
 
-  // ── field_personnel'dan Jr. atamaları yükle ────────────────────
-  const [fpJrEntries,    setFpJrEntries]    = useState<FpJrEntry[]>([])
+  // ── Merch-detay verilerini yükle ───────────────────────────────
+  const reload = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res  = await fetch('/api/merch-detay')
+      const json = await res.json()
+      if (!res.ok) {
+        setError(json.error || 'Veri alınamadı')
+        setDetayRows([])
+      } else {
+        setDetayRows(json.data ?? [])
+      }
+    } catch {
+      setError('Bağlantı hatası')
+      setDetayRows([])
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { reload() }, [reload])
+
+  // ── Destek Personeli Supabase'den yükle ────────────────────────
   const [fpDestekEntries, setFpDestekEntries] = useState<FpDestekEntry[]>([])
   const [fpRefreshKey, setFpRefreshKey] = useState(0)
 
-  const loadFieldPersonnel = () => {
-    supabase
-      .from('field_personnel')
-      .select('sube_adi, cari_adi, jr_profile_id')
-      .then(({ data }) => setFpJrEntries(data ?? []))
+  const loadDestek = () => {
     supabase
       .from('field_personnel')
       .select('sube_adi, cari_adi, merch_adi, merch_grubu')
@@ -527,9 +469,7 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
       .then(({ data }) => setFpDestekEntries(data ?? []))
   }
 
-  useEffect(() => {
-    loadFieldPersonnel()
-  }, [fpRefreshKey])
+  useEffect(() => { loadDestek() }, [fpRefreshKey])
 
   const handleRefresh = () => {
     setFpRefreshKey(k => k + 1)
@@ -567,18 +507,6 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
     }
   }
 
-  // normalize("sube||cari") → Set<jr_profile_id>
-  const fpJrMap = useMemo(() => {
-    const map = new Map<string, Set<string>>()
-    fpJrEntries.forEach(fp => {
-      if (!fp.jr_profile_id) return
-      const key = (fp.sube_adi ?? '').trim() + '||' + (fp.cari_adi ?? '').trim()
-      if (!map.has(key)) map.set(key, new Set())
-      map.get(key)!.add(fp.jr_profile_id)
-    })
-    return map
-  }, [fpJrEntries])
-
   // normalize("sube||cari") → string[] (destek personeli adları)
   const fpDestekMap = useMemo(() => {
     const map = new Map<string, string[]>()
@@ -592,11 +520,11 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
   }, [fpDestekEntries])
 
   // BSY değişince Sup filtresini sıfırla (cascade tutarlılığı)
-  const handleBsyChange = (v: string) => { setFilterBsy(v); setFilterSup('') }
+  const handleBsyChange = (v: string) => { setFilterBsy(v); setFilterSup(''); setFilterCari('') }
 
   const subeList = useMemo(
-    () => buildSubeList(rows, currentProfile, team, bsyLinks, fpJrMap, fpDestekMap),
-    [rows, currentProfile, team, bsyLinks, fpJrMap, fpDestekMap]
+    () => buildSubeListFromDetay(detayRows, currentProfile, team, bsyLinks, fpDestekMap),
+    [detayRows, currentProfile, team, bsyLinks, fpDestekMap]
   )
 
   // BSY listesi
@@ -607,24 +535,11 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
 
   // ── Cascade filtre: her adım bir sonrakinin seçeneklerini daraltır ──
 
-  // 1) BSY filtresi — bsyLinks üzerinden doğrudan hesapla
+  // 1) BSY filtresi
   const afterBsy = useMemo(() => {
     if (!filterBsy) return subeList
-    // Seçili BSY'ye bağlı tüm sup ID'leri
-    const linkedSupIds = new Set(
-      bsyLinks.filter(l => l.bsy_id === filterBsy).map(l => l.sup_id)
-    )
-    // O sup'lara bağlı jr ID'leri
-    const linkedJrIds = new Set(
-      team
-        .filter(p => p.role === 'jr' && p.manager_id && linkedSupIds.has(p.manager_id))
-        .map(p => p.id)
-    )
-    return subeList.filter(s =>
-      s.sups.some(p => p.id && linkedSupIds.has(p.id)) ||
-      s.jrs.some(p => p.id && linkedJrIds.has(p.id))
-    )
-  }, [subeList, filterBsy, bsyLinks, team])
+    return subeList.filter(s => s.bsyIds.includes(filterBsy))
+  }, [subeList, filterBsy])
 
   // Süpervizör seçenekleri — afterBsy içinden dinamik olarak (cascade)
   const supOptions = useMemo(() => {
@@ -669,20 +584,34 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
     )
   }, [afterTip, filterMerch])
 
-  // 4) Metin arama
+  // Cari seçenekleri — mevcut filtreler sonucundan
+  const availableCariNames = useMemo(() => {
+    const s = new Set<string>()
+    afterMerch.forEach(sb => { if (sb.cariIsim) s.add(sb.cariIsim) })
+    return [...s].sort((a, b) => a.localeCompare(b, 'tr'))
+  }, [afterMerch])
+
+  // 4) Cari filtresi
+  const afterCari = useMemo(() => {
+    if (!filterCari) return afterMerch
+    return afterMerch.filter(s => s.cariIsim === filterCari)
+  }, [afterMerch, filterCari])
+
+  // 5) Metin arama
   const filtered = useMemo(() => {
-    if (!search) return afterMerch
+    if (!search) return afterCari
     const q = search.toLowerCase()
-    return afterMerch.filter(s =>
+    return afterCari.filter(s =>
       s.subeAdi.toLowerCase().includes(q) || s.cariIsim.toLowerCase().includes(q)
     )
-  }, [afterMerch, search])
+  }, [afterCari, search])
 
   const isAdminOrBsy = currentProfile.role === 'admin' || currentProfile.role === 'bsy'
 
   const activeFilterCount = [
     filterTip,
     filterMerch,
+    filterCari,
     currentProfile.role === 'admin' ? filterBsy : '',
     isAdminOrBsy ? filterSup : '',
   ].filter(Boolean).length
@@ -784,10 +713,20 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
             />
           )}
 
+          {/* Cari Adı */}
+          {availableCariNames.length > 0 && (
+            <FilterSelect
+              value={filterCari}
+              onChange={setFilterCari}
+              placeholder="Cari"
+              options={availableCariNames.map(n => ({ value: n, label: n }))}
+            />
+          )}
+
           {/* Filtreleri temizle */}
           {activeFilterCount > 0 && (
             <button
-              onClick={() => { setFilterTip(''); setFilterMerch(''); setFilterBsy(''); setFilterSup('') }}
+              onClick={() => { setFilterTip(''); setFilterMerch(''); setFilterBsy(''); setFilterSup(''); setFilterCari('') }}
               className="flex items-center gap-1 text-[11px] text-red-500 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50"
             >
               <X size={11} />

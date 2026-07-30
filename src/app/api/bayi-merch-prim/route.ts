@@ -104,16 +104,23 @@ export async function GET(req: Request) {
   const donemSon = new Date(new Date(nextMonth).getTime() - 86400000)
     .toISOString().slice(0, 10)
 
-  /** Bir satır için prim_ozel'de eşleşen kuralı bul (tarih aralığı kontrolü dahil) */
-  function findOzelRule(stokKodu: string, grupKodu: string, cariAdi: string, subeAdi: string, tarih: string): OzelPrimRow | undefined {
+  const normStr = (s: string) => (s || '').trim().toLowerCase()
+    .replace(/İ/g, 'i').replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ü/g, 'u')
+    .replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c').replace(/\s+/g, ' ')
+
+  /** Bir satır için prim_ozel'de eşleşen kuralı bul (donem bazlı tarih kontrolü) */
+  function findOzelRule(stokKodu: string, grupKodu: string, cariAdi: string, subeAdi: string): OzelPrimRow | undefined {
     for (const rule of ozelPrimRows) {
       const stokOk = !rule.stok_kodu || rule.stok_kodu.some(s => s.toUpperCase() === stokKodu.toUpperCase())
-      const grupOk = !rule.grup_kodu || rule.grup_kodu.some(g => g.toUpperCase() === grupKodu.toUpperCase())
-      const cariOk = !rule.cari_adi  || rule.cari_adi.some(c => c === cariAdi)
-      const subeOk = !rule.sube_adi  || rule.sube_adi.some(s => s === subeAdi)
-      // Tarih aralığı: satış tarihi kural aralığında mı?
-      const basOk = !rule.tarih_baslangic || rule.tarih_baslangic <= tarih
-      const bitOk = !rule.tarih_bitis     || rule.tarih_bitis     >= tarih
+      // Stok kodu belirtilmişse ve eşleşmişse grup kodunu atla
+      const grupOk = !rule.grup_kodu || (rule.stok_kodu?.length ? stokOk : rule.grup_kodu.some(g => g.toUpperCase() === grupKodu.toUpperCase()))
+      const cariOk = !rule.cari_adi  || rule.cari_adi.some(c => normStr(c) === normStr(cariAdi))
+      const subeOk = !rule.sube_adi  || rule.sube_adi.some(s => normStr(s) === normStr(subeAdi))
+      // Tarih aralığı: DONEM (YYYY-MM) bazlı karşılaştırma — PHP tarih formatına bağımsız
+      const ruleFrom = rule.tarih_baslangic ? rule.tarih_baslangic.slice(0, 7) : null
+      const ruleTo   = rule.tarih_bitis     ? rule.tarih_bitis.slice(0, 7)     : null
+      const basOk = !ruleFrom || ruleFrom <= donem
+      const bitOk = !ruleTo   || ruleTo   >= donem
       if (stokOk && grupOk && cariOk && subeOk && basOk && bitOk) return rule
     }
     return undefined
@@ -163,7 +170,7 @@ export async function GET(req: Request) {
     const standardRate = primMap.get(stokKodu) ?? null
 
     // Özel kural varsa uygula
-    const ozelRule = findOzelRule(stokKodu, grupKodu, cells[COL.CARI_ISIM], cells[COL.SUBE_ADI], tarih)
+    const ozelRule = findOzelRule(stokKodu, grupKodu, cells[COL.CARI_ISIM], cells[COL.SUBE_ADI])
     let bayiMerchPrim: number | null
     if (ozelRule) {
       if (ozelRule.prim_carpan != null && standardRate != null) {
