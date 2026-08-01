@@ -1134,19 +1134,20 @@ function CompletedVisitsView({
   tasks: Task[]; team: Profile[]; filterPid: string | null;
 }) {
   const profileMap = new Map(team.map(p => [p.id, p]))
+  const [cariFilter, setCariFilter] = useState('')
 
   // Check-in yapılmış görevler
   const completedVisits = tasks
     .filter(t => t.checkin_ts && (!filterPid || t.pid === filterPid))
-    .sort((a, b) => {
-      const dateA = new Date(a.checkin_ts!)
-      const dateB = new Date(b.checkin_ts!)
-      return dateB.getTime() - dateA.getTime()
-    })
+    .sort((a, b) => new Date(b.checkin_ts!).getTime() - new Date(a.checkin_ts!).getTime())
+
+  const visibleVisits = cariFilter
+    ? completedVisits.filter(t => (t.customer || '').toLowerCase().includes(cariFilter.toLowerCase()))
+    : completedVisits
 
   const exportToExcel = async () => {
     const XLSX = await import('xlsx')
-    const data = completedVisits.map(t => ({
+    const data = visibleVisits.map(t => ({
       'Cari / Şube': t.customer || '—',
       'Ziyaret Tarihi': t.checkin_ts ? format(new Date(t.checkin_ts), 'dd.MM.yyyy HH:mm') : '—',
       'Ziyaret Nedeni': t.type,
@@ -1174,7 +1175,7 @@ function CompletedVisitsView({
     autoTable(doc, {
       startY: 25,
       head: [['Cari / Sube', 'Ziyaret Tarihi', 'Ziyaret Nedeni', 'Check-in Adresi', 'Kisi']],
-      body: completedVisits.map(t => [
+      body: visibleVisits.map(t => [
         t.customer || '-',
         t.checkin_ts ? format(new Date(t.checkin_ts), 'dd.MM.yyyy HH:mm') : '-',
         t.type,
@@ -1213,22 +1214,39 @@ function CompletedVisitsView({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Export butonları */}
-      <div className="flex justify-end gap-2 px-4 py-3 border-b bg-gray-50">
-        <button
-          onClick={exportToExcel}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors"
-        >
-          <FileSpreadsheet size={14} />
-          Excel
-        </button>
-        <button
-          onClick={exportToPDF}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors"
-        >
-          <Download size={14} />
-          PDF
-        </button>
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 px-4 py-3 border-b bg-gray-50 flex-wrap">
+        <input
+          type="text"
+          value={cariFilter}
+          onChange={e => setCariFilter(e.target.value)}
+          placeholder="Cari İsmi ara…"
+          className="pl-2.5 pr-2.5 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-brand-400 w-52"
+        />
+        {cariFilter && (
+          <button onClick={() => setCariFilter('')} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+            <X size={12} />
+          </button>
+        )}
+        {cariFilter && (
+          <span className="text-[10px] text-gray-400">{visibleVisits.length} / {completedVisits.length} satır</span>
+        )}
+        <div className="flex gap-2 ml-auto">
+          <button
+            onClick={exportToExcel}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors"
+          >
+            <FileSpreadsheet size={14} />
+            Excel
+          </button>
+          <button
+            onClick={exportToPDF}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors"
+          >
+            <Download size={14} />
+            PDF
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-x-auto">
@@ -1243,7 +1261,7 @@ function CompletedVisitsView({
           </tr>
         </thead>
         <tbody>
-          {completedVisits.map(t => {
+          {visibleVisits.map(t => {
             const profile = profileMap.get(t.pid)
             return (
               <tr key={t.id} className="border-b hover:bg-gray-50">
