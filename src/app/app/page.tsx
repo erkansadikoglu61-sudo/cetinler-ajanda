@@ -2014,7 +2014,7 @@ if (currentProfile.role === 'bsy') {
             </div>
 
             {/* Ay navigasyon */}
-            {['month','week','day'].includes(tab) && (
+            {['month','week','day','visits'].includes(tab) && (
               <div className="flex items-center gap-1">
                 <button onClick={prevMonth} className="p-2 text-gray-500 min-h-[44px] min-w-[44px] flex items-center justify-center">
                   <ChevronLeft size={18} />
