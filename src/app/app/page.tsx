@@ -121,8 +121,12 @@ function TaskSheet({
   }, [task?.id])
 
   // Şube listesini çek (export_merch_detay.php üzerinden)
-  // Kullanıcının kendi şubeleri en üstte, ardından diğer tüm şubeler —
-  // böylece hiçbir kullanıcı kendine bağlı bir şubeyi kaçırmaz.
+  // Görünürlük giriş yapan kullanıcının hiyerarşisine göre (visibleIds):
+  //   Admin → tüm şubeler
+  //   BSY   → kendi bölgesi (BSY kodu) = kendisi + bağlı sup'lar + onların Jr'ları
+  //   Sup   → kendisi + kendi Jr'larının şubeleri (sup_adi / jr_adi eşleşmesi)
+  //   Jr    → sadece kendi şubeleri (jr_adi eşleşmesi)
+  const visibleKey = visibleIds.join(',')
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
@@ -131,40 +135,44 @@ function TaskSheet({
         const json = await res.json()
         const data: { cari_adi: string; sube_adi: string; bsy_adi: string; bsy_kod: string; sup_adi: string; jr_adi: string }[] = json.data ?? []
 
-        // Tüm benzersiz "CariAdi / ŞubeAdi" kombinasyonları
         const toOpt = (r: { cari_adi: string; sube_adi: string }) =>
           `${r.cari_adi?.trim() || ''} / ${r.sube_adi?.trim() || ''}`
 
-        const selectedProfile = team.find(p => p.id === pid)
-        const nameLower = selectedProfile?.full_name?.trim().toLocaleLowerCase('tr') ?? ''
-        const bsyKod = selectedProfile?.role === 'bsy'
-          ? (BSY_NAME_TO_KOD[nameLower] ?? null)
-          : null
+        const isAdmin = currentProfile.role === 'admin'
 
-        // Kullanıcıya bağlı satır mı? (isim herhangi bir kolonda eşleşiyor veya BSY kodu tutuyor)
-        const isMine = (r: { bsy_adi: string; bsy_kod: string; sup_adi: string; jr_adi: string }) => {
-          if (!selectedProfile || selectedProfile.role === 'admin') return false
-          if (bsyKod && r.bsy_kod?.trim().toUpperCase() === bsyKod.toUpperCase()) return true
+        // Giriş yapan kullanıcının görebildiği kişiler (visibleIds) → isim ve BSY kodu setleri
+        const visibleProfiles = team.filter(p => visibleIds.includes(p.id))
+        const visibleNames = new Set(
+          visibleProfiles.map(p => p.full_name?.trim().toLocaleLowerCase('tr')).filter(Boolean)
+        )
+        const visibleBsyKods = new Set(
+          visibleProfiles
+            .filter(p => p.role === 'bsy')
+            .map(p => BSY_NAME_TO_KOD[p.full_name?.trim().toLocaleLowerCase('tr') ?? ''])
+            .filter(Boolean)
+            .map(k => k.toUpperCase())
+        )
+
+        // Bir şube (merch-detay satırı) giriş yapan kullanıcının hiyerarşisinde mi?
+        const isVisible = (r: { bsy_adi: string; bsy_kod: string; sup_adi: string; jr_adi: string }) => {
+          if (isAdmin) return true
+          const bsyKod = (r.bsy_kod || '').trim().toUpperCase()
+          if (bsyKod && visibleBsyKods.has(bsyKod)) return true
           return (
-            r.bsy_adi?.trim().toLocaleLowerCase('tr') === nameLower ||
-            r.sup_adi?.trim().toLocaleLowerCase('tr') === nameLower ||
-            r.jr_adi?.trim().toLocaleLowerCase('tr')  === nameLower
+            visibleNames.has((r.bsy_adi || '').trim().toLocaleLowerCase('tr')) ||
+            visibleNames.has((r.sup_adi || '').trim().toLocaleLowerCase('tr')) ||
+            visibleNames.has((r.jr_adi  || '').trim().toLocaleLowerCase('tr'))
           )
         }
 
-        const mineSet = new Set<string>()
-        const allSet  = new Set<string>()
+        const set = new Set<string>()
         for (const r of data) {
+          if (!isVisible(r)) continue
           const opt = toOpt(r)
-          if (!opt || opt === ' / ') continue
-          allSet.add(opt)
-          if (isMine(r)) mineSet.add(opt)
+          if (opt && opt !== ' / ') set.add(opt)
         }
 
-        const mine   = [...mineSet].sort((a, b) => a.localeCompare(b, 'tr'))
-        const others = [...allSet].filter(o => !mineSet.has(o)).sort((a, b) => a.localeCompare(b, 'tr'))
-        // Kendi şubeleri üstte, sonra diğer tüm şubeler
-        setCustomerOptions([...mine, ...others])
+        setCustomerOptions([...set].sort((a, b) => a.localeCompare(b, 'tr')))
       } catch (err) {
         console.error('Müşteri listesi yüklenemedi:', err)
         setCustomerOptions([])
@@ -172,7 +180,8 @@ function TaskSheet({
     }
 
     fetchCustomers()
-  }, [pid, team])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProfile.id, currentProfile.role, visibleKey])
 
   // Type değiştiğinde endDate'i sıfırla
   useEffect(() => {
