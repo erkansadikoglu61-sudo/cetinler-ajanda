@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+export const dynamic = 'force-dynamic'
+
+// İstemciyi handler içinde oluştur (build sırasında env yokken hata vermesin)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
 
 // GET - Görseli al
 export async function GET() {
   try {
+    const supabase = getSupabase()
     // Signed URL kullan (1 saat geçerli)
     const { data, error } = await supabase.storage
       .from('bsy-excel')
@@ -27,6 +33,7 @@ export async function GET() {
 // POST - Görsel yükle
 export async function POST(req: NextRequest) {
   try {
+    const supabase = getSupabase()
     const formData = await req.formData()
     const file = formData.get('file') as File
 

@@ -120,53 +120,51 @@ function TaskSheet({
     }
   }, [task?.id])
 
-  // Kullanıcının şubelerini çek (export_merch_detay.php üzerinden)
+  // Şube listesini çek (export_merch_detay.php üzerinden)
+  // Kullanıcının kendi şubeleri en üstte, ardından diğer tüm şubeler —
+  // böylece hiçbir kullanıcı kendine bağlı bir şubeyi kaçırmaz.
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const selectedProfile = team.find(p => p.id === pid)
-        if (!selectedProfile) {
-          setCustomerOptions([])
-          return
-        }
-
         const res = await fetch('/api/merch-detay')
         if (!res.ok) throw new Error('merch-detay API hatası')
         const json = await res.json()
         const data: { cari_adi: string; sube_adi: string; bsy_adi: string; bsy_kod: string; sup_adi: string; jr_adi: string }[] = json.data ?? []
 
-        const name = selectedProfile.full_name?.trim() ?? ''
-        const nameLower = name.toLocaleLowerCase('tr')
+        // Tüm benzersiz "CariAdi / ŞubeAdi" kombinasyonları
+        const toOpt = (r: { cari_adi: string; sube_adi: string }) =>
+          `${r.cari_adi?.trim() || ''} / ${r.sube_adi?.trim() || ''}`
 
-        // Rol bazlı filtreleme
-        let filtered = data
-        if (selectedProfile.role === 'jr') {
-          filtered = data.filter(r => r.jr_adi?.trim().toLocaleLowerCase('tr') === nameLower)
-        } else if (selectedProfile.role === 'sup') {
-          const jrNames = team
-            .filter(p => p.role === 'jr' && p.manager_id === selectedProfile.id)
-            .map(p => p.full_name?.trim().toLocaleLowerCase('tr') ?? '')
-          filtered = data.filter(r =>
+        const selectedProfile = team.find(p => p.id === pid)
+        const nameLower = selectedProfile?.full_name?.trim().toLocaleLowerCase('tr') ?? ''
+        const bsyKod = selectedProfile?.role === 'bsy'
+          ? (BSY_NAME_TO_KOD[nameLower] ?? null)
+          : null
+
+        // Kullanıcıya bağlı satır mı? (isim herhangi bir kolonda eşleşiyor veya BSY kodu tutuyor)
+        const isMine = (r: { bsy_adi: string; bsy_kod: string; sup_adi: string; jr_adi: string }) => {
+          if (!selectedProfile || selectedProfile.role === 'admin') return false
+          if (bsyKod && r.bsy_kod?.trim().toUpperCase() === bsyKod.toUpperCase()) return true
+          return (
+            r.bsy_adi?.trim().toLocaleLowerCase('tr') === nameLower ||
             r.sup_adi?.trim().toLocaleLowerCase('tr') === nameLower ||
-            (r.jr_adi && jrNames.includes(r.jr_adi.trim().toLocaleLowerCase('tr')))
+            r.jr_adi?.trim().toLocaleLowerCase('tr')  === nameLower
           )
-        } else if (selectedProfile.role === 'bsy') {
-          // Önce BSY kodu ile eşleştir (daha güvenilir), yoksa isme göre
-          const bsyKod = BSY_NAME_TO_KOD[nameLower] ?? null
-          if (bsyKod) {
-            filtered = data.filter(r => r.bsy_kod?.trim().toUpperCase() === bsyKod.toUpperCase())
-          } else {
-            filtered = data.filter(r => r.bsy_adi?.trim().toLocaleLowerCase('tr') === nameLower)
-          }
         }
-        // admin → tümü
 
-        // Benzersiz "CariAdi / ŞubeAdi" kombinasyonları
-        const options = [...new Set(
-          filtered.map(r => `${r.cari_adi?.trim() || ''} / ${r.sube_adi?.trim() || ''}`)
-        )].filter(Boolean).sort((a, b) => a.localeCompare(b, 'tr'))
+        const mineSet = new Set<string>()
+        const allSet  = new Set<string>()
+        for (const r of data) {
+          const opt = toOpt(r)
+          if (!opt || opt === ' / ') continue
+          allSet.add(opt)
+          if (isMine(r)) mineSet.add(opt)
+        }
 
-        setCustomerOptions(options)
+        const mine   = [...mineSet].sort((a, b) => a.localeCompare(b, 'tr'))
+        const others = [...allSet].filter(o => !mineSet.has(o)).sort((a, b) => a.localeCompare(b, 'tr'))
+        // Kendi şubeleri üstte, sonra diğer tüm şubeler
+        setCustomerOptions([...mine, ...others])
       } catch (err) {
         console.error('Müşteri listesi yüklenemedi:', err)
         setCustomerOptions([])
@@ -350,18 +348,28 @@ function TaskSheet({
 
           {/* Müşteri */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Müşteri / Şube</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Müşteri / Şube
+              {customerOptions.length > 0 && (
+                <span className="ml-1 text-xs font-normal text-gray-400">
+                  ({customerOptions.length} şube)
+                </span>
+              )}
+            </label>
             <select
-              value={customer}
-              onChange={e => setCustomer(e.target.value)}
+              value={customer && !customerOptions.includes(customer) ? '__mevcut__' : customer}
+              onChange={e => setCustomer(e.target.value === '__mevcut__' ? customer : e.target.value)}
               disabled={!canEdit}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
             >
               <option value="">Seçiniz...</option>
+              {/* Kayıtlı ama listede olmayan mevcut değeri koru */}
+              {customer && !customerOptions.includes(customer) && (
+                <option value="__mevcut__">{customer}</option>
+              )}
               {customerOptions.map((opt, i) => (
                 <option key={i} value={opt}>{opt}</option>
               ))}
-              <option value="Diğer">Diğer (Yeni müşteri)</option>
             </select>
           </div>
 

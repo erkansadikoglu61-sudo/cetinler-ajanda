@@ -56,11 +56,26 @@ export function useTasks(
     const { data, error } = await supabase
       .from('tasks')
       .insert(task)
-      .select()
+      .select('*, creator:profiles!created_by(full_name)')
       .single()
     if (!error && data) {
-      await load()
-      return data as Task
+      const newTask = data as Task
+      // Optimistic: görev, görüntülenen ay aralığındaysa hemen listeye ekle
+      // (kullanıcı kaydettikten sonra takvimde anında görsün, load()'u beklemeden)
+      const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`
+      const endDay = new Date(year, month + 1, 0).getDate()
+      const endDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`
+      if (newTask.date >= startDate && newTask.date <= endDateStr) {
+        setTasks(prev => {
+          if (prev.some(t => t.id === newTask.id)) return prev
+          return [...prev, newTask].sort((a, b) =>
+            a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? '')
+          )
+        })
+      }
+      // Arka planda sunucuyla senkronize et (join'li tam veri için)
+      load()
+      return newTask
     }
     return null
   }
