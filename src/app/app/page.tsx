@@ -1149,17 +1149,18 @@ function escapeHtml(s: string): string {
   return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function VisitsMap({ visits, profileMap }: {
-  visits: Task[]
+interface MapMarker { lat: number; lng: number; kind: 'done' | 'plan'; task: Task }
+
+function VisitsMap({ markers, profileMap, doneCount, planCount }: {
+  markers: MapMarker[]
   profileMap: Map<string, Profile>
+  doneCount: number
+  planCount: number
 }) {
   const mapRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapObj = useRef<any>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-
-  // Koordinatı olan ziyaretler
-  const geoVisits = visits.filter(v => v.checkin_lat != null && v.checkin_lng != null)
 
   useEffect(() => {
     let cancelled = false
@@ -1203,29 +1204,37 @@ function VisitsMap({ visits, profileMap }: {
         }).addTo(map)
 
         const latlngs: [number, number][] = []
-        geoVisits.forEach(v => {
-          const lat = v.checkin_lat as number
-          const lng = v.checkin_lng as number
+        markers.forEach(m => {
+          const v = m.task
+          const isDone = m.kind === 'done'
           const person = profileMap.get(v.pid)?.full_name || '—'
           const parts = (v.customer || '').split(' / ')
           const cari = parts[0]?.trim() || (v.customer || '—')
           const sube = parts.slice(1).join(' / ').trim()
-          const tarih = v.checkin_ts ? format(new Date(v.checkin_ts), 'dd.MM.yyyy HH:mm') : ''
+          const tarih = isDone
+            ? (v.checkin_ts ? format(new Date(v.checkin_ts), 'dd.MM.yyyy HH:mm') : '')
+            : (v.date ? format(new Date(v.date + 'T00:00:00'), 'dd.MM.yyyy') + (v.time ? ' ' + v.time : '') : '')
 
-          const marker = L.circleMarker([lat, lng], {
-            radius: 7, color: '#166534', fillColor: '#22c55e', fillOpacity: 0.9, weight: 2,
-          }).addTo(map)
+          const marker = L.circleMarker([m.lat, m.lng], isDone
+            ? { radius: 7, color: '#166534', fillColor: '#22c55e', fillOpacity: 0.9, weight: 2 }
+            : { radius: 7, color: '#991b1b', fillColor: '#ef4444', fillOpacity: 0.9, weight: 2 }
+          ).addTo(map)
+
+          const durum = isDone
+            ? '<span style="color:#166534;font-weight:600">● Gerçekleşen</span>'
+            : '<span style="color:#991b1b;font-weight:600">● Planlanan</span>'
 
           marker.bindPopup(
             `<div style="font-size:12px;line-height:1.55;min-width:180px">
+              <div style="margin-bottom:3px">${durum}</div>
               <div style="font-weight:700;color:#111;margin-bottom:2px">${escapeHtml(cari)}</div>
               ${sube ? `<div><span style="color:#888">Şube:</span> ${escapeHtml(sube)}</div>` : ''}
               <div><span style="color:#888">Ziyaret eden:</span> <b>${escapeHtml(person)}</b></div>
               ${v.type ? `<div><span style="color:#888">Neden:</span> ${escapeHtml(v.type)}</div>` : ''}
-              ${tarih ? `<div style="color:#888;margin-top:2px">${tarih}</div>` : ''}
+              ${tarih ? `<div style="color:#888;margin-top:2px">${isDone ? '' : 'Plan: '}${tarih}</div>` : ''}
             </div>`
           )
-          latlngs.push([lat, lng])
+          latlngs.push([m.lat, m.lng])
         })
 
         if (latlngs.length > 0) {
@@ -1245,7 +1254,7 @@ function VisitsMap({ visits, profileMap }: {
       if (mapObj.current) { mapObj.current.remove(); mapObj.current = null }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visits])
+  }, [markers])
 
   return (
     <div className="relative flex-1 min-h-[500px]">
@@ -1261,9 +1270,22 @@ function VisitsMap({ visits, profileMap }: {
         </div>
       )}
       {status === 'ready' && (
-        <div className="absolute bottom-2 left-2 z-10 bg-white/90 border border-gray-200 rounded-lg px-2.5 py-1 text-[10px] text-gray-600 shadow-sm">
-          {geoVisits.length} konumlu ziyaret · {visits.length - geoVisits.length} konumsuz
-        </div>
+        <>
+          {/* Lejant */}
+          <div className="absolute top-2 right-2 z-10 bg-white/95 border border-gray-200 rounded-lg px-3 py-2 text-[11px] shadow-sm space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500 border border-green-800" />
+              <span className="text-gray-700">Gerçekleşen ({doneCount})</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 border border-red-800" />
+              <span className="text-gray-700">Planlanan ({planCount})</span>
+            </div>
+          </div>
+          <div className="absolute bottom-2 left-2 z-10 bg-white/90 border border-gray-200 rounded-lg px-2.5 py-1 text-[10px] text-gray-600 shadow-sm">
+            Haritada {markers.length} nokta gösteriliyor
+          </div>
+        </>
       )}
     </div>
   )
@@ -1289,6 +1311,44 @@ function CompletedVisitsView({
   const visibleVisits = cariFilter
     ? completedVisits.filter(t => (t.customer || '').toLowerCase().includes(cariFilter.toLowerCase()))
     : completedVisits
+
+  // ── Harita için: cari/şube → koordinat havuzu (tüm check-in'lerden) ──
+  const customerCoords = useMemo(() => {
+    const m = new Map<string, [number, number]>()
+    tasks.forEach(t => {
+      if (t.checkin_lat != null && t.checkin_lng != null && t.customer && !m.has(t.customer)) {
+        m.set(t.customer, [t.checkin_lat, t.checkin_lng])
+      }
+    })
+    return m
+  }, [tasks])
+
+  // Planlanan = check-in yapılmamış, müşterisi olan görevler (filtreye uyan)
+  const plannedFiltered = useMemo(() => {
+    return tasks.filter(t =>
+      !t.checkin_ts && t.customer &&
+      (!filterPid || t.pid === filterPid) &&
+      (!cariFilter || (t.customer || '').toLowerCase().includes(cariFilter.toLowerCase()))
+    )
+  }, [tasks, filterPid, cariFilter])
+
+  // Harita markerları: yeşil (gerçekleşen) + kırmızı (planlanan, cari konumundan)
+  const mapMarkers = useMemo<MapMarker[]>(() => {
+    const out: MapMarker[] = []
+    visibleVisits.forEach(t => {
+      if (t.checkin_lat != null && t.checkin_lng != null) {
+        out.push({ lat: t.checkin_lat, lng: t.checkin_lng, kind: 'done', task: t })
+      }
+    })
+    plannedFiltered.forEach(t => {
+      const c = customerCoords.get(t.customer!)
+      if (c) out.push({ lat: c[0], lng: c[1], kind: 'plan', task: t })
+    })
+    return out
+  }, [visibleVisits, plannedFiltered, customerCoords])
+
+  const doneCount = mapMarkers.filter(m => m.kind === 'done').length
+  const planCount = mapMarkers.filter(m => m.kind === 'plan').length
 
   const exportToExcel = async () => {
     const XLSX = await import('xlsx')
@@ -1414,7 +1474,7 @@ function CompletedVisitsView({
       </div>
 
       {viewMode === 'harita' ? (
-        <VisitsMap visits={visibleVisits} profileMap={profileMap} />
+        <VisitsMap markers={mapMarkers} profileMap={profileMap} doneCount={doneCount} planCount={planCount} />
       ) : (
       <div className="flex-1 overflow-x-auto">
       <table className="w-full text-sm border-collapse">
