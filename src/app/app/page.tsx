@@ -138,31 +138,45 @@ function TaskSheet({
         const toOpt = (r: { cari_adi: string; sube_adi: string }) =>
           `${r.cari_adi?.trim() || ''} / ${r.sube_adi?.trim() || ''}`
 
-        const isAdmin = currentProfile.role === 'admin'
+        // ── Rol bazlı NET filtre (yetki hiyerarşisi) ──
+        const role = currentProfile.role
+        const norm = (s: string) => (s || '').trim().toLocaleLowerCase('tr')
+        const myName = norm(currentProfile.full_name)
 
-        // Giriş yapan kullanıcının görebildiği kişiler (visibleIds) → isim ve BSY kodu setleri
-        const visibleProfiles = team.filter(p => visibleIds.includes(p.id))
-        const visibleNames = new Set(
-          visibleProfiles.map(p => p.full_name?.trim().toLocaleLowerCase('tr')).filter(Boolean)
-        )
-        const visibleBsyKods = new Set(
-          visibleProfiles
-            .filter(p => p.role === 'bsy')
-            .map(p => BSY_NAME_TO_KOD[p.full_name?.trim().toLocaleLowerCase('tr') ?? ''])
-            .filter(Boolean)
-            .map(k => k.toUpperCase())
-        )
+        // BSY ise kendi BSY kodu
+        const myBsyKod = role === 'bsy' ? (BSY_NAME_TO_KOD[myName] ?? null) : null
 
-        // Bir şube (merch-detay satırı) giriş yapan kullanıcının hiyerarşisinde mi?
+        // Süpervizör ise kendi Jr'larının isimleri (kendisi + Jr'larının carilerini görür)
+        const myJrNames = role === 'sup'
+          ? new Set(
+              team
+                .filter(p => p.role === 'jr' && p.manager_id === currentProfile.id)
+                .map(p => norm(p.full_name))
+                .filter(Boolean)
+            )
+          : new Set<string>()
+
         const isVisible = (r: { bsy_adi: string; bsy_kod: string; sup_adi: string; jr_adi: string }) => {
-          if (isAdmin) return true
-          const bsyKod = (r.bsy_kod || '').trim().toUpperCase()
-          if (bsyKod && visibleBsyKods.has(bsyKod)) return true
-          return (
-            visibleNames.has((r.bsy_adi || '').trim().toLocaleLowerCase('tr')) ||
-            visibleNames.has((r.sup_adi || '').trim().toLocaleLowerCase('tr')) ||
-            visibleNames.has((r.jr_adi  || '').trim().toLocaleLowerCase('tr'))
-          )
+          if (role === 'admin') return true
+
+          // BSY → SADECE BSY'si kendisi olan cariler (bsy_kod eşleşmesi)
+          if (role === 'bsy') {
+            if (myBsyKod) return (r.bsy_kod || '').trim().toUpperCase() === myBsyKod.toUpperCase()
+            // Kod bulunamazsa isimle yedek eşleşme
+            return norm(r.bsy_adi) === myName
+          }
+
+          // Süpervizör → kendi carileri + kendi Jr'larının carileri
+          if (role === 'sup') {
+            return norm(r.sup_adi) === myName || (r.jr_adi ? myJrNames.has(norm(r.jr_adi)) : false)
+          }
+
+          // Jr → yalnızca kendi carileri
+          if (role === 'jr') {
+            return norm(r.jr_adi) === myName
+          }
+
+          return false
         }
 
         const set = new Set<string>()
