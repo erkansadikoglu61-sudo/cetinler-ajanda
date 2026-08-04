@@ -130,8 +130,8 @@ function TaskSheet({
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const res = await fetch('/api/merch-detay')
-        if (!res.ok) throw new Error('merch-detay API hatası')
+        const res = await fetch('/api/bsy-cari-sube')
+        if (!res.ok) throw new Error('bsy-cari-sube API hatası')
         const json = await res.json()
         const data: { cari_adi: string; sube_adi: string; bsy_adi: string; bsy_kod: string; sup_adi: string; jr_adi: string }[] = json.data ?? []
 
