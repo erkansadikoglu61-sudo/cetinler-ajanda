@@ -1143,6 +1143,133 @@ function DayView({
 }
 
 // ─────────────────────────────────────────────────────
+// ZİYARET HARİTASI (Leaflet — CDN üzerinden dinamik yüklenir)
+// ─────────────────────────────────────────────────────
+function escapeHtml(s: string): string {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function VisitsMap({ visits, profileMap }: {
+  visits: Task[]
+  profileMap: Map<string, Profile>
+}) {
+  const mapRef = useRef<HTMLDivElement>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mapObj = useRef<any>(null)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+
+  // Koordinatı olan ziyaretler
+  const geoVisits = visits.filter(v => v.checkin_lat != null && v.checkin_lng != null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function ensureLeaflet(): Promise<void> {
+      // CSS
+      if (!document.getElementById('leaflet-css')) {
+        const link = document.createElement('link')
+        link.id = 'leaflet-css'
+        link.rel = 'stylesheet'
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+        document.head.appendChild(link)
+      }
+      // JS
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (!(window as any).L) {
+        await new Promise<void>((resolve, reject) => {
+          const s = document.createElement('script')
+          s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+          s.onload = () => resolve()
+          s.onerror = () => reject(new Error('Leaflet yüklenemedi'))
+          document.head.appendChild(s)
+        })
+      }
+    }
+
+    async function initMap() {
+      try {
+        await ensureLeaflet()
+        if (cancelled || !mapRef.current) return
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const L = (window as any).L
+
+        if (mapObj.current) { mapObj.current.remove(); mapObj.current = null }
+        const map = L.map(mapRef.current, { scrollWheelZoom: true }).setView([39.0, 35.0], 6)
+        mapObj.current = map
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap katkıcıları',
+          maxZoom: 19,
+        }).addTo(map)
+
+        const latlngs: [number, number][] = []
+        geoVisits.forEach(v => {
+          const lat = v.checkin_lat as number
+          const lng = v.checkin_lng as number
+          const person = profileMap.get(v.pid)?.full_name || '—'
+          const parts = (v.customer || '').split(' / ')
+          const cari = parts[0]?.trim() || (v.customer || '—')
+          const sube = parts.slice(1).join(' / ').trim()
+          const tarih = v.checkin_ts ? format(new Date(v.checkin_ts), 'dd.MM.yyyy HH:mm') : ''
+
+          const marker = L.circleMarker([lat, lng], {
+            radius: 7, color: '#166534', fillColor: '#22c55e', fillOpacity: 0.9, weight: 2,
+          }).addTo(map)
+
+          marker.bindPopup(
+            `<div style="font-size:12px;line-height:1.55;min-width:180px">
+              <div style="font-weight:700;color:#111;margin-bottom:2px">${escapeHtml(cari)}</div>
+              ${sube ? `<div><span style="color:#888">Şube:</span> ${escapeHtml(sube)}</div>` : ''}
+              <div><span style="color:#888">Ziyaret eden:</span> <b>${escapeHtml(person)}</b></div>
+              ${v.type ? `<div><span style="color:#888">Neden:</span> ${escapeHtml(v.type)}</div>` : ''}
+              ${tarih ? `<div style="color:#888;margin-top:2px">${tarih}</div>` : ''}
+            </div>`
+          )
+          latlngs.push([lat, lng])
+        })
+
+        if (latlngs.length > 0) {
+          map.fitBounds(latlngs, { padding: [40, 40], maxZoom: 13 })
+        }
+        // Harita konteyneri sonradan boyutlandıysa yeniden hesapla
+        setTimeout(() => { if (!cancelled && mapObj.current) mapObj.current.invalidateSize() }, 200)
+        if (!cancelled) setStatus('ready')
+      } catch {
+        if (!cancelled) setStatus('error')
+      }
+    }
+
+    initMap()
+    return () => {
+      cancelled = true
+      if (mapObj.current) { mapObj.current.remove(); mapObj.current = null }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visits])
+
+  return (
+    <div className="relative flex-1 min-h-[500px]">
+      <div ref={mapRef} className="absolute inset-0 z-0" />
+      {status === 'loading' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/70 z-10 text-xs text-gray-500">
+          <RefreshCw size={14} className="animate-spin mr-2" /> Harita yükleniyor…
+        </div>
+      )}
+      {status === 'error' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/70 z-10 text-xs text-red-500">
+          Harita yüklenemedi (internet bağlantısını kontrol edin).
+        </div>
+      )}
+      {status === 'ready' && (
+        <div className="absolute bottom-2 left-2 z-10 bg-white/90 border border-gray-200 rounded-lg px-2.5 py-1 text-[10px] text-gray-600 shadow-sm">
+          {geoVisits.length} konumlu ziyaret · {visits.length - geoVisits.length} konumsuz
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────
 // GERÇEKLEŞEN ZİYARETLER
 // ─────────────────────────────────────────────────────
 function CompletedVisitsView({
@@ -1152,6 +1279,7 @@ function CompletedVisitsView({
 }) {
   const profileMap = new Map(team.map(p => [p.id, p]))
   const [cariFilter, setCariFilter] = useState('')
+  const [viewMode, setViewMode] = useState<'liste' | 'harita'>('liste')
 
   // Check-in yapılmış görevler
   const completedVisits = tasks
@@ -1248,7 +1376,26 @@ function CompletedVisitsView({
         {cariFilter && (
           <span className="text-[10px] text-gray-400">{visibleVisits.length} / {completedVisits.length} satır</span>
         )}
-        <div className="flex gap-2 ml-auto">
+
+        {/* Liste / Harita geçişi */}
+        <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5 ml-auto">
+          <button
+            onClick={() => setViewMode('liste')}
+            className={clsx('px-3 py-1 rounded-md text-xs font-medium transition-colors',
+              viewMode === 'liste' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
+          >
+            Liste
+          </button>
+          <button
+            onClick={() => setViewMode('harita')}
+            className={clsx('flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-colors',
+              viewMode === 'harita' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
+          >
+            <MapPin size={12} /> Harita Gör
+          </button>
+        </div>
+
+        <div className="flex gap-2">
           <button
             onClick={exportToExcel}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors"
@@ -1266,6 +1413,9 @@ function CompletedVisitsView({
         </div>
       </div>
 
+      {viewMode === 'harita' ? (
+        <VisitsMap visits={visibleVisits} profileMap={profileMap} />
+      ) : (
       <div className="flex-1 overflow-x-auto">
       <table className="w-full text-sm border-collapse">
         <thead className="bg-gray-50 sticky top-0">
@@ -1303,6 +1453,7 @@ function CompletedVisitsView({
         </tbody>
       </table>
       </div>
+      )}
     </div>
   )
 }
