@@ -6,7 +6,7 @@ import {
   Menu, ChevronLeft, ChevronRight, BarChart2, Plus, X, Trash2,
   MapPin, MessageSquare, Calendar, CalendarDays, CalendarRange,
   FileText, LogOut, Check, TrendingUp, Target, Activity, Store, Users,
-  Download, FileSpreadsheet
+  Download, FileSpreadsheet, RefreshCw
 } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, isToday } from 'date-fns'
 import { tr } from 'date-fns/locale'
@@ -1468,11 +1468,18 @@ const VISIT_TARGETS: Record<string, number> = {
   'Pınar Güler':      60,
 }
 
-function StatsSheet({ tasks, team, visibleIds, onClose }: {
-  tasks: Task[]; team: Profile[]; visibleIds: string[]; onClose: () => void;
+function StatsSheet({ team, visibleIds, initialYear, initialMonth, onClose }: {
+  team: Profile[]; visibleIds: string[]; initialYear: number; initialMonth: number; onClose: () => void;
 }) {
   const [activeFilter, setActiveFilter] = useState<string | null>(null)
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
+
+  // Modal kendi ay/yıl seçimini tutar ve o döneme ait veriyi kendisi çeker
+  const now = new Date()
+  const [statYear, setStatYear]   = useState(initialYear)
+  const [statMonth, setStatMonth] = useState(initialMonth)
+  const { tasks, loading: statLoading } = useTasks(visibleIds, statYear, statMonth)
+  const yearOptions = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]
 
   const visibleTasks = tasks.filter(t => visibleIds.includes(t.pid))
   const checkinTasks = visibleTasks.filter(t => t.checkin_ts)
@@ -1503,10 +1510,29 @@ function StatsSheet({ tasks, team, visibleIds, onClose }: {
         <div className="sticky top-0 bg-white pt-3 pb-2 z-10 border-b border-gray-100">
           <div className="w-8 h-1 bg-gray-200 rounded-full mx-auto mb-2 md:hidden" />
           <div className="flex items-center justify-between px-4">
-            <h2 className="font-semibold text-base">İstatistikler</h2>
-            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-              <X size={18} />
-            </button>
+            <div className="flex items-center gap-2">
+              <h2 className="font-semibold text-base">İstatistikler</h2>
+              {statLoading && <RefreshCw size={13} className="animate-spin text-gray-400" />}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <select
+                value={statMonth}
+                onChange={e => setStatMonth(Number(e.target.value))}
+                className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:border-brand-400"
+              >
+                {MONTHS_TR.map((m, i) => <option key={i} value={i}>{m}</option>)}
+              </select>
+              <select
+                value={statYear}
+                onChange={e => setStatYear(Number(e.target.value))}
+                className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:border-brand-400"
+              >
+                {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+                <X size={18} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -2054,14 +2080,13 @@ if (currentProfile.role === 'bsy') {
               </div>
             )}
 
-            {currentProfile?.role === 'admin' && (
-              <button
-                onClick={() => setShowStats(true)}
-                className="p-2 text-gray-600 min-h-[44px] min-w-[44px] flex items-center justify-center"
-              >
-                <BarChart2 size={20} />
-              </button>
-            )}
+            <button
+              onClick={() => setShowStats(true)}
+              className="p-2 text-gray-600 min-h-[44px] min-w-[44px] flex items-center justify-center"
+              title="İstatistikler"
+            >
+              <BarChart2 size={20} />
+            </button>
 
             {/* Kullanıcı adı ve çıkış - sağ üst köşe */}
             <div className="ml-auto flex items-center gap-2 pl-3 border-l">
@@ -2421,9 +2446,10 @@ if (currentProfile.role === 'bsy') {
 
       {showStats && (
         <StatsSheet
-          tasks={tasks}
           team={team}
           visibleIds={ids}
+          initialYear={year}
+          initialMonth={month}
           onClose={() => setShowStats(false)}
         />
       )}
