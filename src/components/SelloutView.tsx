@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
-import { RefreshCw, X, Save, Target, ChevronDown } from 'lucide-react'
+import { RefreshCw, X, Save, Target, ChevronDown, FileDown } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import clsx from 'clsx'
 
 import { useSellout } from '@/hooks/useSellout'
@@ -681,6 +682,63 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     return map
   }, [merchHedefData, periodRows])
 
+  // ── Satışlar tablosunu Excel'e aktar ──
+  const exportSatislarExcel = useCallback(() => {
+    const headers = [
+      'Merch Personel', 'Cari', 'Şube', 'Stok Adı', 'Stok Kodu', 'Grup/Kategori',
+      'Satılan Adet', 'Süpervizör', 'Merch Tipi', 'BSY',
+      'Bayi Merch Adet Primi', 'Bayi Merch Prim Hakedişi',
+      'Destek Per. Adet Primi', 'Çet. Merch Kat. Gerç. %', 'Çet. Merch Gerç.Oranına Göre Prim',
+    ]
+
+    const aoa: (string | number)[][] = [headers]
+
+    for (const row of satislarRows) {
+      const primData = adetPrimMap.get(row.stok_kodu || '') || { bayiMerch: 0, kosulluDestek: 0, kategori: '' }
+      const satisAdedi = row.satilan_adet || 0
+
+      const bayiMerchPrimAdet = row.merch_tipi === 'Bayi Merch'
+        ? getEffectiveBayiMerch(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '')
+        : primData.bayiMerch
+      const bayiMerchHakedis = bayiMerchPrimAdet * satisAdedi
+
+      const destekVarMi = row.merch_tipi === 'Çetinler Merch' && !!destekFlags[row.merch_personel || '']
+      const destekPrimAdet = destekVarMi ? primData.kosulluDestek : 0
+
+      const merchKey = (row.merch_personel || '').toLowerCase()
+      const kategoriRaw = row.grup_aciklama || ''
+      const kategoriNormalized = GRUP_NORMALIZE[kategoriRaw] || kategoriRaw
+      const cetinlerMerchGercOran = merchKategoriPerformans.get(merchKey)?.get(kategoriNormalized)?.oran || 0
+
+      const cetinlerMerchPrim = destekPrimAdet > 0
+        ? (cetinlerMerchGercOran >= 100
+            ? destekPrimAdet * satisAdedi
+            : (cetinlerMerchGercOran / 100) * destekPrimAdet * satisAdedi)
+        : 0
+
+      const r2 = (n: number) => Math.round(n * 100) / 100
+
+      aoa.push([
+        row.merch_personel || '', row.cari_isim || '', row.sube_adi || '',
+        row.stok_adi || '', row.stok_kodu || '', row.grup_aciklama || '',
+        satisAdedi, row.supervisor_adi || '', row.merch_tipi || '', row.bsy || '',
+        r2(bayiMerchPrimAdet), r2(bayiMerchHakedis),
+        r2(destekPrimAdet), r2(cetinlerMerchGercOran), r2(cetinlerMerchPrim),
+      ])
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    // Kolon genişlikleri
+    ws['!cols'] = [
+      { wch: 18 }, { wch: 34 }, { wch: 16 }, { wch: 34 }, { wch: 12 }, { wch: 18 },
+      { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 8 },
+      { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 22 },
+    ]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Satışlar')
+    XLSX.writeFile(wb, `Satislar_${donem}.xlsx`)
+  }, [satislarRows, adetPrimMap, getEffectiveBayiMerch, destekFlags, merchKategoriPerformans, donem])
+
   // Filtre: MERCH_TIPI === 'Çetinler Merch' olan satırlardan unique kişi listesi
   // Sadece seçili dönemde satışı olan kişiler (toplam satış > 0)
   const uniqueMerch = useMemo(() => {
@@ -1136,7 +1194,15 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                     <button onClick={() => { setSatMerchTipi(''); setSatMerch(''); setSatCari('') }}
                       className="text-xs text-gray-400 hover:text-gray-600 underline">Sıfırla</button>
                   )}
-                  <span className="ml-auto text-[10px] text-gray-400">{satislarRows.length.toLocaleString('tr-TR')} kayıt</span>
+                  <button
+                    onClick={exportSatislarExcel}
+                    disabled={satislarRows.length === 0}
+                    className="ml-auto flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Görünen satışları Excel'e aktar"
+                  >
+                    <FileDown size={13} /> Excel'e Aktar
+                  </button>
+                  <span className="text-[10px] text-gray-400">{satislarRows.length.toLocaleString('tr-TR')} kayıt</span>
                 </div>
               )
             })()}
