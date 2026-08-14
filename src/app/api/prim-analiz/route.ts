@@ -6,19 +6,20 @@ export const maxDuration = 30
 
 const MERCH_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
 
+// PHP'ye SUBE_IL[3] ve SUBE_ILCE[4] eklendi → kolon 3+ hepsi +2 kaydı
 const COL = {
   MERCH_PERSONEL: 0,
   CARI_ISIM:      1,
   SUBE_ADI:       2,
-  STOK_ADI:       3,
-  STOK_KODU:      4,
-  SATILAN_ADET:   6,
-  GRUP_KODU:      7,
-  SUPERVISOR_ADI: 9,
-  DONEM:          12,
-  TARIH:          13,
-  MERCH_TIPI:     14,
-  BSY_KOD:        16,
+  STOK_ADI:       5,
+  STOK_KODU:      6,
+  SATILAN_ADET:   8,
+  GRUP_KODU:      9,
+  SUPERVISOR_ADI: 11,
+  DONEM:          14,
+  TARIH:          15,
+  MERCH_TIPI:     16,
+  BSY_KOD:        18,
 } as const
 
 function decodeHtml(s: string): string {
@@ -125,7 +126,7 @@ export async function GET(req: Request) {
     let m: RegExpExecArray | null
     tdRe.lastIndex = 0
     while ((m = tdRe.exec(part)) !== null) cells.push(decodeHtml(m[1]))
-    if (cells.length < 15) continue
+    if (cells.length < 17) continue
     if (cells[COL.DONEM] !== donem) continue
     if (cells[COL.MERCH_TIPI] !== 'Bayi Merch') continue
 

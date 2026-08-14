@@ -50,26 +50,31 @@ function parseHtmlTable(html: string): SelloutRow[] {
       (m) => decodeHtmlEntities(m[1].replace(/<[^>]+>/g, '')).trim()
     )
 
-    if (cells.length < 15) continue
+    if (cells.length < 17) continue
 
+    // PHP kolon sırası (SUBE_IL[3] ve SUBE_ILCE[4] sonradan eklendi):
+    // 0 MERCH_PERSONEL, 1 CARI_ISIM, 2 SUBE_ADI, 3 SUBE_IL, 4 SUBE_ILCE,
+    // 5 STOK_ADI, 6 STOK_KODU, 7 GRUP_ACIKLAMA, 8 SATILAN_ADET, 9 GRUP_KODU,
+    // 10 BEKLENEN_CIRO, 11 SUPERVISOR_ADI, 12 CARI_KOD, 13 SUBE_KOD,
+    // 14 DONEM, 15 TARIH, 16 MERCH_TIPI, 17 SV_TIPI, 18 BSY
     rows.push({
       merch_personel: cells[0],
       cari_isim:      cells[1],
       sube_adi:       cells[2],
-      stok_adi:       cells[3],
-      stok_kodu:      cells[4],
-      grup_aciklama:  cells[5],
-      satilan_adet:   parseInt(cells[6]) || 0,
-      grup_kodu:      cells[7],
-      beklened_ciro:  parseFloat(cells[8].replace(',', '.')) || 0,
-      supervisor_adi: cells[9],
-      cari_kod:       cells[10],
-      sube_kod:       cells[11],
-      donem:          cells[12],
-      tarih:          cells[13],
-      merch_tipi:     cells[14],
-      sv_tipi:        cells[15] ?? '',
-      bsy:            cells[16] ?? '',
+      stok_adi:       cells[5],
+      stok_kodu:      cells[6],
+      grup_aciklama:  cells[7],
+      satilan_adet:   parseInt(cells[8]) || 0,
+      grup_kodu:      cells[9],
+      beklened_ciro:  parseFloat((cells[10] ?? '').replace(',', '.')) || 0,
+      supervisor_adi: cells[11],
+      cari_kod:       cells[12],
+      sube_kod:       cells[13],
+      donem:          cells[14],
+      tarih:          cells[15],
+      merch_tipi:     cells[16],
+      sv_tipi:        cells[17] ?? '',
+      bsy:            cells[18] ?? '',
     })
   }
 

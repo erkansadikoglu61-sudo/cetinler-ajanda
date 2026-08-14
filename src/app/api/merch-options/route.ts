@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 
 const MERCH_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
 
-const COL = { CARI_ISIM: 1, SUBE_ADI: 2, STOK_KODU: 4, GRUP_KODU: 7, MERCH_TIPI: 14 }
+// PHP'ye SUBE_IL[3] ve SUBE_ILCE[4] eklendi → kolon 3+ hepsi +2 kaydı
+const COL = { CARI_ISIM: 1, SUBE_ADI: 2, STOK_KODU: 6, GRUP_KODU: 9, MERCH_TIPI: 16 }
 
 function decodeHtml(s: string): string {
   return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g,' ').trim()
@@ -33,7 +34,7 @@ export async function GET() {
     let m: RegExpExecArray | null
     tdRe.lastIndex = 0
     while ((m = tdRe.exec(part)) !== null) cells.push(decodeHtml(m[1]))
-    if (cells.length < 15) continue
+    if (cells.length < 17) continue
     if (cells[COL.MERCH_TIPI] !== 'Bayi Merch') continue
     if (cells[COL.CARI_ISIM]) cariSet.add(cells[COL.CARI_ISIM])
     if (cells[COL.SUBE_ADI])  subeSet.add(cells[COL.SUBE_ADI])
