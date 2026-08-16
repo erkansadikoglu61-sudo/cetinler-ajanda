@@ -71,22 +71,45 @@ interface TahsilatData {
   tahsilatTuru?: string
 }
 
+interface GerceklesenTahsilat {
+  bankaKK: number
+  cekSenet: number
+  toplam: number
+}
+
 export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<TahsilatData[]>([])
   const [haftalar] = useState(getHaftaSecenekleri())
+  const [gerceklesen, setGerceklesen] = useState<GerceklesenTahsilat>({ bankaKK: 0, cekSenet: 0, toplam: 0 })
 
   const loadData = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/tahsilat-planim')
-      if (!res.ok) throw new Error('API hatası')
-      const jsonData = await res.json()
+      const [planRes, gercRes] = await Promise.all([
+        fetch('/api/tahsilat-planim'),
+        fetch('/api/tahsilat-gerceklesen'),
+      ])
+      if (!planRes.ok) throw new Error('API hatası')
+      const jsonData = await planRes.json()
       // API { rows: [] } formatında dönüyor
       setData(jsonData.rows || [])
+
+      // Gerçekleşen tahsilatlar (saha exceli — içinde bulunulan ay)
+      if (gercRes.ok) {
+        const g = await gercRes.json()
+        setGerceklesen({
+          bankaKK: g.bankaKK || 0,
+          cekSenet: g.cekSenet || 0,
+          toplam: g.toplam || 0,
+        })
+      } else {
+        setGerceklesen({ bankaKK: 0, cekSenet: 0, toplam: 0 })
+      }
     } catch (error) {
       console.error('Tahsilat takvimi yükleme hatası:', error)
       setData([])
+      setGerceklesen({ bankaKK: 0, cekSenet: 0, toplam: 0 })
     } finally {
       setLoading(false)
     }
@@ -147,6 +170,9 @@ export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) 
     nakit: tahsilatlarHaftaBasina.reduce((sum, h) => sum + h.nakit, 0),
     toplam: tahsilatlarHaftaBasina.reduce((sum, h) => sum + h.toplam, 0)
   }
+
+  // Gerçekleşen tahsilatlar bulunduğumuz aya göre gösterilir
+  const buAyLabel = `${MONTHS_TR[new Date().getMonth()]} ${new Date().getFullYear()}`
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
@@ -230,6 +256,46 @@ export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) 
                 </td>
                 <td className="px-6 py-4 text-xl text-right text-purple-900 font-bold">
                   {fmtCur(genelToplam.toplam)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Gerçekleşen Tahsilatlar tablosu (bulunduğumuz ay) */}
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden mt-6">
+          <table className="w-full">
+            <thead>
+              {/* Başlık bandı */}
+              <tr className="bg-gradient-to-r from-purple-600 to-indigo-600">
+                <th colSpan={3} className="text-left px-6 py-3 text-white">
+                  <span className="font-bold text-base">Gerçekleşen Tahsilatlar</span>
+                  <span className="ml-2 text-xs text-purple-100">{buAyLabel}</span>
+                </th>
+              </tr>
+              {/* Kolon başlıkları */}
+              <tr className="bg-gradient-to-r from-red-500 to-red-600">
+                <th className="text-right px-6 py-4 text-white font-bold text-base border-r border-red-400">
+                  Nakit-Kredi Kartı
+                </th>
+                <th className="text-right px-6 py-4 text-white font-bold text-base border-r border-red-400">
+                  Çek
+                </th>
+                <th className="text-right px-6 py-4 text-white font-bold text-lg">
+                  Toplam
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="bg-white">
+                <td className="px-6 py-4 text-sm text-right font-semibold text-gray-700 border-r border-gray-200">
+                  {gerceklesen.bankaKK > 0 ? fmtCur(gerceklesen.bankaKK) : '—'}
+                </td>
+                <td className="px-6 py-4 text-sm text-right font-semibold text-gray-700 border-r border-gray-200">
+                  {gerceklesen.cekSenet > 0 ? fmtCur(gerceklesen.cekSenet) : '—'}
+                </td>
+                <td className="px-6 py-4 text-base text-right font-bold text-purple-700">
+                  {gerceklesen.toplam > 0 ? fmtCur(gerceklesen.toplam) : '—'}
                 </td>
               </tr>
             </tbody>
