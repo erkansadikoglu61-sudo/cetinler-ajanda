@@ -119,7 +119,11 @@ export async function GET(req: Request) {
     const prim = rate != null ? satisAdet * rate : 0
     if (prim === 0) continue
 
-    const marka: 'Electrolux' | 'Relux' = /relux/i.test(stokAdi) ? 'Relux' : 'Electrolux'
+    // Marka, ürün adına göre değil GRUP_KODU'na göre belirlenir.
+    // Kaynakta yalnızca RELUX ve EKEA (Electrolux) grupları var. Bazı Relux
+    // ürünlerinin adında "relux" geçmiyor (ör. REP9548G/REP9548P, RRS9000);
+    // ada bakınca yanlışlıkla Electrolux'e düşüyorlardı.
+    const marka: 'Electrolux' | 'Relux' = grupKodu === 'RELUX' ? 'Relux' : 'Electrolux'
     const key = `${cariIsim}||${subeAdi}||${stokKodu}`
 
     const existing = aggMap.get(key)
