@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { parseHtmlTableByHeader, num } from '@/lib/merchSatis'
 
 const SOURCE_URL =
   'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
@@ -23,62 +24,29 @@ export interface SelloutRow {
   bsy:        string   // [16] BSY kodu: KB1, IB1, IB2, MB1...
 }
 
-/** Yaygın HTML entity'lerini decode et (&amp; → & vb.) */
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
-}
-
 function parseHtmlTable(html: string): SelloutRow[] {
-  const rows: SelloutRow[] = []
+  // Başlık ismine göre ayrıştır (kolon sırası değişse de bozulmaz)
+  const { rows: rawRows } = parseHtmlTableByHeader(html)
 
-  // Her <tr>…</tr> bloğunu al
-  const trMatches = [...html.matchAll(/<tr>([\s\S]*?)<\/tr>/gi)]
-
-  // İlk satır başlık (<th> içerir) – atla
-  for (let i = 1; i < trMatches.length; i++) {
-    const rowHtml = trMatches[i][1]
-
-    // Her <td>…</td> içeriğini çıkar, HTML tag'lerini ve entity'leri temizle
-    const cells = [...rowHtml.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(
-      (m) => decodeHtmlEntities(m[1].replace(/<[^>]+>/g, '')).trim()
-    )
-
-    if (cells.length < 17) continue
-
-    // PHP kolon sırası (SUBE_IL[3] ve SUBE_ILCE[4] sonradan eklendi):
-    // 0 MERCH_PERSONEL, 1 CARI_ISIM, 2 SUBE_ADI, 3 SUBE_IL, 4 SUBE_ILCE,
-    // 5 STOK_ADI, 6 STOK_KODU, 7 GRUP_ACIKLAMA, 8 SATILAN_ADET, 9 GRUP_KODU,
-    // 10 BEKLENEN_CIRO, 11 SUPERVISOR_ADI, 12 CARI_KOD, 13 SUBE_KOD,
-    // 14 DONEM, 15 TARIH, 16 MERCH_TIPI, 17 SV_TIPI, 18 BSY
-    rows.push({
-      merch_personel: cells[0],
-      cari_isim:      cells[1],
-      sube_adi:       cells[2],
-      stok_adi:       cells[5],
-      stok_kodu:      cells[6],
-      grup_aciklama:  cells[7],
-      satilan_adet:   parseInt(cells[8]) || 0,
-      grup_kodu:      cells[9],
-      beklened_ciro:  parseFloat((cells[10] ?? '').replace(',', '.')) || 0,
-      supervisor_adi: cells[11],
-      cari_kod:       cells[12],
-      sube_kod:       cells[13],
-      donem:          cells[14],
-      tarih:          cells[15],
-      merch_tipi:     cells[16],
-      sv_tipi:        cells[17] ?? '',
-      bsy:            cells[18] ?? '',
-    })
-  }
-
-  return rows
+  return rawRows.map(r => ({
+    merch_personel: r['MERCH_PERSONEL'] ?? '',
+    cari_isim:      r['CARI_ISIM'] ?? '',
+    sube_adi:       r['SUBE_ADI'] ?? '',
+    stok_adi:       r['STOK_ADI'] ?? '',
+    stok_kodu:      r['STOK_KODU'] ?? '',
+    grup_aciklama:  r['GRUP_ACIKLAMA'] ?? '',
+    satilan_adet:   num(r['SATILAN_ADET']),
+    grup_kodu:      r['GRUP_KODU'] ?? '',
+    beklened_ciro:  num(r['BEKLENEN_CIRO']),
+    supervisor_adi: r['SUPERVISOR_ADI'] ?? '',
+    cari_kod:       r['CARI_KOD'] ?? '',
+    sube_kod:       r['SUBE_KOD'] ?? '',
+    donem:          r['DONEM'] ?? '',
+    tarih:          r['TARIH'] ?? '',
+    merch_tipi:     r['MERCH_TIPI'] ?? '',
+    sv_tipi:        r['SV_TIPI'] ?? '',
+    bsy:            r['BSY'] ?? '',
+  }))
 }
 
 export async function GET() {

@@ -1,15 +1,5 @@
 import { NextResponse } from 'next/server'
-
-function decodeHtml(s: string): string {
-  return s
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .trim()
-}
+import { parseHtmlTableByHeader } from '@/lib/merchSatis'
 
 export async function GET() {
   try {
@@ -26,30 +16,13 @@ export async function GET() {
     }
 
     const htmlText = await response.text()
-    const rows: any[] = []
-    const parts = htmlText.split('</tr>')
-    const tdRe = /<td[^>]*>(.*?)<\/td>/g
-
-    for (let i = 1; i < parts.length; i++) {
-      const part = parts[i]
-      if (!part.includes('<td')) continue
-
-      const cells: string[] = []
-      let m: RegExpExecArray | null
-      tdRe.lastIndex = 0
-      while ((m = tdRe.exec(part)) !== null) {
-        cells.push(decodeHtml(m[1]))
-      }
-
-      if (cells.length < 17) continue
-
-      // cells[16] = BSY, cells[9] = Supervisor, cells[15] = SV_TIPI
-      rows.push({
-        bsy: cells[16] || '',
-        supervisor: cells[9] || '',
-        sv_tipi: cells[15] || '',
-      })
-    }
+    // Başlık ismine göre ayrıştır (kolon sırası değişse de bozulmaz)
+    const { rows: rawRows } = parseHtmlTableByHeader(htmlText)
+    const rows = rawRows.map(r => ({
+      bsy: r['BSY'] || '',
+      supervisor: r['SUPERVISOR_ADI'] || '',
+      sv_tipi: r['SV_TIPI'] || '',
+    }))
 
     // Hiyerarşi oluştur
     const hierarchyMap = new Map<string, Map<string, Set<string>>>()

@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server'
-
-function decodeHtml(s: string): string {
-  return s
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
-    .trim()
-}
+import { parseHtmlTableByHeader, num } from '@/lib/merchSatis'
 
 export interface PersonelSatisRow {
   personelAdi: string
@@ -62,22 +56,19 @@ export async function GET(req: Request) {
     )
     const html = await phpRes.text()
 
-    const trMatches = html.match(/<tr>[\s\S]*?<\/tr>/gi) || []
-    for (let i = 1; i < trMatches.length; i++) {
-      const tdMatches = trMatches[i].match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || []
-      if (tdMatches.length < 15) continue
-      const c = tdMatches.map(td => decodeHtml(td.replace(/<\/?td[^>]*>/gi, '')))
-
-      const personelAdi = c[0]?.trim()  || ''
-      const cariIsim    = c[1]?.trim()  || ''
-      const subeAdi     = c[2]?.trim()  || ''
-      const adet        = parseFloat(c[6] || '0') || 0
-      const grupKodu    = (c[7] || '').toUpperCase().trim()
-      const cariKod     = c[10]?.trim() || ''
-      const subeKod     = c[11]?.trim() || ''
-      const donem       = c[12]?.trim() || ''   // "2026-07"
-      const merchTipi   = c[14]?.trim() || ''
-      const bsy         = c[16]?.trim() || ''
+    // Başlık ismine göre ayrıştır (kolon sırası değişse de bozulmaz)
+    const { rows: rawRows } = parseHtmlTableByHeader(html)
+    for (const r of rawRows) {
+      const personelAdi = (r['MERCH_PERSONEL'] ?? '').trim()
+      const cariIsim    = (r['CARI_ISIM'] ?? '').trim()
+      const subeAdi     = (r['SUBE_ADI'] ?? '').trim()
+      const adet        = num(r['SATILAN_ADET'])
+      const grupKodu    = (r['GRUP_KODU'] ?? '').toUpperCase().trim()
+      const cariKod     = (r['CARI_KOD'] ?? '').trim()
+      const subeKod     = (r['SUBE_KOD'] ?? '').trim()
+      const donem       = (r['DONEM'] ?? '').trim()   // "2026-07"
+      const merchTipi   = (r['MERCH_TIPI'] ?? '').trim()
+      const bsy         = (r['BSY'] ?? '').trim()
 
       if (merchTipi !== 'Çetinler Merch') continue
       if (!donem || !personelAdi || !cariKod) continue

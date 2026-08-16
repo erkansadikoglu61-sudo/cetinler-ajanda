@@ -2,21 +2,11 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import * as fs from 'fs'
 import * as XLSX from 'xlsx'
+import { parseHtmlTableByHeader } from '@/lib/merchSatis'
 
 const EXCEL_PATH = '/Users/erkansadikoglu/Desktop/Saha Ajandası/cetinler-ajanda/SAHA.xlsx'
 const BUCKET = 'bsy-excel'
 const OBJ_NAME = 'SAHA.xlsx'
-
-function decodeHtml(s: string): string {
-  return s
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .trim()
-}
 
 async function getExcelBuffer(): Promise<Buffer | null> {
   if (fs.existsSync(EXCEL_PATH)) {
@@ -51,29 +41,13 @@ export async function GET() {
     }
 
     const htmlText = await response.text()
-    const selloutRows: any[] = []
-    const parts = htmlText.split('</tr>')
-    const tdRe = /<td[^>]*>(.*?)<\/td>/g
-
-    for (let i = 1; i < parts.length; i++) {
-      const part = parts[i]
-      if (!part.includes('<td')) continue
-
-      const cells: string[] = []
-      let m: RegExpExecArray | null
-      tdRe.lastIndex = 0
-      while ((m = tdRe.exec(part)) !== null) {
-        cells.push(decodeHtml(m[1]))
-      }
-
-      if (cells.length < 17) continue
-
-      selloutRows.push({
-        bsy_kod: cells[16] || '',
-        supervisor: cells[9] || '',
-        sv_tipi: cells[15] || '',
-      })
-    }
+    // Başlık ismine göre ayrıştır (kolon sırası değişse de bozulmaz)
+    const { rows: rawRows } = parseHtmlTableByHeader(htmlText)
+    const selloutRows = rawRows.map(r => ({
+      bsy_kod: r['BSY'] || '',
+      supervisor: r['SUPERVISOR_ADI'] || '',
+      sv_tipi: r['SV_TIPI'] || '',
+    }))
 
     // 2. Excel'den BSY isimlerini çek
     const excelBuffer = await getExcelBuffer()

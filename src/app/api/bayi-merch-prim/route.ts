@@ -1,42 +1,11 @@
 import { NextResponse } from 'next/server'
 import { ADET_PRIM_DEFAULTS } from '@/lib/adet-prim-defaults'
 import { createClient } from '@supabase/supabase-js'
+import { parseHtmlTableByHeader, num } from '@/lib/merchSatis'
 
 export const maxDuration = 30
 
 const MERCH_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
-
-// Column indices in the HTML table
-// 0:MERCH_PERSONEL 1:CARI_ISIM 2:SUBE_ADI 3:STOK_ADI 4:STOK_KODU
-// 5:GRUP_ACIKLAMA  6:SATILAN_ADET 7:GRUP_KODU 8:BEKLENEN_CIRO
-// 9:SUPERVISOR_ADI 10:CARI_KOD 11:SUBE_KOD 12:DONEM 13:TARIH
-// 14:MERCH_TIPI ("Bayi Merch" | "Çetinler Merch") 15:SV_TIPI 16:BSY
-// PHP'ye SUBE_IL[3] ve SUBE_ILCE[4] eklendi → kolon 3+ hepsi +2 kaydı
-const COL = {
-  MERCH_PERSONEL: 0,
-  CARI_ISIM:      1,
-  SUBE_ADI:       2,
-  STOK_ADI:       5,
-  STOK_KODU:      6,
-  SATILAN_ADET:   8,
-  GRUP_KODU:      9,
-  SUPERVISOR_ADI: 11,
-  DONEM:          14,
-  TARIH:          15,
-  MERCH_TIPI:     16,
-  BSY_KOD:        18,
-} as const
-
-function decodeHtml(s: string): string {
-  return s
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .trim()
-}
 
 interface HakdisRow {
   supervizor:   string
@@ -139,39 +108,27 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Dış kaynak alınamadı: ' + String(e) }, { status: 500 })
   }
 
-  // 3. Parse HTML table rows
-  // Rows are separated by </tr> — split and process each
-  const parts = html.split('</tr>')
+  // 3. Parse HTML table rows — başlık ismine göre ayrıştır
+  const { rows: rawRows } = parseHtmlTableByHeader(html)
   const aggMap = new Map<string, { supervizor: string; cariAdi: string; subeAdi: string; bayiMerch: string; primHakdis: number; satisAdet: number; bsyKod: string }>()
 
-  const tdRe = /<td[^>]*>(.*?)<\/td>/g
-
-  for (let i = 1; i < parts.length; i++) {
-    const part = parts[i]
-    if (!part.includes('<td')) continue
-
-    const cells: string[] = []
-    let m: RegExpExecArray | null
-    tdRe.lastIndex = 0
-    while ((m = tdRe.exec(part)) !== null) {
-      cells.push(decodeHtml(m[1]))
-    }
-    if (cells.length < 17) continue
-
+  for (const row of rawRows) {
     // Filter by donem
-    if (cells[COL.DONEM] !== donem) continue
+    if (row['DONEM'] !== donem) continue
 
     // Only include "Bayi Merch" — skip "Çetinler Merch"
-    if (cells[COL.MERCH_TIPI] !== 'Bayi Merch') continue
+    if (row['MERCH_TIPI'] !== 'Bayi Merch') continue
 
-    const stokKodu  = cells[COL.STOK_KODU].toUpperCase()
-    const grupKodu  = cells[COL.GRUP_KODU]?.toUpperCase() || ''
-    const tarih     = cells[COL.TARIH] || ''
-    const satisAdet = parseFloat(cells[COL.SATILAN_ADET]) || 0
+    const merchPersonel = row['MERCH_PERSONEL'] ?? ''
+    const cariIsim  = row['CARI_ISIM'] ?? ''
+    const subeAdi   = row['SUBE_ADI'] ?? ''
+    const stokKodu  = (row['STOK_KODU'] ?? '').toUpperCase()
+    const grupKodu  = (row['GRUP_KODU'] ?? '').toUpperCase()
+    const satisAdet = num(row['SATILAN_ADET'])
     const standardRate = primMap.get(stokKodu) ?? null
 
     // Özel kural varsa uygula
-    const ozelRule = findOzelRule(stokKodu, grupKodu, cells[COL.CARI_ISIM], cells[COL.SUBE_ADI])
+    const ozelRule = findOzelRule(stokKodu, grupKodu, cariIsim, subeAdi)
     let bayiMerchPrim: number | null
     if (ozelRule) {
       if (ozelRule.prim_carpan != null && standardRate != null) {
@@ -188,7 +145,7 @@ export async function GET(req: Request) {
     }
     const prim = bayiMerchPrim != null ? satisAdet * bayiMerchPrim : 0
 
-    const key = `${cells[COL.SUPERVISOR_ADI]}||${cells[COL.CARI_ISIM]}||${cells[COL.SUBE_ADI]}||${cells[COL.MERCH_PERSONEL]}`
+    const key = `${row['SUPERVISOR_ADI'] ?? ''}||${cariIsim}||${subeAdi}||${merchPersonel}`
 
     const existing = aggMap.get(key)
     if (existing) {
@@ -196,13 +153,13 @@ export async function GET(req: Request) {
       existing.satisAdet  += satisAdet
     } else {
       aggMap.set(key, {
-        supervizor:  cells[COL.SUPERVISOR_ADI],
-        cariAdi:     cells[COL.CARI_ISIM],
-        subeAdi:     cells[COL.SUBE_ADI],
-        bayiMerch:   cells[COL.MERCH_PERSONEL],
+        supervizor:  row['SUPERVISOR_ADI'] ?? '',
+        cariAdi:     cariIsim,
+        subeAdi:     subeAdi,
+        bayiMerch:   merchPersonel,
         primHakdis:  prim,
         satisAdet:   satisAdet,
-        bsyKod:      cells[COL.BSY_KOD] ?? '',
+        bsyKod:      row['BSY'] ?? '',
       })
     }
   }

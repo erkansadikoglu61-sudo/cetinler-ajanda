@@ -1,33 +1,11 @@
 import { NextResponse } from 'next/server'
 import { ADET_PRIM_DEFAULTS } from '@/lib/adet-prim-defaults'
 import { createClient } from '@supabase/supabase-js'
+import { parseHtmlTableByHeader, num } from '@/lib/merchSatis'
 
 export const maxDuration = 30
 
 const MERCH_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
-
-// PHP'ye SUBE_IL[3] ve SUBE_ILCE[4] eklendi → kolon 3+ hepsi +2 kaydı
-const COL = {
-  MERCH_PERSONEL: 0,
-  CARI_ISIM:      1,
-  SUBE_ADI:       2,
-  STOK_ADI:       5,
-  STOK_KODU:      6,
-  SATILAN_ADET:   8,
-  GRUP_KODU:      9,
-  SUPERVISOR_ADI: 11,
-  DONEM:          14,
-  TARIH:          15,
-  MERCH_TIPI:     16,
-  BSY_KOD:        18,
-} as const
-
-function decodeHtml(s: string): string {
-  return s
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
-    .trim()
-}
 
 export interface PrimAnalizRow {
   stokKodu:   string
@@ -113,31 +91,23 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Dış kaynak alınamadı: ' + String(e) }, { status: 500 })
   }
 
-  const parts = html.split('</tr>')
-  const tdRe = /<td[^>]*>(.*?)<\/td>/g
+  const { rows: rawRows } = parseHtmlTableByHeader(html)
   // Aggregate by cariAdi + subeAdi + stokKodu (preserve stok detail)
   const aggMap = new Map<string, PrimAnalizRow>()
 
-  for (let i = 1; i < parts.length; i++) {
-    const part = parts[i]
-    if (!part.includes('<td')) continue
+  for (const row of rawRows) {
+    if (row['DONEM'] !== donem) continue
+    if (row['MERCH_TIPI'] !== 'Bayi Merch') continue
 
-    const cells: string[] = []
-    let m: RegExpExecArray | null
-    tdRe.lastIndex = 0
-    while ((m = tdRe.exec(part)) !== null) cells.push(decodeHtml(m[1]))
-    if (cells.length < 17) continue
-    if (cells[COL.DONEM] !== donem) continue
-    if (cells[COL.MERCH_TIPI] !== 'Bayi Merch') continue
-
-    const stokKodu  = cells[COL.STOK_KODU].toUpperCase()
-    const stokAdi   = cells[COL.STOK_ADI]  || ''
-    const grupKodu  = cells[COL.GRUP_KODU]?.toUpperCase() || ''
-    const tarih     = cells[COL.TARIH] || ''
-    const satisAdet = parseFloat(cells[COL.SATILAN_ADET]) || 0
+    const cariIsim  = row['CARI_ISIM'] ?? ''
+    const subeAdi   = row['SUBE_ADI'] ?? ''
+    const stokKodu  = (row['STOK_KODU'] ?? '').toUpperCase()
+    const stokAdi   = row['STOK_ADI'] || ''
+    const grupKodu  = (row['GRUP_KODU'] ?? '').toUpperCase()
+    const satisAdet = num(row['SATILAN_ADET'])
     const standardRate = primMap.get(stokKodu) ?? null
 
-    const ozelRule = findOzelRule(stokKodu, grupKodu, cells[COL.CARI_ISIM], cells[COL.SUBE_ADI])
+    const ozelRule = findOzelRule(stokKodu, grupKodu, cariIsim, subeAdi)
     let rate: number | null
     if (ozelRule) {
       if (ozelRule.prim_carpan != null && standardRate != null) rate = standardRate * ozelRule.prim_carpan
@@ -150,7 +120,7 @@ export async function GET(req: Request) {
     if (prim === 0) continue
 
     const marka: 'Electrolux' | 'Relux' = /relux/i.test(stokAdi) ? 'Relux' : 'Electrolux'
-    const key = `${cells[COL.CARI_ISIM]}||${cells[COL.SUBE_ADI]}||${stokKodu}`
+    const key = `${cariIsim}||${subeAdi}||${stokKodu}`
 
     const existing = aggMap.get(key)
     if (existing) {
@@ -159,10 +129,10 @@ export async function GET(req: Request) {
       aggMap.set(key, {
         stokKodu,
         stokAdi,
-        cariAdi:    cells[COL.CARI_ISIM],
-        subeAdi:    cells[COL.SUBE_ADI],
-        bsyKod:     cells[COL.BSY_KOD] ?? '',
-        supervizor: cells[COL.SUPERVISOR_ADI],
+        cariAdi:    cariIsim,
+        subeAdi:    subeAdi,
+        bsyKod:     row['BSY'] ?? '',
+        supervizor: row['SUPERVISOR_ADI'] ?? '',
         prim,
         marka,
       })

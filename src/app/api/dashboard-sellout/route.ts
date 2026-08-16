@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { parseHtmlTableByHeader, num } from '@/lib/merchSatis'
 
 export interface DashboardSelloutMetrics {
   // Yıllık (aylikAdet eklendi)
@@ -14,17 +15,6 @@ export interface DashboardSelloutMetrics {
   aylikSupervizorler: Array<{ supervizorAdi: string; adet: number; pay: number; topCari?: string }>
   aylikCetinlerMerchTop10: Array<{ merchAdi: string; adet: number; pay: number; topCari?: string }>
   aylikBayiMerchTop10: Array<{ merchAdi: string; adet: number; pay: number; topCari?: string }>
-}
-
-function decodeHtml(s: string): string {
-  return s
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .trim()
 }
 
 async function fetchPhpSellout(yil: number, ay?: number): Promise<any[]> {
@@ -50,33 +40,13 @@ async function fetchPhpSellout(yil: number, ay?: number): Promise<any[]> {
 
     const htmlText = await response.text()
 
-    // HTML table parse et
-    // Format: <tr><td>...</td><td>CARI</td><td>SUBE</td><td>...</td><td>MERCH</td><td>ADET</td>...</tr>
+    // HTML tabloyu başlık ismine göre ayrıştır (kolon sırası değişse de bozulmaz)
+    const { rows: rawRows } = parseHtmlTableByHeader(htmlText)
     const rows: any[] = []
-    const parts = htmlText.split('</tr>')
-    const tdRe = /<td[^>]*>(.*?)<\/td>/g
 
-    for (let i = 1; i < parts.length; i++) {
-      const part = parts[i]
-      if (!part.includes('<td')) continue
-
-      const cells: string[] = []
-      let m: RegExpExecArray | null
-      tdRe.lastIndex = 0
-      while ((m = tdRe.exec(part)) !== null) {
-        cells.push(decodeHtml(m[1]))
-      }
-
-      if (cells.length < 15) continue
-
-      // Column indices (bayi-merch-prim route'undan)
-      // 0:MERCH_PERSONEL 1:CARI_ISIM 2:SUBE_ADI 3:STOK_ADI 4:STOK_KODU
-      // 5:GRUP_ACIKLAMA  6:SATILAN_ADET 7:GRUP_KODU 8:BEKLENEN_CIRO
-      // 9:SUPERVISOR_ADI 10:CARI_KOD 11:SUBE_KOD 12:DONEM 13:TARIH
-      // 14:MERCH_TIPI ("Bayi Merch" | "Çetinler Merch") 15:SV_TIPI 16:BSY
-
-      const donem = cells[12].trim()
-      const tarih = cells[13].trim()
+    for (const r of rawRows) {
+      const donem = (r['DONEM'] ?? '').trim()
+      const tarih = (r['TARIH'] ?? '').trim()
 
       // Ay filtresi varsa kontrol et
       if (ay) {
@@ -152,19 +122,19 @@ async function fetchPhpSellout(yil: number, ay?: number): Promise<any[]> {
       }
 
       rows.push({
-        merch_adi: cells[0],
-        cari_adi: cells[1],
-        cari_kod: cells[10],
-        sube_adi: cells[2],
-        stok_adi: cells[3],
-        stok_kodu: cells[4],
-        grup_aciklama: cells[5],
-        adet: parseFloat(cells[6]) || 0,
-        grup_kodu: cells[7],
-        supervizor: cells[9],
+        merch_adi: r['MERCH_PERSONEL'] ?? '',
+        cari_adi: r['CARI_ISIM'] ?? '',
+        cari_kod: r['CARI_KOD'] ?? '',
+        sube_adi: r['SUBE_ADI'] ?? '',
+        stok_adi: r['STOK_ADI'] ?? '',
+        stok_kodu: r['STOK_KODU'] ?? '',
+        grup_aciklama: r['GRUP_ACIKLAMA'] ?? '',
+        adet: num(r['SATILAN_ADET']),
+        grup_kodu: r['GRUP_KODU'] ?? '',
+        supervizor: r['SUPERVISOR_ADI'] ?? '',
         donem: donem,
         tarih: tarih,
-        merch_tipi: cells[14],
+        merch_tipi: r['MERCH_TIPI'] ?? '',
       })
     }
 

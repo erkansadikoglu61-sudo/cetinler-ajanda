@@ -1,13 +1,7 @@
 import { NextResponse } from 'next/server'
+import { parseHtmlTableByHeader } from '@/lib/merchSatis'
 
 const MERCH_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
-
-// PHP'ye SUBE_IL[3] ve SUBE_ILCE[4] eklendi → kolon 3+ hepsi +2 kaydı
-const COL = { CARI_ISIM: 1, SUBE_ADI: 2, STOK_KODU: 6, GRUP_KODU: 9, MERCH_TIPI: 16 }
-
-function decodeHtml(s: string): string {
-  return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g,' ').trim()
-}
 
 export async function GET() {
   let html = ''
@@ -24,22 +18,14 @@ export async function GET() {
   // grup_kodu -> Set<stok_kodu>
   const grupStokMap: Record<string, Set<string>> = {}
 
-  const tdRe = /<td[^>]*>(.*?)<\/td>/g
-  const parts = html.split('</tr>')
+  const { rows } = parseHtmlTableByHeader(html)
 
-  for (let i = 1; i < parts.length; i++) {
-    const part = parts[i]
-    if (!part.includes('<td')) continue
-    const cells: string[] = []
-    let m: RegExpExecArray | null
-    tdRe.lastIndex = 0
-    while ((m = tdRe.exec(part)) !== null) cells.push(decodeHtml(m[1]))
-    if (cells.length < 17) continue
-    if (cells[COL.MERCH_TIPI] !== 'Bayi Merch') continue
-    if (cells[COL.CARI_ISIM]) cariSet.add(cells[COL.CARI_ISIM])
-    if (cells[COL.SUBE_ADI])  subeSet.add(cells[COL.SUBE_ADI])
-    const g = cells[COL.GRUP_KODU]
-    const s = cells[COL.STOK_KODU].toUpperCase()
+  for (const row of rows) {
+    if (row['MERCH_TIPI'] !== 'Bayi Merch') continue
+    if (row['CARI_ISIM']) cariSet.add(row['CARI_ISIM'])
+    if (row['SUBE_ADI'])  subeSet.add(row['SUBE_ADI'])
+    const g = row['GRUP_KODU']
+    const s = (row['STOK_KODU'] ?? '').toUpperCase()
     if (g) {
       grupSet.add(g)
       if (s) {
