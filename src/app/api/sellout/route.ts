@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { parseHtmlTableByHeader, num, fetchPhpHtml } from '@/lib/merchSatis'
 
+// 28MB PHP fetch + 62k satır parse soğuk çağrıda ~10sn sürüyor; varsayılan
+// timeout'a takılıp 504 (→ boş sellout) üretmemesi için süreyi uzatıyoruz.
+export const maxDuration = 60
+
 const SOURCE_URL =
   'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
 
@@ -51,11 +55,10 @@ function parseHtmlTable(html: string): SelloutRow[] {
 
 export async function GET() {
   try {
-    // fetchPhpHtml: gövdeyi tam UTF-8 çözer (Türkçe karakter bozulmasını önler)
-    const html = await fetchPhpHtml(SOURCE_URL, {
-      next: { revalidate: 1800 }, // 30 dakika
-      headers: { Accept: 'text/html,application/xhtml+xml' },
-    })
+    // fetchPhpHtml: paylaşımlı bellek cache (10 dk) + tam UTF-8 decode.
+    // 28MB'ı her istekte çekmeyi önler; ~10sn'lik fetch'i Vercel timeout'una
+    // yaklaştırıp ara sıra 504 → boş sellout üretmesini engeller.
+    const html = await fetchPhpHtml(SOURCE_URL)
     const rows = parseHtmlTable(html)
 
     return NextResponse.json({

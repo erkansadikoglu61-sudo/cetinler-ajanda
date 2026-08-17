@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { parseHtmlTableByHeader, num, fetchPhpHtml } from '@/lib/merchSatis'
 
+// Aynı 28MB PHP kaynağını 2 kez çekip parse ediyor; timeout headroom'u.
+export const maxDuration = 60
+
 export interface DashboardSelloutMetrics {
   // Yıllık (aylikAdet eklendi)
   yillikCariTop10: Array<{ cariAdi: string; adet: number; pay: number; aylikAdet: number }>
@@ -28,11 +31,8 @@ async function fetchPhpSellout(yil: number, ay?: number): Promise<any[]> {
     // PHP'ye sadece yıl parametresi gönder, ay filtrelemesini Next.js tarafında yap
     const params = new URLSearchParams({ yil: String(yil) })
 
-    // fetchPhpHtml: gövdeyi tam UTF-8 çözer (Türkçe karakter bozulmasını önler)
-    const htmlText = await fetchPhpHtml(`${phpUrl}?${params}`, {
-      redirect: 'follow',  // Redirect'leri takip et
-      next: { revalidate: 900 }, // 15 dakika cache
-    })
+    // fetchPhpHtml: paylaşımlı cache + tam UTF-8 decode
+    const htmlText = await fetchPhpHtml(`${phpUrl}?${params}`)
 
     // HTML tabloyu başlık ismine göre ayrıştır (kolon sırası değişse de bozulmaz)
     const { rows: rawRows } = parseHtmlTableByHeader(htmlText)

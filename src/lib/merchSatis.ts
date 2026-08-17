@@ -6,20 +6,51 @@
 //   const adet = num(rows[0]['SATILAN_ADET'])
 //   const merchTipi = rows[0]['MERCH_TIPI']
 
+// ── PHP HTML paylaşımlı bellek cache'i ───────────────────────────────
+// export_merch_satis.php ~28MB ve çekmesi ~10sn sürüyor. Next'in fetch
+// cache'i 2MB üstünü tutmadığı için her istek yeniden çekiyor, bu da
+// Vercel fonksiyon timeout'una yaklaşıp ara sıra 504 → boş sellout'a yol
+// açıyordu. Aynı URL'yi çeken tüm route'lar bu modül-seviyesi cache'i
+// paylaşır; sıcak instance'ta TTL boyunca tek çekim yeter.
+const HTML_TTL_MS = 10 * 60 * 1000 // 10 dk
+const htmlCache = new Map<string, { at: number; html: string }>()
+const htmlInflight = new Map<string, Promise<string>>()
+
 /**
- * PHP export'unu çekip gövdeyi TAM olarak UTF-8 çözer.
- *
- * Neden: Response.text() Vercel/undici üzerinde ~28MB'lık bu yanıtta, ağ
- * chunk sınırına denk gelen çok baytlı UTF-8 karakterlerini ara sıra
- * bozuyor (Ş/Ü → U+FFFD "�"). Bu, cari/şube isimlerini bozup eşleşmeleri
- * (ör. Sellin↔Sellout cari) kırıyordu. arrayBuffer() tüm baytları toplar,
- * tek seferde decode ederek chunk-sınırı bozulmasını engeller.
+ * PHP export'unu çekip gövdeyi tam UTF-8 çözer ve URL bazında cache'ler.
+ * @param revalidateMs Cache TTL (ms). 0 → cache'i atla (taze çek).
  */
-export async function fetchPhpHtml(url: string, init?: RequestInit): Promise<string> {
-  const res = await fetch(url, init)
-  if (!res.ok) throw new Error(`PHP API ${res.status}`)
-  const buf = await res.arrayBuffer()
-  return new TextDecoder('utf-8').decode(buf)
+export async function fetchPhpHtml(
+  url: string,
+  opts?: { headers?: Record<string, string>; revalidateMs?: number },
+): Promise<string> {
+  const ttl = opts?.revalidateMs ?? HTML_TTL_MS
+  if (ttl > 0) {
+    const hit = htmlCache.get(url)
+    if (hit && Date.now() - hit.at < ttl) return hit.html
+    const pending = htmlInflight.get(url)
+    if (pending) return pending // eşzamanlı istekler tek çekimi paylaşsın
+  }
+
+  const run = (async () => {
+    // no-store: Next'in fetch enstrümantasyonunu atla (büyük gövdede sorunlu)
+    const res = await fetch(url, {
+      cache: 'no-store',
+      redirect: 'follow',
+      headers: opts?.headers,
+    })
+    if (!res.ok) throw new Error(`PHP API ${res.status}`)
+    // arrayBuffer + tek seferde decode: atomik, doğru UTF-8
+    const html = new TextDecoder('utf-8').decode(await res.arrayBuffer())
+    if (ttl > 0) htmlCache.set(url, { at: Date.now(), html })
+    return html
+  })()
+
+  if (ttl > 0) {
+    htmlInflight.set(url, run)
+    try { return await run } finally { htmlInflight.delete(url) }
+  }
+  return run
 }
 
 export function decodeHtml(s: string): string {

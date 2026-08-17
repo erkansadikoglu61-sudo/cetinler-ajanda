@@ -100,7 +100,7 @@ export async function GET(req: Request) {
   let html = ''
   try {
     // fetchPhpHtml: gövdeyi tam UTF-8 çözer (Türkçe karakter bozulmasını önler)
-    html = await fetchPhpHtml(MERCH_URL, { next: { revalidate: 900 } })
+    html = await fetchPhpHtml(MERCH_URL)
   } catch (e) {
     return NextResponse.json({ error: 'Dış kaynak alınamadı: ' + String(e) }, { status: 500 })
   }

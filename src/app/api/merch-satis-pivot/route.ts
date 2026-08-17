@@ -50,10 +50,9 @@ export async function GET(req: Request) {
   }>()
 
   try {
-    // fetchPhpHtml: gövdeyi tam UTF-8 çözer (Türkçe karakter bozulmasını önler)
+    // fetchPhpHtml: paylaşımlı cache + tam UTF-8 decode
     const html = await fetchPhpHtml(
       'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php',
-      { next: { revalidate: 900 } }
     )
 
     // Başlık ismine göre ayrıştır (kolon sırası değişse de bozulmaz)

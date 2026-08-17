@@ -6,7 +6,7 @@ const MERCH_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.ph
 export async function GET() {
   let html = ''
   try {
-    html = await fetchPhpHtml(MERCH_URL, { next: { revalidate: 900 } })
+    html = await fetchPhpHtml(MERCH_URL)
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
