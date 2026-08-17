@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server'
-import { parseHtmlTableByHeader } from '@/lib/merchSatis'
+import { parseHtmlTableByHeader, fetchPhpHtml } from '@/lib/merchSatis'
 
 const MERCH_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
 
 export async function GET() {
   let html = ''
   try {
-    const res = await fetch(MERCH_URL, { next: { revalidate: 900 }, headers: { 'Accept-Encoding': 'gzip, deflate' } })
-    html = await res.text()
+    html = await fetchPhpHtml(MERCH_URL, { next: { revalidate: 900 } })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { parseHtmlTableByHeader } from '@/lib/merchSatis'
+import { parseHtmlTableByHeader, fetchPhpHtml } from '@/lib/merchSatis'
 
 export async function GET() {
   try {
@@ -9,13 +9,8 @@ export async function GET() {
     }
 
     const params = new URLSearchParams({ yil: '2026' })
-    const response = await fetch(`${phpUrl}?${params}`)
-
-    if (!response.ok) {
-      return NextResponse.json({ error: `PHP API returned ${response.status}` }, { status: 500 })
-    }
-
-    const htmlText = await response.text()
+    // fetchPhpHtml: gövdeyi tam UTF-8 çözer (Türkçe karakter bozulmasını önler)
+    const htmlText = await fetchPhpHtml(`${phpUrl}?${params}`)
     // Başlık ismine göre ayrıştır (kolon sırası değişse de bozulmaz)
     const { rows: rawRows } = parseHtmlTableByHeader(htmlText)
     const rows = rawRows.map(r => ({

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { parseHtmlTableByHeader, num } from '@/lib/merchSatis'
+import { parseHtmlTableByHeader, num, fetchPhpHtml } from '@/lib/merchSatis'
 
 const SOURCE_URL =
   'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
@@ -51,19 +51,11 @@ function parseHtmlTable(html: string): SelloutRow[] {
 
 export async function GET() {
   try {
-    const res = await fetch(SOURCE_URL, {
+    // fetchPhpHtml: gövdeyi tam UTF-8 çözer (Türkçe karakter bozulmasını önler)
+    const html = await fetchPhpHtml(SOURCE_URL, {
       next: { revalidate: 1800 }, // 30 dakika
       headers: { Accept: 'text/html,application/xhtml+xml' },
     })
-
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: `Kaynak sunucu hatası: ${res.status}` },
-        { status: 502 }
-      )
-    }
-
-    const html = await res.text()
     const rows = parseHtmlTable(html)
 
     return NextResponse.json({

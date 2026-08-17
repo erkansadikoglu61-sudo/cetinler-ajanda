@@ -6,6 +6,22 @@
 //   const adet = num(rows[0]['SATILAN_ADET'])
 //   const merchTipi = rows[0]['MERCH_TIPI']
 
+/**
+ * PHP export'unu çekip gövdeyi TAM olarak UTF-8 çözer.
+ *
+ * Neden: Response.text() Vercel/undici üzerinde ~28MB'lık bu yanıtta, ağ
+ * chunk sınırına denk gelen çok baytlı UTF-8 karakterlerini ara sıra
+ * bozuyor (Ş/Ü → U+FFFD "�"). Bu, cari/şube isimlerini bozup eşleşmeleri
+ * (ör. Sellin↔Sellout cari) kırıyordu. arrayBuffer() tüm baytları toplar,
+ * tek seferde decode ederek chunk-sınırı bozulmasını engeller.
+ */
+export async function fetchPhpHtml(url: string, init?: RequestInit): Promise<string> {
+  const res = await fetch(url, init)
+  if (!res.ok) throw new Error(`PHP API ${res.status}`)
+  const buf = await res.arrayBuffer()
+  return new TextDecoder('utf-8').decode(buf)
+}
+
 export function decodeHtml(s: string): string {
   return s
     .replace(/&amp;/g, '&')

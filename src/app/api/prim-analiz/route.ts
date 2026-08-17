@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { ADET_PRIM_DEFAULTS } from '@/lib/adet-prim-defaults'
 import { createClient } from '@supabase/supabase-js'
-import { parseHtmlTableByHeader, num } from '@/lib/merchSatis'
+import { parseHtmlTableByHeader, num, fetchPhpHtml } from '@/lib/merchSatis'
 
 export const maxDuration = 30
 
@@ -82,11 +82,8 @@ export async function GET(req: Request) {
 
   let html = ''
   try {
-    const res = await fetch(MERCH_URL, {
-      next: { revalidate: 900 },
-      headers: { 'Accept-Encoding': 'gzip, deflate' },
-    })
-    html = await res.text()
+    // fetchPhpHtml: gövdeyi tam UTF-8 çözer (Türkçe karakter bozulmasını önler)
+    html = await fetchPhpHtml(MERCH_URL, { next: { revalidate: 900 } })
   } catch (e) {
     return NextResponse.json({ error: 'Dış kaynak alınamadı: ' + String(e) }, { status: 500 })
   }

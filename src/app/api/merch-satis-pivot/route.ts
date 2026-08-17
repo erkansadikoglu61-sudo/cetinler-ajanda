@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { parseHtmlTableByHeader, num } from '@/lib/merchSatis'
+import { parseHtmlTableByHeader, num, fetchPhpHtml } from '@/lib/merchSatis'
 
 export interface PersonelSatisRow {
   personelAdi: string
@@ -50,11 +50,11 @@ export async function GET(req: Request) {
   }>()
 
   try {
-    const phpRes = await fetch(
+    // fetchPhpHtml: gövdeyi tam UTF-8 çözer (Türkçe karakter bozulmasını önler)
+    const html = await fetchPhpHtml(
       'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php',
       { next: { revalidate: 900 } }
     )
-    const html = await phpRes.text()
 
     // Başlık ismine göre ayrıştır (kolon sırası değişse de bozulmaz)
     const { rows: rawRows } = parseHtmlTableByHeader(html)
