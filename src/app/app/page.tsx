@@ -22,6 +22,7 @@ import { SelloutView } from '@/components/SelloutView'
 import { BsyView } from '@/components/BsyView'
 import { TahsilatPlanimView } from '@/components/TahsilatPlanimView'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
+import { namesMatch, normalizeName } from '@/lib/sellout'
 import { GenelRaporlarView } from '@/components/GenelRaporlarView'
 import { KpiView } from '@/components/KpiView'
 import { NoktalarimizView } from '@/components/NoktalarimizView'
@@ -120,13 +121,16 @@ function TaskSheet({
     }
   }, [task?.id])
 
-  // Şube listesini çek (export_merch_detay.php üzerinden)
-  // Görünürlük giriş yapan kullanıcının hiyerarşisine göre (visibleIds):
-  //   Admin → tüm şubeler
-  //   BSY   → kendi bölgesi (BSY kodu) = kendisi + bağlı sup'lar + onların Jr'ları
+  // Şube listesini çek (export_bsy_cari_sube.php + merch-detay üzerinden)
+  // Görev KİME açılıyorsa (seçilen Kişi = pid) o kişinin sorumlu olduğu şubeler listelenir.
+  // Atilla gibi hem Süpervizör ("Atilla Yılmaz SV") hem BSY ("Atilla YILMAZ") olan
+  // kişilerde, modalda seçilen profilin rolü baz alınır — böylece karışıklık olmaz.
+  //   Admin/Yönetici/İK → tüm şubeler
+  //   BSY   → kendi bölgesi (BSY kodu eşleşmesi)
   //   Sup   → kendisi + kendi Jr'larının şubeleri (sup_adi / jr_adi eşleşmesi)
   //   Jr    → sadece kendi şubeleri (jr_adi eşleşmesi)
-  const visibleKey = visibleIds.join(',')
+  // Not: İsim eşleşmesi namesMatch ile yapılır; export'taki " SV" eki ve
+  //      Türkçe karakter farkları normalize edilir.
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
@@ -138,42 +142,43 @@ function TaskSheet({
         const toOpt = (r: { cari_adi: string; sube_adi: string }) =>
           `${r.cari_adi?.trim() || ''} / ${r.sube_adi?.trim() || ''}`
 
-        // ── Rol bazlı NET filtre (yetki hiyerarşisi) ──
-        const role = currentProfile.role
-        const norm = (s: string) => (s || '').trim().toLocaleLowerCase('tr')
-        const myName = norm(currentProfile.full_name)
+        // ── Görev hedefi = seçilen kişi (pid); bulunamazsa giriş yapan kullanıcı ──
+        const person = team.find(p => p.id === pid) ?? currentProfile
+        const role = person.role
 
-        // BSY ise kendi BSY kodu
-        const myBsyKod = role === 'bsy' ? (BSY_NAME_TO_KOD[myName] ?? null) : null
+        // BSY ise kendi BSY kodu (BSY_NAME_TO_KOD tr-küçük harf isimle anahtarlı)
+        const myBsyKod = role === 'bsy'
+          ? (BSY_NAME_TO_KOD[(person.full_name || '').toLocaleLowerCase('tr')] ?? null)
+          : null
 
         // Süpervizör ise kendi Jr'larının isimleri (kendisi + Jr'larının carilerini görür)
         const myJrNames = role === 'sup'
-          ? new Set(
-              team
-                .filter(p => p.role === 'jr' && p.manager_id === currentProfile.id)
-                .map(p => norm(p.full_name))
-                .filter(Boolean)
-            )
-          : new Set<string>()
+          ? team
+              .filter(p => p.role === 'jr' && p.manager_id === person.id)
+              .map(p => p.full_name)
+              .filter(Boolean)
+          : []
 
         const isVisible = (r: { bsy_adi: string; bsy_kod: string; sup_adi: string; jr_adi: string }) => {
-          if (role === 'admin') return true
+          // Admin / Yönetici / İK → tümü
+          if (role === 'admin' || role === 'manager' || role === 'ik') return true
 
           // BSY → SADECE BSY'si kendisi olan cariler (bsy_kod eşleşmesi)
           if (role === 'bsy') {
             if (myBsyKod) return (r.bsy_kod || '').trim().toUpperCase() === myBsyKod.toUpperCase()
             // Kod bulunamazsa isimle yedek eşleşme
-            return norm(r.bsy_adi) === myName
+            return namesMatch(r.bsy_adi, person.full_name)
           }
 
           // Süpervizör → kendi carileri + kendi Jr'larının carileri
           if (role === 'sup') {
-            return norm(r.sup_adi) === myName || (r.jr_adi ? myJrNames.has(norm(r.jr_adi)) : false)
+            return namesMatch(r.sup_adi, person.full_name) ||
+              (r.jr_adi ? myJrNames.some(n => namesMatch(n, r.jr_adi)) : false)
           }
 
           // Jr → yalnızca kendi carileri
           if (role === 'jr') {
-            return norm(r.jr_adi) === myName
+            return namesMatch(r.jr_adi, person.full_name)
           }
 
           return false
@@ -195,7 +200,7 @@ function TaskSheet({
 
     fetchCustomers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentProfile.id, currentProfile.role, visibleKey])
+  }, [pid, currentProfile.id, team])
 
   // Type değiştiğinde endDate'i sıfırla
   useEffect(() => {
@@ -2049,10 +2054,14 @@ if (currentProfile.role === 'bsy') {
       .then(r => r.json())
       .then(json => {
         const data: { cari_adi: string; sube_adi: string; bsy_adi: string }[] = json.data ?? []
-        const name = currentProfile.full_name?.trim() ?? ''
+        // İsim eşleşmesi normalizeName ile yapılır: profil isimleri BÜYÜK harf
+        // soyadlı ("Erdem BOZYEL"), export ise başlık formatlı ("Erdem Bozyel").
+        // Tam eşitlik (===) hiçbir BSY'de tutmuyordu → bsyCariSet boş kalıyor,
+        // carili tüm görevler gizleniyordu (BSY kendi planlarını göremiyordu).
+        const nName = normalizeName(currentProfile.full_name ?? '')
         const allowed = new Set(
           data
-            .filter(r => r.bsy_adi?.trim() === name)
+            .filter(r => normalizeName(r.bsy_adi ?? '') === nName)
             .map(r => `${r.cari_adi?.trim() || ''} / ${r.sube_adi?.trim() || ''}`)
         )
         setBsyCariSet(allowed)
@@ -2063,10 +2072,12 @@ if (currentProfile.role === 'bsy') {
   const filteredTasks = useMemo(() => {
     if (!isBsy || !bsyCariSet) return tasks
     return tasks.filter(t => {
+      // BSY kendi planlarını her zaman görür (cari, merch listesinde olmasa bile)
+      if (t.pid === currentProfile?.id) return true
       if (!t.customer) return true // İzin, Toplantı vb. — müşterisiz görevler görünsün
       return bsyCariSet.has(t.customer)
     })
-  }, [tasks, isBsy, bsyCariSet])
+  }, [tasks, isBsy, bsyCariSet, currentProfile])
 
   const taskCounts: Record<string, number> = {}
   filteredTasks.forEach(t => {
