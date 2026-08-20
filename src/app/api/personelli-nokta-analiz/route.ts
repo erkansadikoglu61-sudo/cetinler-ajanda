@@ -3,6 +3,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as XLSX from 'xlsx'
 import { createClient } from '@supabase/supabase-js'
+import { parseHtmlTableByHeader, fetchPhpHtml } from '@/lib/merchSatis'
 
 const EXCEL_PATH =
   process.env.BSY_EXCEL_PATH ??
@@ -26,13 +27,6 @@ async function getExcelBuffer(): Promise<Buffer | null> {
     if (error || !data) return null
     return Buffer.from(await data.arrayBuffer())
   } catch { return null }
-}
-
-function decodeHtml(s: string): string {
-  return s
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
-    .trim()
 }
 
 // Cari adı normalize: büyük harf, noktalama sil, Türkçe karakterleri dönüştür
@@ -94,21 +88,17 @@ export async function GET(req: Request) {
   const bsySet = new Set<string>()
 
   try {
+    // Başlık ismine göre okunur (export'a MERCH_TC_NO gibi kolon eklendiğinde
+    // sabit indeksler kayıp filtreleri bozuyordu).
     const phpUrl = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_detay.php'
-    const phpRes = await fetch(phpUrl, { next: { revalidate: 900 } })
-    const html   = await phpRes.text()
-
-    const trMatches = html.match(/<tr>[\s\S]*?<\/tr>/gi) || []
-    for (let i = 1; i < trMatches.length; i++) {
-      const tdMatches = trMatches[i].match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || []
-      if (tdMatches.length < 10) continue
-      const cells     = tdMatches.map(td => decodeHtml(td.replace(/<\/?td[^>]*>/gi, '')))
-      const merchAdi  = cells[0]?.trim() || ''
-      const merchTipi = cells[2] || ''
-      const cariKod   = cells[3] || ''
-      const cariAdi   = cells[4] || ''
-      const subeKod   = (cells[5] || '__default__').trim()
-      const bsyAdi    = cells[9] || ''
+    const { rows: mdRows } = parseHtmlTableByHeader(await fetchPhpHtml(phpUrl))
+    for (const r of mdRows) {
+      const merchAdi  = (r['MERCH_ADI'] ?? '').trim()
+      const merchTipi = r['MERCH_TIPI'] ?? ''
+      const cariKod   = r['CARI_KODU'] ?? ''
+      const cariAdi   = r['CARI_ISIM'] ?? ''
+      const subeKod   = (r['SUBE_KODU'] || '__default__').trim()
+      const bsyAdi    = r['BSY_ADI'] ?? ''
 
       if (merchTipi !== 'Çetinler Merch') continue
       if (!cariKod) continue

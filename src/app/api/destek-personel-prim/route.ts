@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { parseHtmlTableByHeader, fetchPhpHtml } from '@/lib/merchSatis'
 
 function getAdmin() {
   return createClient(
@@ -20,13 +21,6 @@ interface DestekPersonelRow {
   satis_adedi:         number
   kosullu_destek_prim: number
   hak_edis:            number
-}
-
-function decodeHtml(text: string): string {
-  return text
-    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>').replace(/&quot;/g, '"')
-    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)))
 }
 
 function normalize(str: string): string {
@@ -55,19 +49,10 @@ export async function GET(req: Request) {
     if (fpError) return NextResponse.json({ error: fpError.message }, { status: 500 })
     if (!destekPersonel?.length) return NextResponse.json({ rows: [] })
 
-    // 2. export_merch_detay.php — kolon mapping:
-    //   [0] MERCH_ADI  [1] MERCH_ID  [2] MERCH_TIPI
-    //   [3] CARI_KODU  [4] CARI_ISIM [5] SUBE_KODU  [6] SUBE_ADI
-    //   [7] IBAN  [8] BSY_KODU  [9] BSY_ADI
-    //   [10] SUPERVIZOR  (K kolonu — doğrudan Supervisor: Sinem Bektaş, Songül Durukan…)
-    //   [11] JR_SUPERVIZOR
-    const phpRes = await fetch(
-      'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_detay.php',
-      { next: { revalidate: 900 } }
-    )
-    if (!phpRes.ok) return NextResponse.json({ rows: [] })
-
-    const html = await phpRes.text()
+    // 2. export_merch_detay.php — başlık ismine göre okunur (export'a kolon
+    //    eklendiğinde, ör. MERCH_TC_NO, sabit indeksler kayıp sup/cari/şube
+    //    alanlarını bozuyordu).
+    const html = await fetchPhpHtml('https://b2b.cetinlerltd.com.tr/phprapor/export_merch_detay.php')
 
     // Cari adının ilk 2 normalize kelimesi (kısaltma uyumsuzluklarını aşmak için)
     function shortCari(cari: string): string {
@@ -82,19 +67,15 @@ export async function GET(req: Request) {
     const fullMap  = new Map<string, PhpEntry>()
     const shortMap = new Map<string, PhpEntry>()
 
-    const trMatches = [...html.matchAll(/<tr>([\s\S]*?)<\/tr>/gi)]
-    for (let i = 1; i < trMatches.length; i++) {
-      const cells = [...trMatches[i][1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)]
-        .map(m => decodeHtml(m[1].replace(/<[^>]+>/g, '')).trim())
-      if (cells.length < 10) continue
-
-      const cariAdi   = cells[4] ?? ''
-      const subeAdi   = cells[6] ?? ''
-      const bsy       = cells[8] ?? ''
-      const supAdiPHP = cells[10] ?? ''
-      const jrAdi     = cells[11] ?? ''
-      const merchAdi  = cells[0]  ?? ''
-      const merchTipi = cells[2]  ?? ''
+    const { rows: mdRows } = parseHtmlTableByHeader(html)
+    for (const r of mdRows) {
+      const cariAdi   = r['CARI_ISIM'] ?? ''
+      const subeAdi   = r['SUBE_ADI'] ?? ''
+      const bsy       = r['BSY_KODU'] ?? ''
+      const supAdiPHP = r['SUPERVIZOR'] ?? ''
+      const jrAdi     = r['JR_SUPERVIZOR'] ?? ''
+      const merchAdi  = r['MERCH_ADI'] ?? ''
+      const merchTipi = r['MERCH_TIPI'] ?? ''
 
       if (!subeAdi || !cariAdi) continue
 
