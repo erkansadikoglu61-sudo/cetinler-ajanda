@@ -16,7 +16,14 @@ import {
 import { Profile } from '@/lib/supabase'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
 
-type SubTab = 'sup' | 'jr' | 'merch' | 'top20' | 'satislar'
+type SubTab = 'sup' | 'jr' | 'merch' | 'top20' | 'satislar' | 'ozel'
+
+// ─── Ağustos 2026 EKSTRA Prim uygulaması ───
+// Şube bazında, aşağıdaki gruplardan 5 adet ve üzeri satışa çift prim.
+const OZEL_DONEM = '2026-08'
+const OZEL_HEDEF = 5
+const OZEL_IPL = ['IPL9650', 'IPL9750', 'IPL9850', 'IPL9950']
+const OZEL_RMS = ['RMS9200B', 'RMS9200P']
 
 // ─── Top-30 yardımcı tipler ───
 interface Top20Row { cariIsim: string; subeAdi: string; adet: number }
@@ -325,6 +332,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const [satMerchTipi, setSatMerchTipi] = useState('')
   const [satMerch,     setSatMerch]     = useState('')
   const [satCari,      setSatCari]      = useState('')
+  const [ozelCari,     setOzelCari]     = useState('')
+  const [ozelSube,     setOzelSube]     = useState('')
 
   const isAdmin = currentProfile.role === 'admin'
   const isSup   = currentProfile.role === 'sup'
@@ -940,6 +949,82 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     if (ok1 && ok2) setTargetModal(null)
   }
 
+  // ── Özel Uygulama Takip (Ağustos 2026 EKSTRA Prim) ───────────
+  // Şube bazında IPL / RMS grubu satış adedi; 5+ olan şubeler çift prim
+  // hakkeder. Rol bazlı görünürlük: Admin tümü, Sup kendi + Jr'ları,
+  // Jr kendi şubeleri (merch-detay'daki sup_adi/jr_adi eşleşmesi).
+  const ozelRows = useMemo(() => {
+    const augRows = allRows.filter(r => r.donem === OZEL_DONEM)
+
+    // merch-detay: norm(cari)||norm(sube) → { sup, jr }
+    const detay = new Map<string, { sup: string; jr: string }>()
+    merchDetayData.forEach(d => {
+      const k = `${normalizeName(d.cari_adi)}||${normalizeName(d.sube_adi)}`
+      if (!detay.has(k)) detay.set(k, { sup: d.sup_adi || '', jr: d.jr_adi || '' })
+    })
+
+    // Şube (cari+sube) bazında IPL / RMS adetleri
+    const groups = new Map<string, { cari: string; sube: string; ipl: number; rms: number }>()
+    augRows.forEach(r => {
+      const code = (r.stok_kodu || '').toUpperCase()
+      const isIpl = OZEL_IPL.includes(code)
+      const isRms = OZEL_RMS.includes(code)
+      if (!isIpl && !isRms) return
+      const k = `${normalizeName(r.cari_isim)}||${normalizeName(r.sube_adi)}`
+      const g = groups.get(k) ?? { cari: r.cari_isim, sube: r.sube_adi, ipl: 0, rms: 0 }
+      if (isIpl) g.ipl += r.satilan_adet
+      else g.rms += r.satilan_adet
+      groups.set(k, g)
+    })
+
+    type Row = { cari: string; sube: string; grup: 'IPL' | 'RMS'; hedef: number; gerc: number; kalan: number; ulasti: boolean }
+    const out: Row[] = []
+    for (const [k, g] of groups) {
+      const info = detay.get(k)
+      let visible = false
+      if (isAdmin) visible = true
+      else if (isSup) visible = !!info && namesMatch(info.sup, currentProfile.full_name)
+      else if (isJr) visible = !!info && namesMatch(info.jr, currentProfile.full_name)
+      if (!visible) continue
+
+      for (const [grup, gerc] of [['IPL', g.ipl], ['RMS', g.rms]] as const) {
+        if (gerc <= 0) continue
+        out.push({
+          cari: g.cari, sube: g.sube, grup,
+          hedef: OZEL_HEDEF, gerc,
+          kalan: Math.max(0, OZEL_HEDEF - gerc),
+          ulasti: gerc >= OZEL_HEDEF,
+        })
+      }
+    }
+    // Hakkedenler üstte değil — takip için: önce hakketmeyen & yakın olanlar,
+    // sonra hakkedenler. (kalan artan; hakkedenler en sonda)
+    out.sort((a, b) =>
+      Number(a.ulasti) - Number(b.ulasti) ||
+      a.kalan - b.kalan ||
+      a.cari.localeCompare(b.cari, 'tr') ||
+      a.sube.localeCompare(b.sube, 'tr') ||
+      a.grup.localeCompare(b.grup)
+    )
+    return out
+  }, [allRows, merchDetayData, isAdmin, isSup, isJr, currentProfile.full_name])
+
+  // Cari / Şube filtre seçenekleri (rol kapsamına göre)
+  const ozelCariOptions = useMemo(
+    () => [...new Set(ozelRows.map(r => r.cari))].sort((a, b) => a.localeCompare(b, 'tr')),
+    [ozelRows]
+  )
+  const ozelSubeOptions = useMemo(
+    () => [...new Set(ozelRows.filter(r => !ozelCari || r.cari === ozelCari).map(r => r.sube))]
+      .sort((a, b) => a.localeCompare(b, 'tr')),
+    [ozelRows, ozelCari]
+  )
+  const ozelFiltered = useMemo(
+    () => ozelRows.filter(r => (!ozelCari || r.cari === ozelCari) && (!ozelSube || r.sube === ozelSube)),
+    [ozelRows, ozelCari, ozelSube]
+  )
+  const ozelUlasan = useMemo(() => ozelFiltered.filter(r => r.ulasti).length, [ozelFiltered])
+
   // ── Which sub-tabs are visible? ───────────────────────────────
   const showSupTab  = isAdmin || isSup
   const showJrTab   = isAdmin || isSup || isJr
@@ -1028,9 +1113,18 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             subTab === 'satislar' ? 'border-brand-700 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'
           )}
         >Satışlar</button>
+        {(isAdmin || isSup || isJr) && (
+          <button
+            onClick={() => setSubTab('ozel')}
+            className={clsx(
+              'px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap',
+              subTab === 'ozel' ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-800'
+            )}
+          >🚀 Özel Uygulama Takip</button>
+        )}
         <div className="flex-1" />
         {/* Target entry button */}
-        {(isAdmin || isSup) && subTab !== 'sup' && (
+        {(isAdmin || isSup) && subTab !== 'sup' && subTab !== 'ozel' && (
           <button
             onClick={() => setTargetModal(subTab)}
             className="flex items-center gap-1 px-2 py-1 mb-1 text-[11px] bg-brand-700 text-white rounded-lg hover:bg-brand-600"
@@ -1397,6 +1491,111 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 </tfoot>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* ── Özel Uygulama Takip (Ağustos 2026 EKSTRA Prim) ── */}
+        {!selloutLoading && subTab === 'ozel' && (
+          <div className="p-2">
+            {/* Bilgi bandı */}
+            <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-bold text-emerald-800">🚀 Ağustos 2026 EKSTRA Prim Uygulaması</span>
+                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">1–31 Ağustos</span>
+              </div>
+              <p className="text-[11px] text-emerald-900/80 leading-snug">
+                Şube bazında aşağıdaki gruplardan <b>{OZEL_HEDEF} adet ve üzeri</b> satışa çift prim uygulanır.
+                {' '}<b>IPL Grubu</b> ({OZEL_IPL.join(', ')}) &nbsp;•&nbsp; <b>RMS Grubu</b> ({OZEL_RMS.join(', ')}).
+              </p>
+              <p className="text-[11px] font-semibold text-emerald-800 mt-1.5">
+                Çift prim hakkeden şube-grup: {ozelUlasan} / {ozelFiltered.length}
+              </p>
+            </div>
+
+            {/* Cari / Şube filtreleri */}
+            {ozelRows.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <select
+                  value={ozelCari}
+                  onChange={e => { setOzelCari(e.target.value); setOzelSube('') }}
+                  className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:border-brand-400 max-w-[280px]"
+                >
+                  <option value="">Cari (Tümü)</option>
+                  {ozelCariOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select
+                  value={ozelSube}
+                  onChange={e => setOzelSube(e.target.value)}
+                  className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:border-brand-400 max-w-[200px]"
+                >
+                  <option value="">Şube (Tümü)</option>
+                  {ozelSubeOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                {(ozelCari || ozelSube) && (
+                  <button
+                    onClick={() => { setOzelCari(''); setOzelSube('') }}
+                    className="text-xs text-gray-400 hover:text-gray-600 underline"
+                  >Sıfırla</button>
+                )}
+                <span className="text-[10px] text-gray-400">{ozelFiltered.length} kayıt</span>
+              </div>
+            )}
+
+            {ozelRows.length === 0 ? (
+              <div className="flex items-center justify-center h-32 text-xs text-gray-400">
+                Kapsamınızda henüz IPL / RMS satışı bulunmuyor.
+              </div>
+            ) : ozelFiltered.length === 0 ? (
+              <div className="flex items-center justify-center h-32 text-xs text-gray-400">
+                Seçili filtreye uygun kayıt yok.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+                <table className="text-xs border-collapse w-full bg-white">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-gray-800 text-white">
+                      <th className="px-3 py-2.5 text-left font-semibold min-w-[220px]">Cari</th>
+                      <th className="px-3 py-2.5 text-left font-semibold min-w-[120px]">Şube</th>
+                      <th className="px-3 py-2.5 text-center font-semibold">Grup</th>
+                      <th className="px-3 py-2.5 text-right font-semibold">Grup Hedef</th>
+                      <th className="px-3 py-2.5 text-right font-semibold">Gerçekleşen</th>
+                      <th className="px-3 py-2.5 text-right font-semibold">Kalan</th>
+                      <th className="px-3 py-2.5 text-center font-semibold">Durum</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ozelFiltered.map((r, i) => (
+                      <tr
+                        key={`${r.cari}|${r.sube}|${r.grup}`}
+                        className={clsx(
+                          'border-t border-gray-100',
+                          r.ulasti ? 'bg-emerald-50' : (r.kalan <= 2 ? 'bg-amber-50' : (i % 2 ? 'bg-gray-50/50' : 'bg-white'))
+                        )}
+                      >
+                        <td className="px-3 py-2 text-gray-800">{r.cari}</td>
+                        <td className="px-3 py-2 text-gray-600">{r.sube}</td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={clsx(
+                            'inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                            r.grup === 'IPL' ? 'bg-indigo-100 text-indigo-700' : 'bg-pink-100 text-pink-700'
+                          )}>{r.grup}</span>
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-gray-500">{r.hedef}</td>
+                        <td className="px-3 py-2 text-right tabular-nums font-bold text-gray-900">{r.gerc}</td>
+                        <td className={clsx('px-3 py-2 text-right tabular-nums font-semibold', r.kalan === 0 ? 'text-emerald-600' : (r.kalan <= 2 ? 'text-amber-600' : 'text-gray-500'))}>
+                          {r.kalan}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {r.ulasti
+                            ? <span className="text-[10px] font-bold text-emerald-700">✓ Çift Prim</span>
+                            : <span className="text-[10px] text-gray-400">{r.kalan} kaldı</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
