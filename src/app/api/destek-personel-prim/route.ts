@@ -43,7 +43,7 @@ export async function GET(req: Request) {
     // 1. Destek personelleri
     const { data: destekPersonel, error: fpError } = await sb
       .from('field_personnel')
-      .select('merch_adi, sube_adi, cari_adi, merch_grubu')
+      .select('merch_adi, sube_adi, cari_adi, merch_grubu, sup_adi, jr_adi, bsy_adi')
       .eq('merch_grubu', 'Destek Personeli')
 
     if (fpError) return NextResponse.json({ error: fpError.message }, { status: 500 })
@@ -111,11 +111,18 @@ export async function GET(req: Request) {
       const nc = normalize(dp.cari_adi)
       const php = phpEntry(ns, nc, dp.cari_adi)
 
+      // Süpervizör/Jr: önce merch-detay enrichment, yoksa field_personnel'ın
+      // KENDİ sup_adi/jr_adi alanları. Bazı destek personellerinin şubesi
+      // (ör. HÜSEYİNGAZİ) merch-detay'da yok → enrichment boş → Süpervizör "-"
+      // görünüp Sup filtresine takılıyor, o Süpervizör kişiyi göremiyordu.
+      const supAdiRaw = (php?.sup || dp.sup_adi || '').trim()
+      const jrAdiRaw  = (php?.jr  || dp.jr_adi  || '').trim()
+
       if (bsyKod) {
         if ((php?.bsy ?? '') !== bsyKod) continue
       } else if (normalizedSupAdi) {
-        const phpSup = normalize(php?.sup ?? '')
-        if (phpSup !== normalizedSupAdi) continue
+        // Efektif Süpervizör (enrichment veya field_personnel) ile eşleş
+        if (normalize(supAdiRaw) !== normalizedSupAdi) continue
       }
 
       // Cari/şube adını PHP'den al (daha tutarlı format), yoksa field_personnel'dan
@@ -123,8 +130,6 @@ export async function GET(req: Request) {
 
       const displayCari = php?.cari_adi || dp.cari_adi
       const displaySube = php?.sube_adi || dp.sube_adi
-      const supAdiRaw     = php?.sup  ?? ''
-      const jrAdiRaw      = php?.jr   ?? ''
 
       // Süpervizör kolonunda Jr. Sup varsa onu göster, üstünde Sup adı küçük
       const displaySup    = jrAdiRaw || supAdiRaw
