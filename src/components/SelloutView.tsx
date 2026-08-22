@@ -1596,6 +1596,18 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot className="sticky bottom-0">
+                    <tr className="bg-gray-100 font-bold border-t-2 border-gray-300">
+                      <td colSpan={4} className="px-3 py-2.5 text-right text-gray-700">Alt Toplam</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-gray-900">
+                        {ozelFiltered.reduce((s, r) => s + r.gerc, 0).toLocaleString('tr-TR')}
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-gray-900">
+                        {ozelFiltered.reduce((s, r) => s + r.kalan, 0).toLocaleString('tr-TR')}
+                      </td>
+                      <td className="px-3 py-2.5" />
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             )}
