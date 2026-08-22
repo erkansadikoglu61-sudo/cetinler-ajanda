@@ -954,7 +954,9 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   // hakkeder. Rol bazlı görünürlük: Admin tümü, Sup kendi + Jr'ları,
   // Jr kendi şubeleri (merch-detay'daki sup_adi/jr_adi eşleşmesi).
   const ozelRows = useMemo(() => {
-    const augRows = allRows.filter(r => r.donem === OZEL_DONEM)
+    // Prim yalnızca Bayi Merch için geçerli — Çetinler Merch satışları sayılmaz
+    // (yalnızca Çetinler Merch olan şubeler tabloya girmez).
+    const augRows = allRows.filter(r => r.donem === OZEL_DONEM && r.merch_tipi === 'Bayi Merch')
 
     // merch-detay: norm(cari)||norm(sube) → { sup, jr }
     const detay = new Map<string, { sup: string; jr: string }>()
@@ -1504,7 +1506,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">1–31 Ağustos</span>
               </div>
               <p className="text-[11px] text-emerald-900/80 leading-snug">
-                Şube bazında aşağıdaki gruplardan <b>{OZEL_HEDEF} adet ve üzeri</b> satışa çift prim uygulanır.
+                Şube bazında aşağıdaki gruplardan <b>{OZEL_HEDEF} adet ve üzeri</b> satışa çift prim uygulanır
+                {' '}(<b>yalnızca Bayi Merch</b>; Çetinler Merch satışları dahil değildir).
                 {' '}<b>IPL Grubu</b> ({OZEL_IPL.join(', ')}) &nbsp;•&nbsp; <b>RMS Grubu</b> ({OZEL_RMS.join(', ')}).
               </p>
               <p className="text-[11px] font-semibold text-emerald-800 mt-1.5">
