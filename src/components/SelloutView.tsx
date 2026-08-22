@@ -18,9 +18,8 @@ import { BSY_NAME_TO_KOD } from '@/lib/bsy'
 
 type SubTab = 'sup' | 'jr' | 'merch' | 'top20' | 'satislar' | 'ozel'
 
-// ─── Ağustos 2026 EKSTRA Prim uygulaması ───
+// ─── EKSTRA Prim uygulaması (seçili döneme göre çalışır) ───
 // Şube bazında, aşağıdaki gruplardan 5 adet ve üzeri satışa çift prim.
-const OZEL_DONEM = '2026-08'
 const OZEL_HEDEF = 5
 const OZEL_IPL = ['IPL9650', 'IPL9750', 'IPL9850', 'IPL9950']
 const OZEL_RMS = ['RMS9200B', 'RMS9200P']
@@ -954,9 +953,10 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   // hakkeder. Rol bazlı görünürlük: Admin tümü, Sup kendi + Jr'ları,
   // Jr kendi şubeleri (merch-detay'daki sup_adi/jr_adi eşleşmesi).
   const ozelRows = useMemo(() => {
+    // Seçili döneme göre çalışır (özel uygulama aylık farklılık gösterebilir).
     // Prim yalnızca Bayi Merch için geçerli — Çetinler Merch satışları sayılmaz
     // (yalnızca Çetinler Merch olan şubeler tabloya girmez).
-    const augRows = allRows.filter(r => r.donem === OZEL_DONEM && r.merch_tipi === 'Bayi Merch')
+    const augRows = allRows.filter(r => r.donem === donem && r.merch_tipi === 'Bayi Merch')
 
     // merch-detay: norm(cari)||norm(sube) → { sup, jr }
     const detay = new Map<string, { sup: string; jr: string }>()
@@ -1009,7 +1009,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       a.grup.localeCompare(b.grup)
     )
     return out
-  }, [allRows, merchDetayData, isAdmin, isSup, isJr, currentProfile.full_name])
+  }, [allRows, donem, merchDetayData, isAdmin, isSup, isJr, currentProfile.full_name])
 
   // Cari / Şube filtre seçenekleri (rol kapsamına göre)
   const ozelCariOptions = useMemo(
@@ -1502,8 +1502,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             {/* Bilgi bandı */}
             <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-bold text-emerald-800">🚀 Ağustos 2026 EKSTRA Prim Uygulaması</span>
-                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">1–31 Ağustos</span>
+                <span className="text-sm font-bold text-emerald-800">🚀 EKSTRA Prim Uygulaması</span>
+                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">{donemLabel(donem)}</span>
               </div>
               <p className="text-[11px] text-emerald-900/80 leading-snug">
                 Şube bazında aşağıdaki gruplardan <b>{OZEL_HEDEF} adet ve üzeri</b> satışa çift prim uygulanır
