@@ -885,10 +885,11 @@ export function PrimOdemeListesi({
       const [bayiData, destekData, detayData] = await Promise.all([bayiRes.json(), destekRes.json(), detayRes.json()])
       if (!bayiRes.ok) throw new Error(bayiData.error ?? 'Bayi Merch yükleme hatası')
 
-      // merch_adi.toLowerCase() → iban
+      // normalize(merch_adi) → iban. Türkçe-karakter/büyük-küçük/boşluk
+      // farklarından bağımsız eşleşme (İ/ı, ç, ş vb.).
       const ibanMap = new Map<string, string>()
       for (const d of (detayData.data ?? [])) {
-        if (d.iban) ibanMap.set((d.merch_adi as string).toLowerCase(), d.iban as string)
+        if (d.iban) ibanMap.set(normOdeme(d.merch_adi as string), d.iban as string)
       }
 
       const combined: PrimOdemeRow[] = []
@@ -904,7 +905,7 @@ export function PrimOdemeListesi({
           subeAdi:   r.subeAdi,
           supAdi:    resolveSupName(r.supervizor ?? ''),
           bsyKod:    r.bsyKod ?? '',
-          iban:      ibanMap.get((r.bayiMerch as string).toLowerCase()) ?? '',
+          iban:      ibanMap.get(normOdeme(r.bayiMerch as string)) ?? '',
         })
       }
 
@@ -919,7 +920,7 @@ export function PrimOdemeListesi({
           subeAdi:   h.sube_adi ?? '',
           supAdi:    resolveSupName(h.sup_adi ?? ''),
           bsyKod:    '',
-          iban:      ibanMap.get((h.merch_adi as string).toLowerCase()) ?? '',
+          iban:      ibanMap.get(normOdeme(h.merch_adi as string)) ?? '',
         })
       }
 
