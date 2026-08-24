@@ -24,6 +24,16 @@ const OZEL_HEDEF = 5
 const OZEL_IPL = ['IPL9650', 'IPL9750', 'IPL9850', 'IPL9950']
 const OZEL_RMS = ['RMS9200B', 'RMS9200P']
 
+// PHP TARIH ("DD.MM.YYYY") veya "YYYY-MM-DD" → karşılaştırılabilir "YYYY-MM-DD".
+// Parse edilemezse '' döner (o zaman ay bazlı karşılaştırmaya düşülür).
+function tarihToIso(t: string): string {
+  const s = (t || '').trim()
+  if (!s) return ''
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
+  const m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})/)
+  return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : ''
+}
+
 // ─── Top-30 yardımcı tipler ───
 interface Top20Row { cariIsim: string; subeAdi: string; adet: number }
 
@@ -626,18 +636,28 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     .replace(/İ/g, 'i').replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ü/g, 'u')
     .replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c').replace(/\s+/g, ' ')
 
-  // Satış satırı için özel bayi merch prim oranını hesapla (standart + özel ek)
-  const getEffectiveBayiMerch = useCallback((stokKodu: string, grupKodu: string, cariIsim: string, subeAdi: string): number => {
+  // Satış satırı için özel bayi merch prim oranını hesapla (standart + özel ek).
+  // tarih: satırın PHP TARIH'i (gün bazlı tarih kısıtı için).
+  const getEffectiveBayiMerch = useCallback((stokKodu: string, grupKodu: string, cariIsim: string, subeAdi: string, tarih: string): number => {
     const standardRate = adetPrimMap.get(stokKodu)?.bayiMerch ?? 0
+    const saleIso = tarihToIso(tarih)  // 'YYYY-MM-DD' veya ''
     const rule = ozelPrimData.find(r => {
       const stokOk = !r.stok_kodu || r.stok_kodu.some(s => s.toUpperCase() === stokKodu.toUpperCase())
       const grupOk = !r.grup_kodu || (r.stok_kodu?.length ? stokOk : r.grup_kodu.some(g => g.toUpperCase() === grupKodu.toUpperCase()))
       const cariOk = !r.cari_adi  || r.cari_adi.some(c => normStr(c) === normStr(cariIsim))
       const subeOk = !r.sube_adi  || r.sube_adi.some(s => normStr(s) === normStr(subeAdi))
-      const from   = r.tarih_baslangic ? r.tarih_baslangic.slice(0, 7) : null
-      const to     = r.tarih_bitis     ? r.tarih_bitis.slice(0, 7)     : null
-      const basOk  = !from || from <= donem
-      const bitOk  = !to   || to   >= donem
+      // Tarih kısıtı GÜN bazlı: satır tarihi çözülebiliyorsa tam tarih karşılaştır,
+      // yoksa (eski davranış) ay bazına düş.
+      let basOk: boolean, bitOk: boolean
+      if (saleIso) {
+        basOk = !r.tarih_baslangic || r.tarih_baslangic.slice(0, 10) <= saleIso
+        bitOk = !r.tarih_bitis     || r.tarih_bitis.slice(0, 10)     >= saleIso
+      } else {
+        const from = r.tarih_baslangic ? r.tarih_baslangic.slice(0, 7) : null
+        const to   = r.tarih_bitis     ? r.tarih_bitis.slice(0, 7)     : null
+        basOk = !from || from <= donem
+        bitOk = !to   || to   >= donem
+      }
       return stokOk && grupOk && cariOk && subeOk && basOk && bitOk
     })
     if (!rule) return standardRate
@@ -706,7 +726,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       const satisAdedi = row.satilan_adet || 0
 
       const bayiMerchPrimAdet = row.merch_tipi === 'Bayi Merch'
-        ? getEffectiveBayiMerch(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '')
+        ? getEffectiveBayiMerch(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '', row.tarih || '')
         : primData.bayiMerch
       const bayiMerchHakedis = bayiMerchPrimAdet * satisAdedi
 
@@ -1376,7 +1396,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
                       // 1. Bayi Merch Adet Primi (özel prim kuralı varsa uygula)
                       const bayiMerchPrimAdet = row.merch_tipi === 'Bayi Merch'
-                        ? getEffectiveBayiMerch(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '')
+                        ? getEffectiveBayiMerch(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '', row.tarih || '')
                         : primData.bayiMerch
 
                       // 2. Bayi Merch Prim Hakedişi

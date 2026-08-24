@@ -53,6 +53,19 @@ export async function fetchPhpHtml(
   return run
 }
 
+/**
+ * PHP TARIH ("DD.MM.YYYY") ya da "YYYY-MM-DD" değerini karşılaştırılabilir
+ * "YYYY-MM-DD" biçimine çevirir. Parse edilemezse '' döner.
+ * Gün bazlı tarih-kısıtlı prim kurallarının doğru uygulanması için.
+ */
+export function tarihToIso(t: string): string {
+  const s = (t || '').trim()
+  if (!s) return ''
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
+  const m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})/)
+  return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : ''
+}
+
 export function decodeHtml(s: string): string {
   return s
     .replace(/&amp;/g, '&')

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { ADET_PRIM_DEFAULTS } from '@/lib/adet-prim-defaults'
 import { createClient } from '@supabase/supabase-js'
-import { parseHtmlTableByHeader, num, fetchPhpHtml } from '@/lib/merchSatis'
+import { parseHtmlTableByHeader, num, fetchPhpHtml, tarihToIso } from '@/lib/merchSatis'
 
 export const maxDuration = 30
 
@@ -65,16 +65,23 @@ export async function GET(req: Request) {
     .replace(/İ/g, 'i').replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ü/g, 'u')
     .replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c').replace(/\s+/g, ' ')
 
-  function findOzelRule(stokKodu: string, grupKodu: string, cariAdi: string, subeAdi: string): OzelPrimRow | undefined {
+  // saleIso: satırın 'YYYY-MM-DD' tarihi (gün bazlı kısıt); boşsa ay bazına düşülür.
+  function findOzelRule(stokKodu: string, grupKodu: string, cariAdi: string, subeAdi: string, saleIso: string): OzelPrimRow | undefined {
     for (const rule of ozelPrimRows) {
       const stokOk = !rule.stok_kodu || rule.stok_kodu.some(s => s.toUpperCase() === stokKodu.toUpperCase())
       const grupOk = !rule.grup_kodu || (rule.stok_kodu?.length ? stokOk : rule.grup_kodu.some(g => g.toUpperCase() === grupKodu.toUpperCase()))
       const cariOk = !rule.cari_adi  || rule.cari_adi.some(c => normStr(c) === normStr(cariAdi))
       const subeOk = !rule.sube_adi  || rule.sube_adi.some(s => normStr(s) === normStr(subeAdi))
-      const ruleFrom = rule.tarih_baslangic ? rule.tarih_baslangic.slice(0, 7) : null
-      const ruleTo   = rule.tarih_bitis     ? rule.tarih_bitis.slice(0, 7)     : null
-      const basOk  = !ruleFrom || ruleFrom <= donem
-      const bitOk  = !ruleTo   || ruleTo   >= donem
+      let basOk: boolean, bitOk: boolean
+      if (saleIso) {
+        basOk = !rule.tarih_baslangic || rule.tarih_baslangic.slice(0, 10) <= saleIso
+        bitOk = !rule.tarih_bitis     || rule.tarih_bitis.slice(0, 10)     >= saleIso
+      } else {
+        const ruleFrom = rule.tarih_baslangic ? rule.tarih_baslangic.slice(0, 7) : null
+        const ruleTo   = rule.tarih_bitis     ? rule.tarih_bitis.slice(0, 7)     : null
+        basOk  = !ruleFrom || ruleFrom <= donem
+        bitOk  = !ruleTo   || ruleTo   >= donem
+      }
       if (stokOk && grupOk && cariOk && subeOk && basOk && bitOk) return rule
     }
     return undefined
@@ -104,7 +111,7 @@ export async function GET(req: Request) {
     const satisAdet = num(row['SATILAN_ADET'])
     const standardRate = primMap.get(stokKodu) ?? null
 
-    const ozelRule = findOzelRule(stokKodu, grupKodu, cariIsim, subeAdi)
+    const ozelRule = findOzelRule(stokKodu, grupKodu, cariIsim, subeAdi, tarihToIso(row['TARIH'] ?? ''))
     let rate: number | null
     if (ozelRule) {
       if (ozelRule.prim_carpan != null && standardRate != null) rate = standardRate * ozelRule.prim_carpan
