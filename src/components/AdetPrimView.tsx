@@ -777,6 +777,36 @@ function normSupName(s: string): string {
   return (s || '').trim().replace(/\s+sv\s*$/i, '').trim().toLowerCase()
 }
 
+// Türkçe küçük harf + karakter sadeleştirme (eşleştirme için)
+function normOdeme(s: string): string {
+  return (s || '').toLocaleLowerCase('tr')
+    .replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ü/g, 'u')
+    .replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c')
+    .replace(/\s+/g, ' ').trim()
+}
+
+// ─── Prim ödemesi YAPILMAYAN noktalar ──────────────────────────────
+// Ödenecek Tutar hesabında dikkate alınır. Yeni istisna eklemek için
+// buraya satır ekleyin.
+//   cari  : cari adında geçmesi yeterli (kısmi eşleşme).
+//   allow : verilirse YALNIZCA bu merch'lere ödeme yapılır; yoksa hiçbirine.
+const ODEME_ISTISNALARI: { cari: string; allow?: string[] }[] = [
+  { cari: 'uğurlu perakende' },                                     // tüm merch'ler → ödenmez
+  { cari: 'kolay home', allow: ['Gülser Çevik', 'Fazilet Aydın'] }, // yalnızca bu ikisi ödenir
+]
+
+// Bir satır için ödenecek tutarı hesapla (istisna varsa 0, yoksa hakediş).
+function hesaplaOdenecek(r: PrimOdemeRow): number {
+  const cari = normOdeme(r.cariAdi)
+  for (const k of ODEME_ISTISNALARI) {
+    if (!cari.includes(normOdeme(k.cari))) continue
+    if (!k.allow || k.allow.length === 0) return 0
+    const merch = normOdeme(r.merchAdi)
+    return k.allow.some(a => normOdeme(a) === merch) ? r.hakedis : 0
+  }
+  return r.hakedis
+}
+
 export function PrimOdemeListesi({
   supervisorFilter = null,
   bsyKodFilter = null,
@@ -914,34 +944,38 @@ export function PrimOdemeListesi({
   })
 
   const toplamPrim = filtered.reduce((s, r) => s + r.hakedis, 0)
+  const toplamOdenecek = filtered.reduce((s, r) => s + hesaplaOdenecek(r), 0)
 
   function exportExcel() {
     const wsData = [
-      ['#', 'Merch Tipi', 'Merch Adı', 'Hakediş (₺)', 'Cari İsmi', 'Şube Adı', 'Süpervizör', 'IBAN'],
+      ['#', 'Merch Tipi', 'Merch Adı', 'Hakediş (₺)', 'Ödenecek Tutar (₺)', 'Cari İsmi', 'Şube Adı', 'Süpervizör', 'IBAN'],
       ...filtered.map((r, i) => [
         i + 1,
         r.merchTipi,
         r.merchAdi,
         r.hakedis,
+        hesaplaOdenecek(r),
         r.cariAdi,
         r.subeAdi || '',
         r.supAdi || '',
         r.iban || '',
       ]),
-      ['', '', 'TOPLAM', toplamPrim, '', '', '', ''],
+      ['', '', 'TOPLAM', toplamPrim, toplamOdenecek, '', '', '', ''],
     ]
     const ws = XLSX.utils.aoa_to_sheet(wsData)
 
-    // Hakediş kolonu (D) için 1.000 ayraçlı ve 2 ondalık basamaklı format uygula
+    // Hakediş (D) ve Ödenecek Tutar (E) kolonlarına sayı formatı uygula
     const numFmt = '#,##0.00'
     const dataRowCount = filtered.length + 2  // başlık + veri + toplam
     for (let row = 1; row < dataRowCount; row++) {
-      const cellRef = XLSX.utils.encode_cell({ r: row, c: 3 })
-      if (ws[cellRef]) ws[cellRef].z = numFmt
+      for (const c of [3, 4]) {
+        const cellRef = XLSX.utils.encode_cell({ r: row, c })
+        if (ws[cellRef]) ws[cellRef].z = numFmt
+      }
     }
 
     ws['!cols'] = [
-      { wch: 5 }, { wch: 16 }, { wch: 22 }, { wch: 16 },
+      { wch: 5 }, { wch: 16 }, { wch: 22 }, { wch: 16 }, { wch: 18 },
       { wch: 50 }, { wch: 22 }, { wch: 20 }, { wch: 30 },
     ]
     const wb = XLSX.utils.book_new()
@@ -1009,7 +1043,7 @@ export function PrimOdemeListesi({
         {!loading && filtered.length > 0 && (
           <>
             <span className="text-[10px] text-gray-400 ml-1">
-              {filtered.length} satır · Toplam: {toplamPrim.toLocaleString('tr-TR')} ₺
+              {filtered.length} satır · Toplam: {toplamPrim.toLocaleString('tr-TR')} ₺ · Ödenecek: <span className="text-emerald-600 font-semibold">{toplamOdenecek.toLocaleString('tr-TR')} ₺</span>
             </span>
             <button onClick={exportExcel}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm ml-1">
@@ -1041,6 +1075,7 @@ export function PrimOdemeListesi({
                   <th className="text-left px-3 py-2.5 font-semibold min-w-[120px]">Merch Tipi</th>
                   <th className="text-left px-3 py-2.5 font-semibold min-w-[150px]">Merch Adı</th>
                   <th className="text-right px-3 py-2.5 font-semibold min-w-[130px]">Hakediş</th>
+                  <th className="text-right px-3 py-2.5 font-semibold min-w-[140px]">Ödenecek Tutar</th>
                   <th className="text-left px-3 py-2.5 font-semibold min-w-[200px]">Cari İsmi</th>
                   <th className="text-left px-3 py-2.5 font-semibold min-w-[130px]">Şube Adı</th>
                   <th className="text-left px-3 py-2.5 font-semibold min-w-[140px]">Süpervizör</th>
@@ -1070,6 +1105,20 @@ export function PrimOdemeListesi({
                     <td className="px-3 py-2 text-right tabular-nums font-bold text-gray-900">
                       {row.hakedis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
                     </td>
+                    {(() => {
+                      const od = hesaplaOdenecek(row)
+                      const kesildi = od < row.hakedis
+                      return (
+                        <td className={clsx(
+                          'px-3 py-2 text-right tabular-nums font-bold',
+                          kesildi ? 'text-red-500' : 'text-emerald-600'
+                        )}
+                        title={kesildi ? 'Bu noktaya prim ödemesi yapılmıyor' : undefined}
+                        >
+                          {od.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                        </td>
+                      )
+                    })()}
                     <td className="px-3 py-2 text-gray-800">{row.cariAdi}</td>
                     <td className="px-3 py-2 text-gray-700">{row.subeAdi || '—'}</td>
                     <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{row.supAdi || '—'}</td>
@@ -1082,6 +1131,9 @@ export function PrimOdemeListesi({
                   <td className="px-3 py-2" colSpan={3}>Toplam</td>
                   <td className="px-3 py-2 text-right tabular-nums font-bold">
                     {toplamPrim.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums font-bold text-emerald-300">
+                    {toplamOdenecek.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
                   </td>
                   <td colSpan={4} />
                 </tr>
