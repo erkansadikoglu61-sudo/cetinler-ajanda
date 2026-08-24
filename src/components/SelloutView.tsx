@@ -334,7 +334,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const [targetModal, setTargetModal] = useState<SubTab | null>(null)
   const [merchSearch, setMerchSearch] = useState('')
   const [adetPrimData, setAdetPrimData] = useState<{ stokKodu: string; bayiMerch: number | null; kosulluDestek: number | null; kategori: string | null }[]>([])
-  const [ozelPrimData, setOzelPrimData] = useState<{ stok_kodu: string[] | null; grup_kodu: string[] | null; cari_adi: string[] | null; sube_adi: string[] | null; bayi_merch: number | null; prim_carpan: number | null; tarih_baslangic: string | null; tarih_bitis: string | null }[]>([])
+  const [ozelPrimData, setOzelPrimData] = useState<{ stok_kodu: string[] | null; grup_kodu: string[] | null; cari_adi: string[] | null; sube_adi: string[] | null; bayi_merch: number | null; kosullu_destek: number | null; prim_carpan: number | null; tarih_baslangic: string | null; tarih_bitis: string | null }[]>([])
   const [merchHedefData, setMerchHedefData] = useState<{ merch_name: string; grup: string; hedef: number }[]>([])
   const [merchDetayData, setMerchDetayData] = useState<{ merch_adi: string; merch_grubu: string; sup_adi: string; jr_adi: string; cari_adi: string; sube_adi: string; sube_kod: string }[]>([])
   const [destekFlags, setDestekFlags] = useState<Record<string, boolean>>({})
@@ -636,18 +636,15 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     .replace(/İ/g, 'i').replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ü/g, 'u')
     .replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c').replace(/\s+/g, ' ')
 
-  // Satış satırı için özel bayi merch prim oranını hesapla (standart + özel ek).
-  // tarih: satırın PHP TARIH'i (gün bazlı tarih kısıtı için).
-  const getEffectiveBayiMerch = useCallback((stokKodu: string, grupKodu: string, cariIsim: string, subeAdi: string, tarih: string): number => {
-    const standardRate = adetPrimMap.get(stokKodu)?.bayiMerch ?? 0
+  // Satış satırına uyan özel prim kuralını bul (cari/şube/stok/grup + GÜN bazlı tarih).
+  const findOzel = useCallback((stokKodu: string, grupKodu: string, cariIsim: string, subeAdi: string, tarih: string) => {
     const saleIso = tarihToIso(tarih)  // 'YYYY-MM-DD' veya ''
-    const rule = ozelPrimData.find(r => {
+    return ozelPrimData.find(r => {
       const stokOk = !r.stok_kodu || r.stok_kodu.some(s => s.toUpperCase() === stokKodu.toUpperCase())
       const grupOk = !r.grup_kodu || (r.stok_kodu?.length ? stokOk : r.grup_kodu.some(g => g.toUpperCase() === grupKodu.toUpperCase()))
       const cariOk = !r.cari_adi  || r.cari_adi.some(c => normStr(c) === normStr(cariIsim))
       const subeOk = !r.sube_adi  || r.sube_adi.some(s => normStr(s) === normStr(subeAdi))
-      // Tarih kısıtı GÜN bazlı: satır tarihi çözülebiliyorsa tam tarih karşılaştır,
-      // yoksa (eski davranış) ay bazına düş.
+      // Tarih kısıtı GÜN bazlı: satır tarihi çözülebiliyorsa tam tarih; yoksa ay bazına düş.
       let basOk: boolean, bitOk: boolean
       if (saleIso) {
         basOk = !r.tarih_baslangic || r.tarih_baslangic.slice(0, 10) <= saleIso
@@ -660,11 +657,28 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       }
       return stokOk && grupOk && cariOk && subeOk && basOk && bitOk
     })
+  }, [ozelPrimData, donem, normStr])
+
+  // Bayi merch prim oranı (standart + özel ek / çarpan). Merch tipinden bağımsız —
+  // özel kural o cari/stok/tarihe uygulanır.
+  const getEffectiveBayiMerch = useCallback((stokKodu: string, grupKodu: string, cariIsim: string, subeAdi: string, tarih: string): number => {
+    const standardRate = adetPrimMap.get(stokKodu)?.bayiMerch ?? 0
+    const rule = findOzel(stokKodu, grupKodu, cariIsim, subeAdi, tarih)
     if (!rule) return standardRate
     if (rule.prim_carpan != null) return standardRate * rule.prim_carpan
     if (rule.bayi_merch  != null) return standardRate + rule.bayi_merch
     return standardRate
-  }, [adetPrimMap, ozelPrimData, donem, normStr])
+  }, [adetPrimMap, findOzel])
+
+  // Koşullu destek prim oranı (standart + özel koşullu destek ek / çarpan).
+  const getEffectiveKosulluDestek = useCallback((stokKodu: string, grupKodu: string, cariIsim: string, subeAdi: string, tarih: string): number => {
+    const standardRate = adetPrimMap.get(stokKodu)?.kosulluDestek ?? 0
+    const rule = findOzel(stokKodu, grupKodu, cariIsim, subeAdi, tarih)
+    if (!rule) return standardRate
+    if (rule.prim_carpan   != null) return standardRate * rule.prim_carpan
+    if (rule.kosullu_destek != null) return standardRate + rule.kosullu_destek
+    return standardRate
+  }, [adetPrimMap, findOzel])
 
   // ── Merch kategori performans hesapla ──
   const merchKategoriPerformans = useMemo(() => {
@@ -725,13 +739,13 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       const primData = adetPrimMap.get(row.stok_kodu || '') || { bayiMerch: 0, kosulluDestek: 0, kategori: '' }
       const satisAdedi = row.satilan_adet || 0
 
-      const bayiMerchPrimAdet = row.merch_tipi === 'Bayi Merch'
-        ? getEffectiveBayiMerch(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '', row.tarih || '')
-        : primData.bayiMerch
+      const bayiMerchPrimAdet = getEffectiveBayiMerch(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '', row.tarih || '')
       const bayiMerchHakedis = bayiMerchPrimAdet * satisAdedi
 
       const destekVarMi = row.merch_tipi === 'Çetinler Merch' && !!destekFlags[row.merch_personel || '']
-      const destekPrimAdet = destekVarMi ? primData.kosulluDestek : 0
+      const destekPrimAdet = destekVarMi
+        ? getEffectiveKosulluDestek(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '', row.tarih || '')
+        : 0
 
       const merchKey = (row.merch_personel || '').toLowerCase()
       const kategoriRaw = row.grup_aciklama || ''
@@ -765,7 +779,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Satışlar')
     XLSX.writeFile(wb, `Satislar_${donem}.xlsx`)
-  }, [satislarRows, adetPrimMap, getEffectiveBayiMerch, destekFlags, merchKategoriPerformans, donem])
+  }, [satislarRows, adetPrimMap, getEffectiveBayiMerch, getEffectiveKosulluDestek, destekFlags, merchKategoriPerformans, donem])
 
   // Filtre: MERCH_TIPI === 'Çetinler Merch' olan satırlardan unique kişi listesi
   // Sadece seçili dönemde satışı olan kişiler (toplam satış > 0)
@@ -1394,17 +1408,18 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                       const primData = adetPrimMap.get(row.stok_kodu || '') || { bayiMerch: 0, kosulluDestek: 0, kategori: '' }
                       const satisAdedi = row.satilan_adet || 0
 
-                      // 1. Bayi Merch Adet Primi (özel prim kuralı varsa uygula)
-                      const bayiMerchPrimAdet = row.merch_tipi === 'Bayi Merch'
-                        ? getEffectiveBayiMerch(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '', row.tarih || '')
-                        : primData.bayiMerch
+                      // 1. Bayi Merch Adet Primi (özel prim kuralı varsa uygula — merch tipinden bağımsız)
+                      const bayiMerchPrimAdet = getEffectiveBayiMerch(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '', row.tarih || '')
 
                       // 2. Bayi Merch Prim Hakedişi
                       const bayiMerchHakedis = bayiMerchPrimAdet * satisAdedi
 
                       // 3. Destek Personeli Adet Primi — yalnızca o dönem için flag'li Merch'ler
+                      //    (özel koşullu destek ek'i de uygulanır)
                       const destekVarMi = row.merch_tipi === 'Çetinler Merch' && !!destekFlags[row.merch_personel || '']
-                      const destekPrimAdet = destekVarMi ? primData.kosulluDestek : 0
+                      const destekPrimAdet = destekVarMi
+                        ? getEffectiveKosulluDestek(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '', row.tarih || '')
+                        : 0
 
                       // 4. Çetinler Merch Kategori Gerçekleşme Oranı
                       const merchKey = (row.merch_personel || '').toLowerCase()
