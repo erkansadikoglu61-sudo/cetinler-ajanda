@@ -1061,6 +1061,21 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   )
   const ozelUlasan = useMemo(() => ozelFiltered.filter(r => r.ulasti).length, [ozelFiltered])
 
+  const exportOzelExcel = useCallback(() => {
+    const headers = ['Cari', 'Şube', 'Grup', 'Grup Hedef', 'Gerçekleşen', 'Kalan', 'Durum']
+    const aoa: (string | number)[][] = [headers]
+    for (const r of ozelFiltered) {
+      aoa.push([r.cari, r.sube, r.grup, r.hedef, r.gerc, r.kalan, r.ulasti ? 'Çift Prim' : `${r.kalan} kaldı`])
+    }
+    // Alt toplam
+    aoa.push(['TOPLAM', '', '', '', ozelFiltered.reduce((s, r) => s + r.gerc, 0), ozelFiltered.reduce((s, r) => s + r.kalan, 0), ''])
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    ws['!cols'] = [{ wch: 46 }, { wch: 18 }, { wch: 8 }, { wch: 11 }, { wch: 13 }, { wch: 8 }, { wch: 14 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Özel Uygulama Takip')
+    XLSX.writeFile(wb, `Ozel_Uygulama_Takip_${donem}.xlsx`)
+  }, [ozelFiltered, donem])
+
   // ── Which sub-tabs are visible? ───────────────────────────────
   const showSupTab  = isAdmin || isSup
   const showJrTab   = isAdmin || isSup || isJr
@@ -1575,6 +1590,14 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                     className="text-xs text-gray-400 hover:text-gray-600 underline"
                   >Sıfırla</button>
                 )}
+                <button
+                  onClick={exportOzelExcel}
+                  disabled={ozelFiltered.length === 0}
+                  className="ml-auto flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Görünen kayıtları Excel'e aktar"
+                >
+                  <FileDown size={13} /> Excel'e Aktar
+                </button>
                 <span className="text-[10px] text-gray-400">{ozelFiltered.length} kayıt</span>
               </div>
             )}
