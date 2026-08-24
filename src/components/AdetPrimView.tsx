@@ -790,9 +790,12 @@ function normOdeme(s: string): string {
 // buraya satır ekleyin.
 //   cari  : cari adında geçmesi yeterli (kısmi eşleşme).
 //   allow : verilirse YALNIZCA bu merch'lere ödeme yapılır; yoksa hiçbirine.
-const ODEME_ISTISNALARI: { cari: string; allow?: string[] }[] = [
+//   yil   : verilirse yalnızca bu yılda geçerli.
+//   aylar : verilirse yalnızca bu aylarda geçerli (1-12).
+const ODEME_ISTISNALARI: { cari: string; allow?: string[]; yil?: number; aylar?: number[] }[] = [
   { cari: 'uğurlu perakende' },                                     // tüm merch'ler → ödenmez
   { cari: 'kolay home', allow: ['Gülser Çevik', 'Fazilet Aydın'] }, // yalnızca bu ikisi ödenir
+  { cari: 'çınarlar dtm', yil: 2026, aylar: [6, 7, 8] },            // Haz/Tem/Ağu 2026 → ödenmez
 ]
 
 // IBAN'ı standart formata çevir: TR + 24 hane = 26 karakter, 4'erli gruplar
@@ -806,10 +809,13 @@ function formatIban(raw: string): { text: string; valid: boolean } {
 }
 
 // Bir satır için ödenecek tutarı hesapla (istisna varsa 0, yoksa hakediş).
-function hesaplaOdenecek(r: PrimOdemeRow): number {
+// yil/ay: dönem bazlı istisnalar için (ör. Çınarlar DTM Haz/Tem/Ağu 2026).
+function hesaplaOdenecek(r: PrimOdemeRow, yil: number, ay: number): number {
   const cari = normOdeme(r.cariAdi)
   for (const k of ODEME_ISTISNALARI) {
     if (!cari.includes(normOdeme(k.cari))) continue
+    if (k.yil != null && k.yil !== yil) continue
+    if (k.aylar && !k.aylar.includes(ay)) continue
     if (!k.allow || k.allow.length === 0) return 0
     const merch = normOdeme(r.merchAdi)
     return k.allow.some(a => normOdeme(a) === merch) ? r.hakedis : 0
@@ -954,7 +960,7 @@ export function PrimOdemeListesi({
   })
 
   const toplamPrim = filtered.reduce((s, r) => s + r.hakedis, 0)
-  const toplamOdenecek = filtered.reduce((s, r) => s + hesaplaOdenecek(r), 0)
+  const toplamOdenecek = filtered.reduce((s, r) => s + hesaplaOdenecek(r, yil, ay), 0)
 
   // Aynı Merch Adı + Cari İsmi'ne sahip (tekrar eden) satırları işaretle
   const dupKey = (r: PrimOdemeRow) => `${normOdeme(r.merchAdi)}||${normOdeme(r.cariAdi)}`
@@ -972,7 +978,7 @@ export function PrimOdemeListesi({
         r.merchTipi,
         r.merchAdi,
         r.hakedis,
-        hesaplaOdenecek(r),
+        hesaplaOdenecek(r, yil, ay),
         r.cariAdi,
         r.subeAdi || '',
         r.supAdi || '',
@@ -1136,7 +1142,7 @@ export function PrimOdemeListesi({
                       {row.hakedis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
                     </td>
                     {(() => {
-                      const od = hesaplaOdenecek(row)
+                      const od = hesaplaOdenecek(row, yil, ay)
                       const kesildi = od < row.hakedis
                       return (
                         <td className={clsx(
