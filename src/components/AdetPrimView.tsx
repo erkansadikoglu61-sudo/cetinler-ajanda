@@ -946,6 +946,14 @@ export function PrimOdemeListesi({
   const toplamPrim = filtered.reduce((s, r) => s + r.hakedis, 0)
   const toplamOdenecek = filtered.reduce((s, r) => s + hesaplaOdenecek(r), 0)
 
+  // Aynı Merch Adı + Cari İsmi'ne sahip (tekrar eden) satırları işaretle
+  const dupKey = (r: PrimOdemeRow) => `${normOdeme(r.merchAdi)}||${normOdeme(r.cariAdi)}`
+  const dupKeys = (() => {
+    const cnt = new Map<string, number>()
+    filtered.forEach(r => cnt.set(dupKey(r), (cnt.get(dupKey(r)) ?? 0) + 1))
+    return new Set([...cnt.entries()].filter(([, c]) => c > 1).map(([k]) => k))
+  })()
+
   function exportExcel() {
     const wsData = [
       ['#', 'Merch Tipi', 'Merch Adı', 'Hakediş (₺)', 'Ödenecek Tutar (₺)', 'Cari İsmi', 'Şube Adı', 'Süpervizör', 'IBAN'],
@@ -1083,12 +1091,16 @@ export function PrimOdemeListesi({
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row, idx) => (
+                {filtered.map((row, idx) => {
+                  const isDup = dupKeys.has(dupKey(row))
+                  return (
                   <tr key={idx} className={clsx(
                     'border-b border-gray-100 last:border-0',
-                    row.merchTipi === 'Destek Personeli'
-                      ? (idx % 2 === 0 ? 'bg-violet-50/40' : 'bg-violet-50/70')
-                      : (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40')
+                    isDup
+                      ? 'bg-amber-100 border-l-4 border-l-amber-500'
+                      : row.merchTipi === 'Destek Personeli'
+                        ? (idx % 2 === 0 ? 'bg-violet-50/40' : 'bg-violet-50/70')
+                        : (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40')
                   )}>
                     <td className="px-3 py-2 text-gray-400 font-mono">{idx + 1}</td>
                     <td className="px-3 py-2 whitespace-nowrap">
@@ -1101,7 +1113,15 @@ export function PrimOdemeListesi({
                         {row.merchTipi}
                       </span>
                     </td>
-                    <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{row.merchAdi}</td>
+                    <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">
+                      {row.merchAdi}
+                      {isDup && (
+                        <span className="ml-2 text-[9px] font-bold text-amber-700 bg-amber-200 rounded px-1.5 py-0.5 align-middle"
+                          title="Aynı Merch Adı + Cari İsmi birden fazla satırda">
+                          TEKRAR
+                        </span>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-right tabular-nums font-bold text-gray-900">
                       {row.hakedis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
                     </td>
@@ -1124,7 +1144,8 @@ export function PrimOdemeListesi({
                     <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{row.supAdi || '—'}</td>
                     <td className="px-3 py-2 font-mono text-gray-600 text-[11px] tracking-wider whitespace-nowrap">{row.iban || '—'}</td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
               <tfoot>
                 <tr className="bg-gray-800 text-white text-[10px] font-semibold">
