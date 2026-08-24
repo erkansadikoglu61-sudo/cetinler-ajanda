@@ -2007,6 +2007,7 @@ export default function AppPage() {
   const { primSupervisorFilter, primBsyKod } = useMemo(() => {
     if (!currentProfile) return { primSupervisorFilter: [] as string[], primBsyKod: null as string | null }
     if (currentProfile.role === 'admin') return { primSupervisorFilter: null, primBsyKod: null }
+    if (currentProfile.role === 'manager') return { primSupervisorFilter: null, primBsyKod: null }  // Yönetici tüm verileri görür (Prim Analiz)
     if (currentProfile.role === 'sup') return { primSupervisorFilter: [currentProfile.full_name], primBsyKod: null }
     if (currentProfile.role === 'ik')  return { primSupervisorFilter: null, primBsyKod: null }  // IK tüm verileri görür
 if (currentProfile.role === 'bsy') {
