@@ -795,6 +795,16 @@ const ODEME_ISTISNALARI: { cari: string; allow?: string[] }[] = [
   { cari: 'kolay home', allow: ['Gülser Çevik', 'Fazilet Aydın'] }, // yalnızca bu ikisi ödenir
 ]
 
+// IBAN'ı standart formata çevir: TR + 24 hane = 26 karakter, 4'erli gruplar
+// "TR05 0006 4000 0017 0001 3382 25". Uzunluk 26 değilse/boşsa geçersiz say.
+function formatIban(raw: string): { text: string; valid: boolean } {
+  const cleaned = (raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+  if (cleaned.length !== 26 || !cleaned.startsWith('TR')) {
+    return { text: 'Hatalı veya Eksik IBAN', valid: false }
+  }
+  return { text: cleaned.match(/.{1,4}/g)?.join(' ') ?? cleaned, valid: true }
+}
+
 // Bir satır için ödenecek tutarı hesapla (istisna varsa 0, yoksa hakediş).
 function hesaplaOdenecek(r: PrimOdemeRow): number {
   const cari = normOdeme(r.cariAdi)
@@ -966,7 +976,7 @@ export function PrimOdemeListesi({
         r.cariAdi,
         r.subeAdi || '',
         r.supAdi || '',
-        r.iban || '',
+        formatIban(r.iban).text,
       ]),
       ['', '', 'TOPLAM', toplamPrim, toplamOdenecek, '', '', '', ''],
     ]
@@ -1142,7 +1152,17 @@ export function PrimOdemeListesi({
                     <td className="px-3 py-2 text-gray-800">{row.cariAdi}</td>
                     <td className="px-3 py-2 text-gray-700">{row.subeAdi || '—'}</td>
                     <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{row.supAdi || '—'}</td>
-                    <td className="px-3 py-2 font-mono text-gray-600 text-[11px] tracking-wider whitespace-nowrap">{row.iban || '—'}</td>
+                    {(() => {
+                      const ib = formatIban(row.iban)
+                      return (
+                        <td className={clsx(
+                          'px-3 py-2 text-[11px] tracking-wider whitespace-nowrap',
+                          ib.valid ? 'font-mono text-gray-600' : 'font-semibold text-red-500'
+                        )}>
+                          {ib.text}
+                        </td>
+                      )
+                    })()}
                   </tr>
                   )
                 })}
