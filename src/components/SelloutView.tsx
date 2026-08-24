@@ -781,6 +781,27 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     XLSX.writeFile(wb, `Satislar_${donem}.xlsx`)
   }, [satislarRows, adetPrimMap, getEffectiveBayiMerch, getEffectiveKosulluDestek, destekFlags, merchKategoriPerformans, donem])
 
+  // ── Satışlar alt toplamları (satır hesabıyla birebir aynı — özel prim + gün bazlı) ──
+  const satislarTotals = useMemo(() => {
+    let toplamAdet = 0, bayiHakedis = 0, destekHakedis = 0, cetinlerPrim = 0
+    for (const r of satislarRows) {
+      const adet = r.satilan_adet || 0
+      toplamAdet += adet
+      const stk = r.stok_kodu || '', grp = (r.grup_kodu || '').toUpperCase()
+      const cari = r.cari_isim || '', sube = r.sube_adi || '', tarih = r.tarih || ''
+      bayiHakedis += getEffectiveBayiMerch(stk, grp, cari, sube, tarih) * adet
+      if (r.merch_tipi === 'Çetinler Merch' && destekFlags[r.merch_personel || '']) {
+        const dp = getEffectiveKosulluDestek(stk, grp, cari, sube, tarih)
+        destekHakedis += dp * adet
+        const mk  = (r.merch_personel || '').toLowerCase()
+        const kat = GRUP_NORMALIZE[r.grup_aciklama || ''] || r.grup_aciklama || ''
+        const oran = merchKategoriPerformans.get(mk)?.get(kat)?.oran || 0
+        cetinlerPrim += oran >= 100 ? dp * adet : (oran / 100) * dp * adet
+      }
+    }
+    return { toplamAdet, bayiHakedis, destekHakedis, cetinlerPrim }
+  }, [satislarRows, getEffectiveBayiMerch, getEffectiveKosulluDestek, destekFlags, merchKategoriPerformans])
+
   // Filtre: MERCH_TIPI === 'Çetinler Merch' olan satırlardan unique kişi listesi
   // Sadece seçili dönemde satışı olan kişiler (toplam satış > 0)
   const uniqueMerch = useMemo(() => {
@@ -1374,38 +1395,20 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                   {/* ── Üst toplam satırı ── */}
                   {(() => {
                     const fmt2 = (n: number) => n > 0 ? `${n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺` : '—'
-                    const topBayiHakedis = satislarRows.reduce((s, r) => {
-                      const p = adetPrimMap.get(r.stok_kodu || '')?.bayiMerch || 0
-                      return s + p * (r.satilan_adet || 0)
-                    }, 0)
-                    const topDestekHakedis = satislarRows.reduce((s, r) => {
-                      if (r.merch_tipi !== 'Çetinler Merch' || !destekFlags[r.merch_personel || '']) return s
-                      const p = adetPrimMap.get(r.stok_kodu || '')?.kosulluDestek || 0
-                      return s + p * (r.satilan_adet || 0)
-                    }, 0)
-                    const topCetinlerPrim = satislarRows.reduce((s, r) => {
-                      if (r.merch_tipi !== 'Çetinler Merch' || !destekFlags[r.merch_personel || '']) return s
-                      const p = adetPrimMap.get(r.stok_kodu || '')?.kosulluDestek || 0
-                      const mk = (r.merch_personel || '').toLowerCase()
-                      const kat = GRUP_NORMALIZE[r.grup_aciklama || ''] || r.grup_aciklama || ''
-                      const oran = merchKategoriPerformans.get(mk)?.get(kat)?.oran || 0
-                      const adet = r.satilan_adet || 0
-                      return s + (oran >= 100 ? p * adet : (oran / 100) * p * adet)
-                    }, 0)
                     return (
                       <tr className="bg-gray-700 text-white text-[11px] font-semibold">
                         <td colSpan={6} className="px-3 py-1.5 text-right text-gray-300">TOPLAM</td>
                         <td className="px-3 py-1.5 text-right tabular-nums">
-                          {satislarRows.reduce((s, r) => s + (r.satilan_adet || 0), 0).toLocaleString('tr-TR')}
+                          {satislarTotals.toplamAdet.toLocaleString('tr-TR')}
                         </td>
                         <td colSpan={3} className="px-3 py-1.5 text-center text-gray-300 text-[10px]">
                           {satislarRows.length.toLocaleString('tr-TR')} kayıt
                         </td>
                         <td className="px-3 py-1.5 text-right tabular-nums bg-blue-800">—</td>
-                        <td className="px-3 py-1.5 text-right tabular-nums bg-blue-800">{fmt2(topBayiHakedis)}</td>
-                        <td className="px-3 py-1.5 text-right tabular-nums bg-purple-800">{fmt2(topDestekHakedis)}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums bg-blue-800">{fmt2(satislarTotals.bayiHakedis)}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums bg-purple-800">{fmt2(satislarTotals.destekHakedis)}</td>
                         <td className="px-3 py-1.5 text-right tabular-nums bg-green-800">—</td>
-                        <td className="px-3 py-1.5 text-right tabular-nums bg-green-800">{fmt2(topCetinlerPrim)}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums bg-green-800">{fmt2(satislarTotals.cetinlerPrim)}</td>
                       </tr>
                     )
                   })()}
@@ -1505,38 +1508,20 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 <tfoot>
                   {(() => {
                     const fmt2 = (n: number) => n > 0 ? `${n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺` : '—'
-                    const botBayiHakedis = satislarRows.reduce((s, r) => {
-                      const p = adetPrimMap.get(r.stok_kodu || '')?.bayiMerch || 0
-                      return s + p * (r.satilan_adet || 0)
-                    }, 0)
-                    const botDestekHakedis = satislarRows.reduce((s, r) => {
-                      if (r.merch_tipi !== 'Çetinler Merch' || !destekFlags[r.merch_personel || '']) return s
-                      const p = adetPrimMap.get(r.stok_kodu || '')?.kosulluDestek || 0
-                      return s + p * (r.satilan_adet || 0)
-                    }, 0)
-                    const botCetinlerPrim = satislarRows.reduce((s, r) => {
-                      if (r.merch_tipi !== 'Çetinler Merch' || !destekFlags[r.merch_personel || '']) return s
-                      const p = adetPrimMap.get(r.stok_kodu || '')?.kosulluDestek || 0
-                      const mk = (r.merch_personel || '').toLowerCase()
-                      const kat = GRUP_NORMALIZE[r.grup_aciklama || ''] || r.grup_aciklama || ''
-                      const oran = merchKategoriPerformans.get(mk)?.get(kat)?.oran || 0
-                      const adet = r.satilan_adet || 0
-                      return s + (oran >= 100 ? p * adet : (oran / 100) * p * adet)
-                    }, 0)
                     return (
                       <tr className="bg-gray-800 text-white font-semibold">
                         <td colSpan={6} className="px-3 py-2.5 text-right">TOPLAM</td>
                         <td className="px-3 py-2.5 text-right tabular-nums">
-                          {satislarRows.reduce((s, r) => s + (r.satilan_adet || 0), 0).toLocaleString('tr-TR')}
+                          {satislarTotals.toplamAdet.toLocaleString('tr-TR')}
                         </td>
                         <td colSpan={3} className="px-3 py-2.5 text-center text-[10px]">
                           {satislarRows.length.toLocaleString('tr-TR')} kayıt
                         </td>
                         <td className="px-3 py-2.5 text-right tabular-nums bg-blue-900">—</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums bg-blue-900">{fmt2(botBayiHakedis)}</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums bg-purple-900">{fmt2(botDestekHakedis)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums bg-blue-900">{fmt2(satislarTotals.bayiHakedis)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums bg-purple-900">{fmt2(satislarTotals.destekHakedis)}</td>
                         <td className="px-3 py-2.5 text-right tabular-nums bg-green-900">—</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums bg-green-900">{fmt2(botCetinlerPrim)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums bg-green-900">{fmt2(satislarTotals.cetinlerPrim)}</td>
                       </tr>
                     )
                   })()}
