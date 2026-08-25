@@ -5,6 +5,7 @@ import { parseHtmlTableByHeader, fetchPhpHtml } from '@/lib/merchSatis'
 interface MerchDetay {
   merch_adi: string
   merch_id: string
+  merch_tc: string
   merch_grubu: string
   cari_kod: string
   cari_adi: string
@@ -30,6 +31,7 @@ export async function GET() {
     for (const r of mdRows) {
       const merchAdi  = r['MERCH_ADI'] || ''
       const merchId   = r['MERCH_ID'] || ''
+      const merchTc   = r['MERCH_TC_NO'] || ''
       const merchTipi = r['MERCH_TIPI'] || ''
       const cariKod   = r['CARI_KODU'] || ''
       const cariAdi   = r['CARI_ISIM'] || ''
@@ -50,6 +52,7 @@ export async function GET() {
         merchMap.set(key, {
           merch_adi: merchAdi,
           merch_id: merchId,
+          merch_tc: merchTc,
           merch_grubu: merchTipi,
           cari_kod: cariKod,
           cari_adi: cariAdi,
@@ -83,6 +86,7 @@ export async function GET() {
             merchMap.set(key, {
               merch_adi: d.merch_adi || '',
               merch_id: '',
+              merch_tc: '',
               merch_grubu: 'Destek Personeli',
               cari_kod: '',
               cari_adi: d.cari_adi || '',

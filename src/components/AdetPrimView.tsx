@@ -770,6 +770,7 @@ interface PrimOdemeRow {
   supAdi:    string   // çözümlenmiş supervisor adı (Jr.→parent, SV stripped)
   bsyKod:    string
   iban:      string
+  tc:        string   // TC Kimlik No (merch-detay PHP'den)
 }
 
 // "Ad Soyad SV" → "ad soyad" (normalize for comparison)
@@ -885,11 +886,14 @@ export function PrimOdemeListesi({
       const [bayiData, destekData, detayData] = await Promise.all([bayiRes.json(), destekRes.json(), detayRes.json()])
       if (!bayiRes.ok) throw new Error(bayiData.error ?? 'Bayi Merch yükleme hatası')
 
-      // normalize(merch_adi) → iban. Türkçe-karakter/büyük-küçük/boşluk
+      // normalize(merch_adi) → iban / tc. Türkçe-karakter/büyük-küçük/boşluk
       // farklarından bağımsız eşleşme (İ/ı, ç, ş vb.).
       const ibanMap = new Map<string, string>()
+      const tcMap   = new Map<string, string>()
       for (const d of (detayData.data ?? [])) {
-        if (d.iban) ibanMap.set(normOdeme(d.merch_adi as string), d.iban as string)
+        const key = normOdeme(d.merch_adi as string)
+        if (d.iban) ibanMap.set(key, d.iban as string)
+        if (d.merch_tc) tcMap.set(key, d.merch_tc as string)
       }
 
       const combined: PrimOdemeRow[] = []
@@ -906,6 +910,7 @@ export function PrimOdemeListesi({
           supAdi:    resolveSupName(r.supervizor ?? ''),
           bsyKod:    r.bsyKod ?? '',
           iban:      ibanMap.get(normOdeme(r.bayiMerch as string)) ?? '',
+          tc:        tcMap.get(normOdeme(r.bayiMerch as string)) ?? '',
         })
       }
 
@@ -921,6 +926,7 @@ export function PrimOdemeListesi({
           supAdi:    resolveSupName(h.sup_adi ?? ''),
           bsyKod:    '',
           iban:      ibanMap.get(normOdeme(h.merch_adi as string)) ?? '',
+          tc:        tcMap.get(normOdeme(h.merch_adi as string)) ?? '',
         })
       }
 
@@ -973,7 +979,7 @@ export function PrimOdemeListesi({
 
   function exportExcel() {
     const wsData = [
-      ['#', 'Merch Tipi', 'Merch Adı', 'Hakediş (₺)', 'Ödenecek Tutar (₺)', 'Cari İsmi', 'Şube Adı', 'Süpervizör', 'IBAN'],
+      ['#', 'Merch Tipi', 'Merch Adı', 'Hakediş (₺)', 'Ödenecek Tutar (₺)', 'Cari İsmi', 'Şube Adı', 'Süpervizör', 'IBAN', 'TC Kimlik No'],
       ...filtered.map((r, i) => [
         i + 1,
         r.merchTipi,
@@ -984,8 +990,9 @@ export function PrimOdemeListesi({
         r.subeAdi || '',
         r.supAdi || '',
         formatIban(r.iban).text,
+        r.tc || '',
       ]),
-      ['', '', 'TOPLAM', toplamPrim, toplamOdenecek, '', '', '', ''],
+      ['', '', 'TOPLAM', toplamPrim, toplamOdenecek, '', '', '', '', ''],
     ]
     const ws = XLSX.utils.aoa_to_sheet(wsData)
 
@@ -1001,7 +1008,7 @@ export function PrimOdemeListesi({
 
     ws['!cols'] = [
       { wch: 5 }, { wch: 16 }, { wch: 22 }, { wch: 16 }, { wch: 18 },
-      { wch: 50 }, { wch: 22 }, { wch: 20 }, { wch: 30 },
+      { wch: 50 }, { wch: 22 }, { wch: 20 }, { wch: 30 }, { wch: 15 },
     ]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Prim Ödeme Listesi')
@@ -1105,6 +1112,7 @@ export function PrimOdemeListesi({
                   <th className="text-left px-3 py-2.5 font-semibold min-w-[130px]">Şube Adı</th>
                   <th className="text-left px-3 py-2.5 font-semibold min-w-[140px]">Süpervizör</th>
                   <th className="text-left px-3 py-2.5 font-semibold min-w-[260px]">IBAN</th>
+                  <th className="text-left px-3 py-2.5 font-semibold min-w-[130px]">TC Kimlik No</th>
                 </tr>
               </thead>
               <tbody>
@@ -1170,6 +1178,12 @@ export function PrimOdemeListesi({
                         </td>
                       )
                     })()}
+                    <td className={clsx(
+                      'px-3 py-2 text-[11px] whitespace-nowrap',
+                      row.tc ? 'font-mono text-gray-600' : 'text-gray-300'
+                    )}>
+                      {row.tc || '—'}
+                    </td>
                   </tr>
                   )
                 })}
@@ -1183,7 +1197,7 @@ export function PrimOdemeListesi({
                   <td className="px-3 py-2 text-right tabular-nums font-bold text-emerald-300">
                     {toplamOdenecek.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
                   </td>
-                  <td colSpan={4} />
+                  <td colSpan={5} />
                 </tr>
               </tfoot>
             </table>
