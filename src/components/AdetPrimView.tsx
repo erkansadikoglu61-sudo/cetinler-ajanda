@@ -898,14 +898,23 @@ export function PrimOdemeListesi({
       const [bayiData, destekData, detayData] = await Promise.all([bayiRes.json(), destekRes.json(), detayRes.json()])
       if (!bayiRes.ok) throw new Error(bayiData.error ?? 'Bayi Merch yükleme hatası')
 
-      // normalize(merch_adi) → iban / tc. Türkçe-karakter/büyük-küçük/boşluk
-      // farklarından bağımsız eşleşme (İ/ı, ç, ş vb.).
-      const ibanMap = new Map<string, string>()
-      const tcMap   = new Map<string, string>()
+      // merch-detay'ı STABİL kimlik MERCH_ID etrafında indexle. Soyisim/IBAN
+      // değişse bile MERCH_ID değişmez → güncel ad/IBAN/TC her zaman ID'den gelir.
+      const byId     = new Map<string, { ad: string; iban: string; tc: string }>()  // merch_id → güncel bilgi
+      const idByName = new Map<string, string>()                                     // normalize(ad) → merch_id
       for (const d of (detayData.data ?? [])) {
-        const key = normOdeme(d.merch_adi as string)
-        if (d.iban) ibanMap.set(key, d.iban as string)
-        if (d.merch_tc) tcMap.set(key, d.merch_tc as string)
+        const id = ((d.merch_id as string) || '').trim()
+        if (!id) continue  // Supabase'den eklenen (id'siz) destek kayıtlarını atla
+        if (!byId.has(id)) byId.set(id, { ad: d.merch_adi as string, iban: (d.iban as string) || '', tc: (d.merch_tc as string) || '' })
+        const k = normOdeme(d.merch_adi as string)
+        if (k && !idByName.has(k)) idByName.set(k, id)
+      }
+      // İsim (gerekirse düzeltme haritasıyla) → MERCH_ID → güncel ad/IBAN/TC.
+      const cozMerch = (rawName: string): { ad: string; iban: string; tc: string } => {
+        const nm  = duzeltIsim(rawName)
+        const id  = idByName.get(normOdeme(nm))
+        const cur = id ? byId.get(id) : undefined
+        return { ad: cur?.ad ?? nm, iban: cur?.iban ?? '', tc: cur?.tc ?? '' }
       }
 
       const combined: PrimOdemeRow[] = []
@@ -913,34 +922,34 @@ export function PrimOdemeListesi({
       // Bayi Merch
       for (const r of (bayiData.rows ?? [])) {
         if ((r.primHakdis ?? 0) <= 0) continue
-        const ad = duzeltIsim(r.bayiMerch as string)  // PHP'de adı değişmişse güncelle
+        const m = cozMerch(r.bayiMerch as string)
         combined.push({
           merchTipi: 'Bayi Merch',
-          merchAdi:  ad,
+          merchAdi:  m.ad,
           hakedis:   r.primHakdis,
           cariAdi:   r.cariAdi,
           subeAdi:   r.subeAdi,
           supAdi:    resolveSupName(r.supervizor ?? ''),
           bsyKod:    r.bsyKod ?? '',
-          iban:      ibanMap.get(normOdeme(ad)) ?? '',
-          tc:        tcMap.get(normOdeme(ad)) ?? '',
+          iban:      m.iban,
+          tc:        m.tc,
         })
       }
 
       // Destek Personeli
       for (const h of (destekData.rows ?? [])) {
         if ((h.hakedis ?? 0) <= 0) continue
-        const ad = duzeltIsim(h.merch_adi as string)  // PHP'de adı değişmişse güncelle
+        const m = cozMerch(h.merch_adi as string)
         combined.push({
           merchTipi: 'Destek Personeli',
-          merchAdi:  ad,
+          merchAdi:  m.ad,
           hakedis:   h.hakedis,
           cariAdi:   h.cari_adi,
           subeAdi:   h.sube_adi ?? '',
           supAdi:    resolveSupName(h.sup_adi ?? ''),
           bsyKod:    '',
-          iban:      ibanMap.get(normOdeme(ad)) ?? '',
-          tc:        tcMap.get(normOdeme(ad)) ?? '',
+          iban:      m.iban,
+          tc:        m.tc,
         })
       }
 
