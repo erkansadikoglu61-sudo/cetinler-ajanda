@@ -807,7 +807,7 @@ function duzeltIsim(name: string): string {
 //   aylar : verilirse yalnızca bu aylarda geçerli (1-12).
 const ODEME_ISTISNALARI: { cari: string; allow?: string[]; yil?: number; aylar?: number[] }[] = [
   { cari: 'uğurlu perakende' },                                     // tüm merch'ler → ödenmez
-  { cari: 'kolay home', allow: ['Gülser Çevik', 'Fazilet Aydın'] }, // yalnızca bu ikisi ödenir
+  { cari: 'kolay home', allow: ['Gülser Çevik', 'Fazilet Aydın', 'Büşra Çalcalı'] }, // yalnızca bu üçü ödenir
   { cari: 'çınarlar dtm', yil: 2026, aylar: [6, 7, 8] },            // Haz/Tem/Ağu 2026 → ödenmez
 ]
 
