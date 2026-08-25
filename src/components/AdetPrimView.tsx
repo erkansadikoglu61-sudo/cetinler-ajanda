@@ -786,6 +786,18 @@ function normOdeme(s: string): string {
     .replace(/\s+/g, ' ').trim()
 }
 
+// ─── İsim düzeltmeleri (PHP'de adı değişen destek personelleri) ─────
+// Supabase snapshot'ında (field_personnel / destek_hakedis) eski isimle
+// kayıtlı kişiler; PHP güncel ismi buradan çözülür. Böylece hem gösterim
+// hem IBAN/TC eşleşmesi güncel isme göre yapılır. Yeni değişimde tek satır
+// eklemek yeterli: normalize(eski) → 'Yeni İsim'.
+const ISIM_DUZELTMELERI: Record<string, string> = {
+  'buse karagoz': 'Buse Toksoy',
+}
+function duzeltIsim(name: string): string {
+  return ISIM_DUZELTMELERI[normOdeme(name)] ?? name
+}
+
 // ─── Prim ödemesi YAPILMAYAN noktalar ──────────────────────────────
 // Ödenecek Tutar hesabında dikkate alınır. Yeni istisna eklemek için
 // buraya satır ekleyin.
@@ -901,32 +913,34 @@ export function PrimOdemeListesi({
       // Bayi Merch
       for (const r of (bayiData.rows ?? [])) {
         if ((r.primHakdis ?? 0) <= 0) continue
+        const ad = duzeltIsim(r.bayiMerch as string)  // PHP'de adı değişmişse güncelle
         combined.push({
           merchTipi: 'Bayi Merch',
-          merchAdi:  r.bayiMerch,
+          merchAdi:  ad,
           hakedis:   r.primHakdis,
           cariAdi:   r.cariAdi,
           subeAdi:   r.subeAdi,
           supAdi:    resolveSupName(r.supervizor ?? ''),
           bsyKod:    r.bsyKod ?? '',
-          iban:      ibanMap.get(normOdeme(r.bayiMerch as string)) ?? '',
-          tc:        tcMap.get(normOdeme(r.bayiMerch as string)) ?? '',
+          iban:      ibanMap.get(normOdeme(ad)) ?? '',
+          tc:        tcMap.get(normOdeme(ad)) ?? '',
         })
       }
 
       // Destek Personeli
       for (const h of (destekData.rows ?? [])) {
         if ((h.hakedis ?? 0) <= 0) continue
+        const ad = duzeltIsim(h.merch_adi as string)  // PHP'de adı değişmişse güncelle
         combined.push({
           merchTipi: 'Destek Personeli',
-          merchAdi:  h.merch_adi,
+          merchAdi:  ad,
           hakedis:   h.hakedis,
           cariAdi:   h.cari_adi,
           subeAdi:   h.sube_adi ?? '',
           supAdi:    resolveSupName(h.sup_adi ?? ''),
           bsyKod:    '',
-          iban:      ibanMap.get(normOdeme(h.merch_adi as string)) ?? '',
-          tc:        tcMap.get(normOdeme(h.merch_adi as string)) ?? '',
+          iban:      ibanMap.get(normOdeme(ad)) ?? '',
+          tc:        tcMap.get(normOdeme(ad)) ?? '',
         })
       }
 
