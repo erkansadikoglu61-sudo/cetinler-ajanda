@@ -133,8 +133,10 @@ export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) 
   // Her hafta için tahsilatları grupla
   const tahsilatlarHaftaBasina = haftalar.map(hafta => {
     // Sadece tahsilat bilgisi olan kayıtları al
+    // "Tahsilat Yapıldı" seçilen satırlar takvime eklenmez (planı şaşırtmasın)
     const haftaninTahsilatlari = data.filter(d =>
       d.tahsilatHaftasi === hafta.label &&
+      d.tahsilatHaftasi !== 'Tahsilat Yapıldı' &&
       d.tutar &&
       d.tutar > 0 &&
       d.tahsilatTuru
