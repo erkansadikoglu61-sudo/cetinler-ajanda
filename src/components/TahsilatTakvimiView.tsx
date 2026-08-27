@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, X } from 'lucide-react'
 
 const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
                    'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
@@ -82,6 +82,8 @@ export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) 
   const [data, setData] = useState<TahsilatData[]>([])
   const [haftalar] = useState(getHaftaSecenekleri())
   const [gerceklesen, setGerceklesen] = useState<GerceklesenTahsilat>({ bankaKK: 0, cekSenet: 0, toplam: 0 })
+  // Tutara tıklanınca açılan detay modalı (hangi müşterilerden oluştuğu)
+  const [detay, setDetay] = useState<{ hafta: string; tur: string | null } | null>(null)
 
   const loadData = async () => {
     setLoading(true)
@@ -176,6 +178,21 @@ export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) 
   // Gerçekleşen tahsilatlar bulunduğumuz aya göre gösterilir
   const buAyLabel = `${MONTHS_TR[new Date().getMonth()]} ${new Date().getFullYear()}`
 
+  // Modal için: seçilen hafta + tür kırılımına göre müşteri listesi
+  const detayMusteriler = detay
+    ? data
+        .filter(d =>
+          d.tahsilatHaftasi === detay.hafta &&
+          d.tahsilatHaftasi !== 'Tahsilat Yapıldı' &&
+          d.tutar &&
+          d.tutar > 0 &&
+          d.tahsilatTuru &&
+          (detay.tur === null || d.tahsilatTuru === detay.tur)
+        )
+        .sort((a, b) => (b.tutar || 0) - (a.tutar || 0))
+    : []
+  const detayToplam = detayMusteriler.reduce((sum, d) => sum + (d.tutar || 0), 0)
+
   return (
     <div className="h-full flex flex-col bg-gray-50">
       {/* Header */}
@@ -228,16 +245,48 @@ export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) 
                     {hafta.hafta}
                   </td>
                   <td className="px-6 py-4 text-sm text-right font-semibold text-gray-700 border-r border-gray-200">
-                    {hafta.cek > 0 ? fmtCur(hafta.cek) : '—'}
+                    {hafta.cek > 0 ? (
+                      <button
+                        onClick={() => setDetay({ hafta: hafta.hafta, tur: 'Çek' })}
+                        className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                        title="Müşteri detayını gör"
+                      >
+                        {fmtCur(hafta.cek)}
+                      </button>
+                    ) : '—'}
                   </td>
                   <td className="px-6 py-4 text-sm text-right font-semibold text-gray-700 border-r border-gray-200">
-                    {hafta.krediKarti > 0 ? fmtCur(hafta.krediKarti) : '—'}
+                    {hafta.krediKarti > 0 ? (
+                      <button
+                        onClick={() => setDetay({ hafta: hafta.hafta, tur: 'Kredi Kartı' })}
+                        className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                        title="Müşteri detayını gör"
+                      >
+                        {fmtCur(hafta.krediKarti)}
+                      </button>
+                    ) : '—'}
                   </td>
                   <td className="px-6 py-4 text-sm text-right font-semibold text-gray-700 border-r border-gray-200">
-                    {hafta.nakit > 0 ? fmtCur(hafta.nakit) : '—'}
+                    {hafta.nakit > 0 ? (
+                      <button
+                        onClick={() => setDetay({ hafta: hafta.hafta, tur: 'Nakit' })}
+                        className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                        title="Müşteri detayını gör"
+                      >
+                        {fmtCur(hafta.nakit)}
+                      </button>
+                    ) : '—'}
                   </td>
                   <td className="px-6 py-4 text-base text-right font-bold text-purple-700">
-                    {hafta.toplam > 0 ? fmtCur(hafta.toplam) : '—'}
+                    {hafta.toplam > 0 ? (
+                      <button
+                        onClick={() => setDetay({ hafta: hafta.hafta, tur: null })}
+                        className="text-purple-700 hover:text-purple-900 hover:underline cursor-pointer font-bold"
+                        title="Müşteri detayını gör"
+                      >
+                        {fmtCur(hafta.toplam)}
+                      </button>
+                    ) : '—'}
                   </td>
                 </tr>
               ))}
@@ -304,6 +353,77 @@ export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) 
           </table>
         </div>
       </div>
+
+      {/* Müşteri Detay Modalı */}
+      {detay && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setDetay(null)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal başlık */}
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-5 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold">
+                  {detay.tur ?? 'Tüm Tahsilatlar'} — {detay.hafta}
+                </h2>
+                <p className="text-xs text-purple-100">
+                  {detayMusteriler.length} müşteri
+                </p>
+              </div>
+              <button
+                onClick={() => setDetay(null)}
+                className="p-1.5 hover:bg-white/20 rounded transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal içerik */}
+            <div className="flex-1 overflow-auto">
+              {detayMusteriler.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-8">Kayıt bulunamadı.</p>
+              ) : (
+                <table className="w-full">
+                  <thead className="sticky top-0 bg-gray-100">
+                    <tr>
+                      <th className="text-left px-5 py-2.5 text-xs font-bold text-gray-600">Müşteri</th>
+                      {detay.tur === null && (
+                        <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-600">Tür</th>
+                      )}
+                      <th className="text-right px-5 py-2.5 text-xs font-bold text-gray-600">Tutar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detayMusteriler.map((m, i) => (
+                      <tr key={`${m.cariKod}-${i}`} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="px-5 py-2.5 text-sm text-gray-800">{m.cariIsim}</td>
+                        {detay.tur === null && (
+                          <td className="px-3 py-2.5 text-xs text-gray-600">{m.tahsilatTuru}</td>
+                        )}
+                        <td className="px-5 py-2.5 text-sm text-right font-semibold text-gray-800">
+                          {fmtCur(m.tutar || 0)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Modal toplam */}
+            {detayMusteriler.length > 0 && (
+              <div className="bg-purple-50 border-t border-purple-200 px-5 py-3 flex items-center justify-between">
+                <span className="text-sm font-bold text-purple-900">Toplam</span>
+                <span className="text-base font-bold text-purple-900">{fmtCur(detayToplam)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
