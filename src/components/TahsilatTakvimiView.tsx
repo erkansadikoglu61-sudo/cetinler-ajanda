@@ -77,7 +77,7 @@ interface GerceklesenTahsilat {
   toplam: number
 }
 
-export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) {
+export function TahsilatTakvimiView({ isAdmin = false, bsyAdi = '' }: { isAdmin?: boolean; bsyAdi?: string }) {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<TahsilatData[]>([])
   const [haftalar] = useState(getHaftaSecenekleri())
@@ -88,9 +88,11 @@ export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) 
   const loadData = async () => {
     setLoading(true)
     try {
+      // BSY kullanıcısı ise sadece kendi carilerini getir (admin/manager tümünü görür)
+      const bsyQs = bsyAdi ? `?bsyAdi=${encodeURIComponent(bsyAdi)}` : ''
       const [planRes, gercRes] = await Promise.all([
-        fetch('/api/tahsilat-planim'),
-        fetch('/api/tahsilat-gerceklesen'),
+        fetch(`/api/tahsilat-planim${bsyQs}`),
+        fetch(`/api/tahsilat-gerceklesen${bsyQs}`),
       ])
       if (!planRes.ok) throw new Error('API hatası')
       const jsonData = await planRes.json()
@@ -119,7 +121,8 @@ export function TahsilatTakvimiView({ isAdmin = false }: { isAdmin?: boolean }) 
 
   useEffect(() => {
     loadData()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bsyAdi])
 
   if (loading) {
     return (

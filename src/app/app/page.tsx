@@ -2208,8 +2208,8 @@ if (currentProfile.role === 'bsy') {
                   <BarChart2 size={15} /> Dashboard
                 </button>
               )}
-              {/* Tahsilat Takvimi (admin + manager) */}
-              {(currentProfile?.role === 'admin' || currentProfile?.role === 'manager') && (
+              {/* Tahsilat Takvimi (admin + manager + bsy) */}
+              {(currentProfile?.role === 'admin' || currentProfile?.role === 'manager' || currentProfile?.role === 'bsy') && (
                 <button
                   onClick={() => setTab('tahsilat-takvimi')}
                   className={clsx(
@@ -2537,9 +2537,12 @@ if (currentProfile.role === 'bsy') {
               />
             </div>
           )}
-          {tab === 'tahsilat-takvimi' && (currentProfile?.role === 'admin' || currentProfile?.role === 'manager') && (
+          {tab === 'tahsilat-takvimi' && (currentProfile?.role === 'admin' || currentProfile?.role === 'manager' || currentProfile?.role === 'bsy') && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
-              <TahsilatTakvimiView />
+              <TahsilatTakvimiView
+                isAdmin={currentProfile?.role === 'admin'}
+                bsyAdi={isBsy ? (currentProfile?.full_name ?? '') : ''}
+              />
             </div>
           )}
           {tab === 'dashboard' && (currentProfile?.role === 'admin' || currentProfile?.role === 'manager') && (

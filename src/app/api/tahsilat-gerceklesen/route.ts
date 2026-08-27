@@ -3,6 +3,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as XLSX from 'xlsx'
 import { createClient } from '@supabase/supabase-js'
+import { BSY_KOD_TO_NAME } from '@/lib/bsy'
 
 const EXCEL_PATH =
   process.env.BSY_EXCEL_PATH ??
@@ -63,6 +64,21 @@ export async function GET(req: Request) {
   const sp  = new URL(req.url).searchParams
   const yil = sp.get('yil') ? parseInt(sp.get('yil')!) : new Date().getFullYear()
   const ay  = sp.get('ay')  ? parseInt(sp.get('ay')!)  : new Date().getMonth() + 1
+  const bsyAdi = sp.get('bsyAdi') ?? ''
+
+  // BSY filtresi: verilen isme izin verilen BSY adlarını çöz (Burak KILIÇ → IB1 + IB2)
+  let allowedBsyNames: Set<string> | null = null
+  if (bsyAdi) {
+    const nameToKod = Object.fromEntries(
+      Object.entries(BSY_KOD_TO_NAME).map(([k, v]) => [normTr(v), k])
+    )
+    const kod = nameToKod[normTr(bsyAdi)]
+    const kods = kod ? [kod] : []
+    if (kod === 'IB1') kods.push('IB2')
+    allowedBsyNames = new Set(
+      (kods.length ? kods.map(k => BSY_KOD_TO_NAME[k]) : [bsyAdi]).map(normTr)
+    )
+  }
 
   const empty: TahsilatGerceklesenResponse = { bankaKK: 0, cekSenet: 0, toplam: 0 }
 
@@ -79,12 +95,13 @@ export async function GET(req: Request) {
   if (raw.length < 2) return NextResponse.json<TahsilatGerceklesenResponse>(empty)
 
   // Header'dan kolon indekslerini bul
-  let ayCol = -1, yilCol = -1, turCol = -1, tutarCol = -1
+  let ayCol = -1, yilCol = -1, turCol = -1, tutarCol = -1, bsyCol = -1
   const header = raw[0] as unknown[]
   for (let c = 0; c < header.length; c++) {
     const h = normTr(String(header[c] ?? ''))
     if (h === 'ay') ayCol = c
     if (h === 'yil') yilCol = c
+    if (bsyCol === -1 && h === 'bsy') bsyCol = c
     if (turCol === -1 && (h.includes('tur') || h.includes('tip') || h.includes('odeme'))) turCol = c
     if (tutarCol === -1 && h.includes('tutar')) tutarCol = c
   }
@@ -94,6 +111,11 @@ export async function GET(req: Request) {
   for (let i = 1; i < raw.length; i++) {
     const r = raw[i]
     if (!r) continue
+
+    // BSY filtresi (verildiyse): sadece izin verilen BSY'nin satırları
+    if (allowedBsyNames && bsyCol >= 0) {
+      if (!allowedBsyNames.has(normTr(String(r[bsyCol] ?? '')))) continue
+    }
 
     if (yilCol >= 0) {
       const rowYil = typeof r[yilCol] === 'number' ? r[yilCol] : parseInt(String(r[yilCol] ?? '0'))
