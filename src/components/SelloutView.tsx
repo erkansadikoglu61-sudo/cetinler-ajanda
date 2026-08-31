@@ -15,6 +15,7 @@ import {
 } from '@/lib/sellout'
 import { Profile } from '@/lib/supabase'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
+import { SayfaParametreleri } from '@/components/SayfaParametreleri'
 
 type SubTab = 'sup' | 'jr' | 'merch' | 'top20' | 'satislar' | 'ozel'
 
@@ -1296,6 +1297,23 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
               })()}
               showPrim
               kategoriPrimi={PRIM_MERCH}
+            />
+            <SayfaParametreleri
+              visible={isAdmin}
+              baslik="Sellout ▸ Merch (Çetinler Merch)"
+              aciklama="Çetinler Merch personelinin, seçili dönemdeki kategori bazlı satış hedef/gerçekleşme ve prim tablosu."
+              parametreler={[
+                { label: 'Dönem', value: `Üstteki "Dönem" seçimi (şu an: ${donemLabel(donem)}). Tüm hedef, gerçekleşen ve primler bu döneme aittir.` },
+                { label: 'Kişi listesi', value: 'merch_tipi = "Çetinler Merch" olan personel. Satış yapanlar (sellout) + merch-detay listesinde tanımlı satış yapmayanlar dahil. Satışı 0 olanlar kırmızı yazılır.' },
+                { label: 'Arama', value: 'Merch adı veya bağlı Süpervizör adına göre filtreler.' },
+                { label: 'Kategori grupları', value: 'IPL · Üflemeli · Düzleştirici&Maşa · Epilatör&Baskül&Mutfak · Erkek Bakım · Süpürge · Mutfak ve Diğer (grup_aciklama → GRUP_NORMALIZE eşlemesiyle).' },
+                { label: 'Hedef (Hed.)', value: '"Hedef Gir" ile girilen, dönem bazlı merch hedefleri (Supabase).' },
+                { label: 'Gerçekleşen (Gerç.)', value: 'Sellout satış verisinden (/api/sellout) o merch + gruba ait satılan_adet toplamı.' },
+                { label: '% ve renkler', value: 'Gerç ÷ Hedef. ≥%100 koyu yeşil, ≥%80 açık yeşil, ≥%60 sarı, <%60 kırmızı.' },
+                { label: 'Kat. Primi (₺)', value: 'IPL 3.750 · Üflemeli 3.250 · Düzleştirici&Maşa 2.000 · Epilatör&Baskül&Mutfak 1.250 · Erkek Bakım 1.250 · Süpürge 3.750 · Mutfak ve Diğer 1.250 (Merch seviyesi = PRIM_MERCH).' },
+                { label: 'Prim hesabı', value: 'Hedef 0 → prim yok. Oran <%80 → prim yok. Oran ≥%80 → KatPrimi × min(oran, %100). Yani %100+ tam prim, %80–100 arası oranla (calcPrim).' },
+                { label: 'Toplam sütunu', value: 'Satırdaki tüm grupların Hedef / Gerçekleşen / Prim toplamı.' },
+              ]}
             />
           </>
         )}
