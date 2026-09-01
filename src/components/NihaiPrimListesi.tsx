@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { RefreshCw, X, Check } from 'lucide-react'
+import { RefreshCw, X, Check, FileDown } from 'lucide-react'
 import clsx from 'clsx'
+import * as XLSX from 'xlsx'
 import { useSellout } from '@/hooks/useSellout'
 import {
   computeSelloutPrimForMonth, NP_MONTHS_TR,
@@ -172,6 +173,27 @@ export function NihaiPrimListesi({
   const yilTotal = (ay: number) =>
     rows.reduce((s, r) => s + (r.aylar[ay] ?? 0), 0)
 
+  const exportExcel = () => {
+    const header = ['Tip', 'Ad Soyad', ...NP_MONTHS_TR, 'Toplam']
+    const data = rows.map(r => {
+      const aylar = NP_MONTHS_TR.map((_, i) => {
+        const v = r.aylar[i + 1] ?? 0
+        return v > 0 ? Math.round(v) : ''
+      })
+      const toplam = NP_MONTHS_TR.reduce((s, _, i) => s + (r.aylar[i + 1] ?? 0), 0)
+      return [r.tip, r.ad, ...aylar, Math.round(toplam)]
+    })
+    const totalRow = ['', 'TOPLAM',
+      ...NP_MONTHS_TR.map((_, i) => { const t = yilTotal(i + 1); return t > 0 ? Math.round(t) : '' }),
+      Math.round(NP_MONTHS_TR.reduce((s, _, i) => s + yilTotal(i + 1), 0)),
+    ]
+    const ws = XLSX.utils.aoa_to_sheet([header, ...data, totalRow])
+    ws['!cols'] = [{ wch: 14 }, { wch: 22 }, ...NP_MONTHS_TR.map(() => ({ wch: 11 })), { wch: 13 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, `Nihai Prim ${yil}`)
+    XLSX.writeFile(wb, `nihai-prim-${yil}.xlsx`)
+  }
+
   const openCell = (r: NihaiPrimRow, ay: number) => {
     const prim = r.aylar[ay] ?? 0
     if (prim <= 0) return
@@ -221,6 +243,14 @@ export function NihaiPrimListesi({
           <p className="text-[11px] text-purple-100">BSY · Süpervizör · Jr. Süpervizör · Çetinler Merch</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={exportExcel}
+            disabled={loading || rows.length === 0}
+            className="flex items-center gap-1.5 text-xs bg-white/15 hover:bg-white/25 disabled:opacity-40 rounded-lg px-2.5 py-1.5 font-medium transition-colors"
+            title="Tabloyu Excel'e aktar"
+          >
+            <FileDown size={14} /> Excel
+          </button>
           <select
             value={yil}
             onChange={e => setYil(parseInt(e.target.value))}
