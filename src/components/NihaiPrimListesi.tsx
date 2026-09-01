@@ -246,7 +246,7 @@ export function NihaiPrimListesi({
           <button
             onClick={exportExcel}
             disabled={loading || rows.length === 0}
-            className="flex items-center gap-1.5 text-xs bg-white/15 hover:bg-white/25 disabled:opacity-40 rounded-lg px-2.5 py-1.5 font-medium transition-colors"
+            className="flex items-center gap-1.5 text-xs bg-emerald-500 hover:bg-emerald-600 text-white disabled:opacity-40 rounded-lg px-2.5 py-1.5 font-medium transition-colors shadow-sm"
             title="Tabloyu Excel'e aktar"
           >
             <FileDown size={14} /> Excel
