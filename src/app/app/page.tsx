@@ -33,6 +33,7 @@ import { AnalizView } from '@/components/AnalizView'
 import { AdminDashboardView } from '@/components/AdminDashboardView'
 import { DestekPersonelHakedisView } from '@/components/DestekPersonelHakedisView'
 import { TahsilatTakvimiView } from '@/components/TahsilatTakvimiView'
+import { NihaiPrimListesi } from '@/components/NihaiPrimListesi'
 import { PersonelliNoktaAnalizView } from '@/components/PersonelliNoktaAnalizView'
 type TabType = 'month' | 'week' | 'day' | 'report' | 'personelli-nokta-analiz' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'destek-hakedis' | 'prim-odeme' | 'prim-analiz' | 'prim-cetinler-merch' | 'analiz' | 'tahsilat-planim' | 'tahsilat-takvimi' | 'dashboard'
 
@@ -2283,10 +2284,10 @@ if (currentProfile.role === 'bsy') {
                   <BarChart2 size={15} /> Analiz
                 </button>
               )}
-              {/* Primler — admin + BSY + Süpervizör + İnsan Kaynakları */}
-              {(currentProfile?.role === 'admin' || isBsy || isSup || isIk) && (
+              {/* Primler — admin + BSY + Süpervizör + İnsan Kaynakları + Jr (nihai prim) */}
+              {(currentProfile?.role === 'admin' || isBsy || isSup || isIk || isJr) && (
                 <button
-                  onClick={() => { if (!['prim-cetinler-merch','adet-prim','bayi-merch','destek-hakedis','prim-odeme','prim-analiz'].includes(tab)) setTab(isIk ? 'prim-odeme' : 'adet-prim') }}
+                  onClick={() => { if (!['prim-cetinler-merch','adet-prim','bayi-merch','destek-hakedis','prim-odeme','prim-analiz'].includes(tab)) setTab(isIk ? 'prim-odeme' : isJr ? 'prim-cetinler-merch' : 'adet-prim') }}
                   className={clsx(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
                     ['prim-cetinler-merch','adet-prim','bayi-merch','destek-hakedis','prim-odeme','prim-analiz'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
@@ -2413,12 +2414,12 @@ if (currentProfile.role === 'bsy') {
             </div>
           )}
           {/* Primler alt sekmeleri (2 seviyeli: gruplar + grup içi sekmeler) */}
-          {(currentProfile?.role === 'admin' || isBsy || isSup || isIk || isManager) && ['prim-cetinler-merch','adet-prim','bayi-merch','destek-hakedis','prim-odeme','prim-analiz'].includes(tab) && (() => {
+          {(currentProfile?.role === 'admin' || isBsy || isSup || isIk || isJr || isManager) && ['prim-cetinler-merch','adet-prim','bayi-merch','destek-hakedis','prim-odeme','prim-analiz'].includes(tab) && (() => {
             const role = currentProfile?.role ?? ''
             const primGroups = ([
-              { key: 'grup-cetinler', label: 'Bsy-Süpervizör-Jr.Süpervizör-Çetinler Merch', roles: ['admin'],
+              { key: 'grup-cetinler', label: 'Bsy-Süpervizör-Jr.Süpervizör-Çetinler Merch', roles: ['admin','ik','bsy','sup','jr'],
                 children: [
-                  { key: 'prim-cetinler-merch' as const, label: 'Bsy-Süpervizör-Jr.Süpervizör-Çetinler Merch', roles: ['admin'] },
+                  { key: 'prim-cetinler-merch' as const, label: 'Bsy-Süpervizör-Jr.Süpervizör-Çetinler Merch', roles: ['admin','ik','bsy','sup','jr'] },
                 ] },
               { key: 'grup-bayi', label: 'Bayi Merch', roles: ['admin','bsy','sup'],
                 children: [
@@ -2620,11 +2621,9 @@ if (currentProfile.role === 'bsy') {
               <AnalizView currentProfile={currentProfile} active={tab === 'analiz'} />
             </div>
           )}
-          {tab === 'prim-cetinler-merch' && currentProfile?.role === 'admin' && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center px-6 h-full">
-              <Activity size={40} className="text-gray-300 mb-3" />
-              <p className="text-sm font-medium text-gray-500">Bsy-Süpervizör-Jr.Süpervizör-Çetinler Merch</p>
-              <p className="text-xs text-gray-400 mt-1">Bu bölüm yakında eklenecek.</p>
+          {tab === 'prim-cetinler-merch' && (currentProfile?.role === 'admin' || isIk || isBsy || isSup || isJr) && currentProfile && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <NihaiPrimListesi currentProfile={currentProfile} team={team} />
             </div>
           )}
           {tab === 'adet-prim' && (currentProfile?.role === 'admin' || isBsy || isSup) && (
@@ -2701,12 +2700,12 @@ if (currentProfile.role === 'bsy') {
             ...(!isIk ? [{ key: 'sellout'  as const, icon: TrendingUp, label: 'Sellout' }] : []),
             ...(isBsyOrAdmin ? [{ key: 'analiz'   as const, icon: BarChart2, label: 'Analiz'  }] : []),
             ...(!isIk ? [{ key: 'noktalar' as const, icon: Store, label: 'Noktalar' }] : []),
-            ...((currentProfile?.role === 'admin' || isBsy || isSup || isIk)
+            ...((currentProfile?.role === 'admin' || isBsy || isSup || isIk || isJr)
               ? [{ key: 'adet-prim' as const, icon: Activity, label: 'Primler' }] : []),
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
-              onClick={() => key === 'month' ? (!['month','week','day'].includes(tab) && setTab('month')) : key === 'report' ? (!['report','personelli-nokta-analiz'].includes(tab) && setTab('report')) : key === 'adet-prim' ? setTab(isIk ? 'prim-odeme' : 'adet-prim') : setTab(key)}
+              onClick={() => key === 'month' ? (!['month','week','day'].includes(tab) && setTab('month')) : key === 'report' ? (!['report','personelli-nokta-analiz'].includes(tab) && setTab('report')) : key === 'adet-prim' ? setTab(isIk ? 'prim-odeme' : isJr ? 'prim-cetinler-merch' : 'adet-prim') : setTab(key)}
               className={clsx(
                 'flex flex-col items-center justify-center gap-0.5 transition-colors',
                 (tab === key ||

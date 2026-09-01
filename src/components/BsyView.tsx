@@ -7,7 +7,7 @@ import clsx from 'clsx'
 import { useBsyCiro, BRAND_KEYS, BrandKey } from '@/hooks/useBsyCiro'
 import { useBsyHedef } from '@/hooks/useBsyHedef'
 import { useBsyKisiHedef } from '@/hooks/useBsyKisiHedef'
-import { BRAND_LABEL, calcBsyPrims, PRIM_EXCLUDED_BSYS, NEW_LAYOUT_BRANDS } from '@/lib/bsy'
+import { BRAND_LABEL, calcBsyPrims, PRIM_EXCLUDED_BSYS, NEW_LAYOUT_BRANDS, calcTieredPrimBsy, DEFAULT_BSY_PARAMS } from '@/lib/bsy'
 import type { BsyBrandRow } from '@/hooks/useBsyCiro'
 import { supabase } from '@/lib/supabase'
 
@@ -18,79 +18,10 @@ const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
 const PRIM_BARAJI_PCT = 80
 
 // ─── Prim parametreleri (BsyTakip ile aynı mantık) ────────────
+// Params tipi, varsayılanlar ve kademeli prim hesabı artık @/lib/bsy'de
+// (nihai prim tablosuyla ortak kullanılıyor).
 type Params = Record<string, number>
-const DEFAULT_PARAMS: Params = {
-  elx_t1_thr: 80,  elx_t1_rate: 0.40,
-  elx_t2_thr: 100, elx_t2_rate: 0.70,
-  elx_t3_thr: 130, elx_t3_rate: 1.00,
-  elx_t4_thr: 150, elx_t4_rate: 1.20,
-  relux_t1_thr: 80,  relux_t1_rate: 0.60,
-  relux_t2_thr: 100, relux_t2_rate: 0.85,
-  relux_t3_thr: 130, relux_t3_rate: 1.15,
-  relux_t4_thr: 150, relux_t4_rate: 1.40,
-  carp1_thr: 50, carp1_val: 0.70,
-  carp2_thr: 80, carp2_val: 0.50,
-  carp3_thr: 100, carp3_val: 1.50,
-}
-
-function calcTieredPrimBsy(
-  gercElx: number, hedefElx: number,
-  gercRelux: number, hedefRelux: number,
-  compGerc: number, compHedef: number,
-  tahsilatOran: number, params: Params, excluded: boolean,
-): { elxPrim: number; reluxPrim: number; topPrim: number } {
-  if (excluded) return { elxPrim: 0, reluxPrim: 0, topPrim: 0 }
-  const achElx   = hedefElx   > 0 ? (gercElx   / hedefElx)   * 100 : 0
-  const achRelux = hedefRelux > 0 ? (gercRelux / hedefRelux) * 100 : 0
-
-  // Her marka bağımsız hesaplanır:
-  // ≥%80 → tier bazlı prim | <%80 → tierRate = 0 → prim = 0
-  // Sonra ① ② ③ sırayla toplama uygulanır.
-  function tierRate(achPct: number, prefix: string): number {
-    const tiers: [number, number][] = [4,3,2,1].map(i => [
-      params[`${prefix}_t${i}_thr`] ?? 0, params[`${prefix}_t${i}_rate`] ?? 0,
-    ] as [number, number]).sort((a,b) => b[0]-a[0])
-    for (const [thr, rate] of tiers) { if (thr>0 && achPct>=thr) return rate }
-    return 0
-  }
-  // 1. Marka bazında bağımsız prim (≥%80 tier var, <%80 tier=0)
-  const elxPrimBase   = gercElx   * tierRate(achElx,   'elx')   / 100
-  const reluxPrimBase = gercRelux * tierRate(achRelux, 'relux') / 100
-
-  // 2. Toplam hakedilen = iki marka toplamı
-  let toplam = elxPrimBase + reluxPrimBase
-
-  // 3. Çarpanlar sırayla TOPLAMA uygulanır:
-  // ① İki markadan birinde %50 altı → hakedişin %70'i
-  const c1thr = params['carp1_thr'] ?? 50
-  const c1val = params['carp1_val'] ?? 0.70
-  if ((hedefElx>0 && achElx<c1thr) || (hedefRelux>0 && achRelux<c1thr)) {
-    toplam *= c1val
-  }
-
-  // ② Şirket toplam gerc. %80 altı → hakedişin yarısı
-  const compAch = compHedef>0 ? (compGerc/compHedef)*100 : 0
-  const c2thr = params['carp2_thr'] ?? 80
-  const c2val = params['carp2_val'] ?? 0.50
-  if (compAch < c2thr) {
-    toplam *= c2val
-  }
-
-  // ③ Tahsilat ≥%100 → 1,5 ile çarp
-  const c3thr = params['carp3_thr'] ?? 100
-  const c3val = params['carp3_val'] ?? 1.50
-  if (tahsilatOran >= c3thr) {
-    toplam *= c3val
-  }
-
-  // Marka bazındaki görüntü: oransal dağıt (ay≥5 Hakedilen Prim sütunları için)
-  const topBase = elxPrimBase + reluxPrimBase
-  const elxPrim   = topBase > 0 ? Math.round(toplam * elxPrimBase   / topBase) : 0
-  const reluxPrim = topBase > 0 ? Math.round(toplam * reluxPrimBase / topBase) : 0
-  const topPrim   = Math.round(toplam)
-
-  return { elxPrim, reluxPrim, topPrim }
-}
+const DEFAULT_PARAMS: Params = DEFAULT_BSY_PARAMS
 
 function useBsyParametreler() {
   const [params,  setParams]  = useState<Params>({ ...DEFAULT_PARAMS })
