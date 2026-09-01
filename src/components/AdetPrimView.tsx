@@ -850,6 +850,7 @@ export function PrimOdemeListesi({
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
   const [supFilter,  setSupFilter]  = useState('')
+  const [merchFilter, setMerchFilter] = useState('')
   const [cariFilter, setCariFilter] = useState('')
 
   // Jr. adı (normalize) → parent Sup adı haritası (SV stripped)
@@ -978,6 +979,20 @@ export function PrimOdemeListesi({
     return opts.sort((a, b) => a.localeCompare(b, 'tr'))
   }, [allRows])
 
+  // Merch (Merch Adı) filtre seçenekleri
+  const merchOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const opts: string[] = []
+    for (const r of allRows) {
+      const key = normOdeme(r.merchAdi)
+      if (r.merchAdi && !seen.has(key)) {
+        seen.add(key)
+        opts.push(r.merchAdi)
+      }
+    }
+    return opts.sort((a, b) => a.localeCompare(b, 'tr'))
+  }, [allRows])
+
   const filtered = allRows.filter(r => {
     if (bsyKodFilter !== null && r.bsyKod !== bsyKodFilter) return false
     if (supervisorFilter !== null) {
@@ -985,6 +1000,7 @@ export function PrimOdemeListesi({
       if (!match) return false
     }
     if (supFilter && normSupName(r.supAdi) !== normSupName(supFilter)) return false
+    if (merchFilter && normOdeme(r.merchAdi) !== normOdeme(merchFilter)) return false
     if (cariFilter && !r.cariAdi.toLowerCase().includes(cariFilter.toLowerCase())) return false
     return true
   })
@@ -1071,6 +1087,18 @@ export function PrimOdemeListesi({
               className="appearance-none pl-2 pr-6 py-1 text-xs border border-gray-200 rounded-lg bg-white font-medium text-gray-700 focus:outline-none max-w-[220px]">
               <option value="">Tüm Süpervizörler</option>
               {supOptions.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <ChevronDown size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+        )}
+
+        {/* Merch filtresi */}
+        {merchOptions.length > 0 && (
+          <div className="relative">
+            <select value={merchFilter} onChange={e => setMerchFilter(e.target.value)}
+              className="appearance-none pl-2 pr-6 py-1 text-xs border border-gray-200 rounded-lg bg-white font-medium text-gray-700 focus:outline-none max-w-[220px]">
+              <option value="">Tüm Merchler</option>
+              {merchOptions.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
             <ChevronDown size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
