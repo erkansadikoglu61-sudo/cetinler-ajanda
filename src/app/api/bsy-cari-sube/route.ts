@@ -26,16 +26,28 @@ export async function GET() {
     //    Başlık ismine göre okunur; export'a kolon eklendiğinde (ör. MERCH_TC_NO)
     //    sabit indeksler kaydığından sup/jr boş kalıp Sup/Jr'ın şube listesi
     //    boşalıyordu — bu yüzden isimle eşleştiriyoruz.
+    // Not: Aynı SUBE_KODU'nun birden çok merch satırı olabilir ve bazılarında
+    // SUPERVIZOR/JR_SUPERVIZOR boş kalabilir (ör. YÖN Silivri'de ilk satır Jr boş,
+    // sonraki satırlarda Jr = Duygu Duman). Bu yüzden "ilk satır" değil, aynı şube
+    // kodundaki satırlar arasında BOŞ OLMAYAN sup/jr değerleri doldurulur.
     const supJrMap = new Map<string, { sup: string; jr: string }>()
     try {
       const { rows: mdRows } = parseHtmlTableByHeader(await fetchPhpHtml(MERCH_URL))
       for (const r of mdRows) {
         const subeKod = (r['SUBE_KODU'] ?? '').trim()
-        if (!subeKod || supJrMap.has(subeKod)) continue
-        supJrMap.set(subeKod, {
-          sup: (r['SUPERVIZOR'] ?? '').trim(),
-          jr:  (r['JR_SUPERVIZOR'] ?? '').trim(),
-        })
+        if (!subeKod) continue
+        const sup = (r['SUPERVIZOR'] ?? '').trim()
+        const jr  = (r['JR_SUPERVIZOR'] ?? '').trim()
+        const existing = supJrMap.get(subeKod)
+        if (!existing) {
+          supJrMap.set(subeKod, { sup, jr })
+        } else {
+          // Eksik alanları sonraki satırlardan tamamla (ilk boş-olmayan değeri koru)
+          supJrMap.set(subeKod, {
+            sup: existing.sup || sup,
+            jr:  existing.jr  || jr,
+          })
+        }
       }
     } catch { /* sup/jr olmadan devam et */ }
 
