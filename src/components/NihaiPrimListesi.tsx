@@ -58,6 +58,13 @@ export function NihaiPrimListesi({
   const [editTarih, setEditTarih] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Toplu ödeme modalı
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkAy, setBulkAy] = useState(new Date().getMonth() + 1)
+  const [bulkTarih, setBulkTarih] = useState(new Date().toISOString().slice(0, 10))
+  const [bulkChecked, setBulkChecked] = useState<Record<string, boolean>>({})
+  const [bulkSaving, setBulkSaving] = useState(false)
+
   const okey = (ay: number, tip: string, ad: string) => `${ay}||${tip}||${ad}`
 
   // Yıl değişince tüm verileri çek
@@ -231,6 +238,60 @@ export function NihaiPrimListesi({
     }
   }
 
+  // ── Toplu ödeme ──
+  const pKey = (tip: string, ad: string) => `${tip}||${ad}`
+  const bulkList = useMemo(() =>
+    rows.filter(r => (r.aylar[bulkAy] ?? 0) > 0)
+        .map(r => ({ tip: r.tip, ad: r.ad, prim: Math.round(r.aylar[bulkAy] ?? 0) })),
+    [rows, bulkAy]
+  )
+
+  // Modal açıkken / ay değişince mevcut ödeme durumunu doldur
+  useEffect(() => {
+    if (!bulkOpen) return
+    const chk: Record<string, boolean> = {}
+    let foundDate = ''
+    for (const r of rows) {
+      if ((r.aylar[bulkAy] ?? 0) <= 0) continue
+      const rec = odeme[okey(bulkAy, r.tip, r.ad)]
+      chk[pKey(r.tip, r.ad)] = !!rec?.odendi
+      if (rec?.odeme_tarihi && !foundDate) foundDate = rec.odeme_tarihi
+    }
+    setBulkChecked(chk)
+    if (foundDate) setBulkTarih(foundDate)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bulkOpen, bulkAy, rows])
+
+  const setAllBulk = (v: boolean) =>
+    setBulkChecked(Object.fromEntries(bulkList.map(x => [pKey(x.tip, x.ad), v])))
+
+  const bulkCheckedCount = bulkList.filter(x => bulkChecked[pKey(x.tip, x.ad)]).length
+
+  const saveBulk = async () => {
+    if (bulkCheckedCount > 0 && !bulkTarih) { alert('Lütfen ödeme tarihi seçin.'); return }
+    setBulkSaving(true)
+    try {
+      const items = bulkList.map(x => {
+        const paid = !!bulkChecked[pKey(x.tip, x.ad)]
+        return { yil, ay: bulkAy, kullanici_tipi: x.tip, kullanici_adi: x.ad, odendi: paid, odeme_tarihi: paid ? bulkTarih : null }
+      })
+      const res = await fetch('/api/nihai-prim-odeme', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items, updated_by: currentProfile.id }),
+      })
+      if (res.ok) {
+        setOdeme(prev => {
+          const next = { ...prev }
+          for (const it of items) next[okey(it.ay, it.kullanici_tipi, it.kullanici_adi)] = { odendi: it.odendi, odeme_tarihi: it.odeme_tarihi }
+          return next
+        })
+        setBulkOpen(false)
+      } else {
+        const j = await res.json().catch(() => ({})); alert(j.error ?? 'Kaydedilemedi')
+      }
+    } finally { setBulkSaving(false) }
+  }
+
   const loading = loadingAll || selloutLoading
   const yillar = Array.from({ length: 4 }, (_, i) => nowYil - 2 + i)
 
@@ -243,6 +304,16 @@ export function NihaiPrimListesi({
           <p className="text-[11px] text-purple-100">BSY · Süpervizör · Jr. Süpervizör · Çetinler Merch</p>
         </div>
         <div className="flex items-center gap-2">
+          {canEdit && (
+            <button
+              onClick={() => setBulkOpen(true)}
+              disabled={loading || rows.length === 0}
+              className="flex items-center gap-1.5 text-xs bg-white/15 hover:bg-white/25 text-white disabled:opacity-40 rounded-lg px-2.5 py-1.5 font-medium transition-colors"
+              title="Bir ay için toplu ödendi/tarih işaretle"
+            >
+              <Check size={14} /> Toplu Ödeme
+            </button>
+          )}
           <button
             onClick={exportExcel}
             disabled={loading || rows.length === 0}
@@ -399,6 +470,91 @@ export function NihaiPrimListesi({
                     : 'Henüz ödenmedi. Ödendi bilgisi yalnızca admin ve İnsan Kaynakları tarafından girilir.'}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toplu ödeme modalı (admin + İK) */}
+      {bulkOpen && canEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !bulkSaving && setBulkOpen(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <h3 className="text-sm font-bold text-gray-800">Toplu Ödeme İşaretleme</h3>
+              <button onClick={() => setBulkOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded"><X size={16} /></button>
+            </div>
+
+            {/* Ay + tarih + toplu seçim */}
+            <div className="px-4 py-3 border-b border-gray-100 space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div>
+                  <label className="block text-[10px] text-gray-500 mb-0.5">Ay</label>
+                  <select
+                    value={bulkAy}
+                    onChange={e => setBulkAy(parseInt(e.target.value))}
+                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+                  >
+                    {NP_MONTHS_TR.map((m, i) => <option key={i} value={i + 1}>{m} {yil}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-gray-500 mb-0.5">Ödeme Tarihi</label>
+                  <input
+                    type="date"
+                    value={bulkTarih}
+                    onChange={e => setBulkTarih(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+                <div className="ml-auto flex items-end gap-1.5">
+                  <button onClick={() => setAllBulk(true)} className="text-[11px] px-2 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600">Tümünü seç</button>
+                  <button onClick={() => setAllBulk(false)} className="text-[11px] px-2 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600">Temizle</button>
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-500">
+                <span className="font-semibold text-gray-700">{bulkCheckedCount}</span> / {bulkList.length} kişi ödendi işaretli.
+                İşaretlenenler seçilen tarihle ödendi; işareti kaldırılanlar ödenmedi olur.
+              </p>
+            </div>
+
+            {/* Kişi listesi */}
+            <div className="flex-1 overflow-auto">
+              {bulkList.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-10">Bu ayda hakedişi olan kişi yok.</p>
+              ) : (
+                <table className="w-full text-xs">
+                  <tbody>
+                    {bulkList.map((x, i) => {
+                      const k = pKey(x.tip, x.ad)
+                      const checked = !!bulkChecked[k]
+                      return (
+                        <tr
+                          key={i}
+                          className={clsx('border-b border-gray-50 cursor-pointer', checked ? 'bg-green-50' : 'hover:bg-gray-50')}
+                          onClick={() => setBulkChecked(prev => ({ ...prev, [k]: !prev[k] }))}
+                        >
+                          <td className="px-3 py-2 w-8">
+                            <input type="checkbox" checked={checked} onChange={() => {}} />
+                          </td>
+                          <td className="px-2 py-2">
+                            <span className={clsx('inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold', TIP_BADGE[x.tip])}>{x.tip}</span>
+                          </td>
+                          <td className="px-2 py-2 font-medium text-gray-800">{x.ad}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-gray-700">{fmtCur(x.prim)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Kaydet */}
+            <div className="flex gap-2 px-4 py-3 border-t border-gray-100">
+              <button onClick={() => setBulkOpen(false)} disabled={bulkSaving} className="flex-1 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 disabled:opacity-50">İptal</button>
+              <button onClick={saveBulk} disabled={bulkSaving || bulkList.length === 0} className="flex-1 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-50 flex items-center justify-center gap-1">
+                {bulkSaving ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />} Kaydet ({bulkList.length})
+              </button>
             </div>
           </div>
         </div>

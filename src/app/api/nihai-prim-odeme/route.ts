@@ -34,19 +34,26 @@ export async function GET(req: Request) {
   return NextResponse.json({ rows: (data ?? []) as NihaiPrimOdemeRow[] })
 }
 
+interface OdemeInput {
+  yil: number; ay: number; kullanici_tipi: string; kullanici_adi: string
+  odendi: boolean; odeme_tarihi: string | null
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { yil, ay, kullanici_tipi, kullanici_adi, odendi, odeme_tarihi, updated_by } = body as {
-      yil: number; ay: number; kullanici_tipi: string; kullanici_adi: string
-      odendi: boolean; odeme_tarihi: string | null; updated_by?: string
-    }
+    const updated_by: string | undefined = body.updated_by
 
-    if (!yil || !ay || !kullanici_tipi || !kullanici_adi) {
-      return NextResponse.json({ error: 'Eksik alan' }, { status: 400 })
-    }
+    // Tekli veya toplu (items dizisi)
+    const items: OdemeInput[] = Array.isArray(body.items) ? body.items : [body]
+
     if (!updated_by) {
       return NextResponse.json({ error: 'Yetki bilgisi eksik' }, { status: 401 })
+    }
+    for (const it of items) {
+      if (!it.yil || !it.ay || !it.kullanici_tipi || !it.kullanici_adi) {
+        return NextResponse.json({ error: 'Eksik alan' }, { status: 400 })
+      }
     }
 
     const sb = getSupabase()
@@ -57,18 +64,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Bu işlem için yetkiniz yok' }, { status: 403 })
     }
 
+    const now = new Date().toISOString()
+    const rows = items.map(it => ({
+      yil: it.yil, ay: it.ay, kullanici_tipi: it.kullanici_tipi, kullanici_adi: it.kullanici_adi,
+      odendi: !!it.odendi,
+      odeme_tarihi: it.odendi ? (it.odeme_tarihi ?? null) : null,
+      updated_by,
+      updated_at: now,
+    }))
+
     const { error } = await sb
       .from('nihai_prim_odeme')
-      .upsert({
-        yil, ay, kullanici_tipi, kullanici_adi,
-        odendi: !!odendi,
-        odeme_tarihi: odendi ? (odeme_tarihi ?? null) : null,
-        updated_by,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'yil,ay,kullanici_tipi,kullanici_adi' })
+      .upsert(rows, { onConflict: 'yil,ay,kullanici_tipi,kullanici_adi' })
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, count: rows.length })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
