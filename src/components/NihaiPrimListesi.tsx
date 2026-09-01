@@ -196,6 +196,16 @@ export function NihaiPrimListesi({
     ]
     const ws = XLSX.utils.aoa_to_sheet([header, ...data, totalRow])
     ws['!cols'] = [{ wch: 14 }, { wch: 22 }, ...NP_MONTHS_TR.map(() => ({ wch: 11 })), { wch: 13 }]
+
+    // Tutar kolonlarına (Ocak..Aralık + Toplam = C..O) bin ayracı formatı
+    const numFmt = '#,##0'
+    const totalRows = rows.length + 2 // başlık + veri + toplam
+    for (let r = 1; r < totalRows; r++) {
+      for (let c = 2; c <= 14; c++) {
+        const ref = XLSX.utils.encode_cell({ r, c })
+        if (ws[ref] && typeof ws[ref].v === 'number') ws[ref].z = numFmt
+      }
+    }
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, `Nihai Prim ${yil}`)
     XLSX.writeFile(wb, `nihai-prim-${yil}.xlsx`)
@@ -350,11 +360,12 @@ export function NihaiPrimListesi({
                   {NP_MONTHS_TR.map((m, i) => (
                     <th key={i} className="text-right px-3 py-2 border-r border-brand-600 min-w-[92px] whitespace-nowrap">{m}</th>
                   ))}
+                  <th className="text-right px-3 py-2 min-w-[104px] whitespace-nowrap bg-brand-800">Toplam</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 && (
-                  <tr><td colSpan={14} className="text-center text-gray-400 py-10">Hakedişi olan kayıt bulunamadı.</td></tr>
+                  <tr><td colSpan={15} className="text-center text-gray-400 py-10">Hakedişi olan kayıt bulunamadı.</td></tr>
                 )}
                 {rows.map((r, ri) => (
                   <tr key={ri} className={clsx('border-b border-gray-100 hover:bg-gray-50', ri % 2 === 1 && 'bg-gray-50/40')}>
@@ -395,6 +406,9 @@ export function NihaiPrimListesi({
                         </td>
                       )
                     })}
+                    <td className="px-3 py-1.5 text-right font-bold text-purple-800 bg-purple-50/60">
+                      {(() => { const t = NP_MONTHS_TR.reduce((s, _, i) => s + (r.aylar[i + 1] ?? 0), 0); return t > 0 ? fmtCur(t) : '—' })()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -411,6 +425,9 @@ export function NihaiPrimListesi({
                         </td>
                       )
                     })}
+                    <td className="text-right px-3 py-2 text-purple-900 bg-purple-100">
+                      {fmtCur(NP_MONTHS_TR.reduce((s, _, i) => s + yilTotal(i + 1), 0))}
+                    </td>
                   </tr>
                 </tfoot>
               )}
