@@ -20,10 +20,22 @@ import { SayfaParametreleri } from '@/components/SayfaParametreleri'
 type SubTab = 'sup' | 'jr' | 'merch' | 'top20' | 'satislar' | 'ozel'
 
 // ─── EKSTRA Prim uygulaması (seçili döneme göre çalışır) ───
-// Şube bazında, aşağıdaki gruplardan 5 adet ve üzeri satışa çift prim.
-const OZEL_HEDEF = 5
-const OZEL_IPL = ['IPL9650', 'IPL9750', 'IPL9850', 'IPL9950']
-const OZEL_RMS = ['RMS9200B', 'RMS9200P']
+// Şube bazında, aşağıdaki ürün gruplarından belirtilen adet ve üzeri satışa
+// çift prim uygulanır (yalnızca Bayi Merch). Grup/kod/eşik burada tanımlanır;
+// bilgi metni ve tablo bu tanımdan üretilir (tek kaynak).
+interface OzelGrup { key: string; label: string; badge: string; codes: string[]; hedef: number; renk: string }
+const OZEL_GRUPLAR: OzelGrup[] = [
+  { key: 'IPL',          label: 'IPL Grubu',           badge: 'IPL',          hedef: 5,  codes: ['IPL9650', 'IPL9750', 'IPL9850', 'IPL9950'], renk: 'bg-indigo-100 text-indigo-700' },
+  { key: 'RMS',          label: 'RMS Grubu',           badge: 'RMS',          hedef: 5,  codes: ['RMS9200B', 'RMS9200P'],                     renk: 'bg-pink-100 text-pink-700' },
+  { key: 'EasyFold',     label: 'EasyFold Serisi',     badge: 'EasyFold',     hedef: 5,  codes: ['RHD7130B', 'RHD7130P'],                     renk: 'bg-sky-100 text-sky-700' },
+  { key: 'EasyStraight', label: 'EasyStraight Serisi', badge: 'EasyStraight', hedef: 5,  codes: ['RHS8900B', 'RHS8900P'],                     renk: 'bg-teal-100 text-teal-700' },
+  { key: 'Keratin',      label: 'Keratin Serisi',      badge: 'Keratin',      hedef: 10, codes: ['RS9500', 'RS9505', 'RC9525', 'RC9532'],     renk: 'bg-amber-100 text-amber-700' },
+  { key: 'ErkekBakim',   label: 'Erkek Bakım',         badge: 'Erkek Bakım',  hedef: 5,  codes: ['RPG7500'],                                  renk: 'bg-purple-100 text-purple-700' },
+]
+// stok kodu → grup key hızlı arama
+const OZEL_CODE_TO_KEY: Record<string, string> = {}
+OZEL_GRUPLAR.forEach(g => g.codes.forEach(c => { OZEL_CODE_TO_KEY[c.toUpperCase()] = g.key }))
+const OZEL_GRUP_BY_KEY: Record<string, OzelGrup> = Object.fromEntries(OZEL_GRUPLAR.map(g => [g.key, g]))
 
 // PHP TARIH ("DD.MM.YYYY") veya "YYYY-MM-DD" → karşılaştırılabilir "YYYY-MM-DD".
 // Parse edilemezse '' döner (o zaman ay bazlı karşılaştırmaya düşülür).
@@ -1021,21 +1033,19 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       if (!detay.has(k)) detay.set(k, { sup: d.sup_adi || '', jr: d.jr_adi || '' })
     })
 
-    // Şube (cari+sube) bazında IPL / RMS adetleri
-    const groups = new Map<string, { cari: string; sube: string; ipl: number; rms: number }>()
+    // Şube (cari+sube) bazında her özel grup için adet
+    const groups = new Map<string, { cari: string; sube: string; adet: Record<string, number> }>()
     augRows.forEach(r => {
       const code = (r.stok_kodu || '').toUpperCase()
-      const isIpl = OZEL_IPL.includes(code)
-      const isRms = OZEL_RMS.includes(code)
-      if (!isIpl && !isRms) return
+      const gkey = OZEL_CODE_TO_KEY[code]
+      if (!gkey) return
       const k = `${normalizeName(r.cari_isim)}||${normalizeName(r.sube_adi)}`
-      const g = groups.get(k) ?? { cari: r.cari_isim, sube: r.sube_adi, ipl: 0, rms: 0 }
-      if (isIpl) g.ipl += r.satilan_adet
-      else g.rms += r.satilan_adet
+      const g = groups.get(k) ?? { cari: r.cari_isim, sube: r.sube_adi, adet: {} }
+      g.adet[gkey] = (g.adet[gkey] ?? 0) + r.satilan_adet
       groups.set(k, g)
     })
 
-    type Row = { cari: string; sube: string; grup: 'IPL' | 'RMS'; hedef: number; gerc: number; kalan: number; ulasti: boolean }
+    type Row = { cari: string; sube: string; grup: string; renk: string; hedef: number; gerc: number; kalan: number; ulasti: boolean }
     const out: Row[] = []
     for (const [k, g] of groups) {
       const info = detay.get(k)
@@ -1045,13 +1055,14 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       else if (isJr) visible = !!info && namesMatch(info.jr, currentProfile.full_name)
       if (!visible) continue
 
-      for (const [grup, gerc] of [['IPL', g.ipl], ['RMS', g.rms]] as const) {
+      for (const grp of OZEL_GRUPLAR) {
+        const gerc = g.adet[grp.key] ?? 0
         if (gerc <= 0) continue
         out.push({
-          cari: g.cari, sube: g.sube, grup,
-          hedef: OZEL_HEDEF, gerc,
-          kalan: Math.max(0, OZEL_HEDEF - gerc),
-          ulasti: gerc >= OZEL_HEDEF,
+          cari: g.cari, sube: g.sube, grup: grp.badge, renk: grp.renk,
+          hedef: grp.hedef, gerc,
+          kalan: Math.max(0, grp.hedef - gerc),
+          ulasti: gerc >= grp.hedef,
         })
       }
     }
@@ -1549,9 +1560,23 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
           </div>
         )}
 
-        {/* ── Özel Uygulama Takip (Ağustos 2026 EKSTRA Prim) ── */}
+        {/* ── Özel Uygulama Takip (EKSTRA Prim) ── */}
         {!selloutLoading && subTab === 'ozel' && (
           <div className="p-2">
+            <SayfaParametreleri
+              visible={isAdmin}
+              baslik="Sellout ▸ Özel Uygulama Takip (EKSTRA Prim)"
+              aciklama="Seçili dönemde, tanımlı ürün gruplarından şube bazında eşik ve üzeri satış yapan şubelerin çift prim takibi."
+              parametreler={[
+                { label: 'Dönem', value: `Üstteki "Dönem" seçimi (şu an: ${donemLabel(donem)}). Satışlar bu döneme göre süzülür.` },
+                { label: 'Kapsam', value: 'Yalnızca Bayi Merch satışları sayılır; Çetinler Merch satışları dahil edilmez.' },
+                { label: 'Gruplama', value: 'Şube bazında (Cari + Şube). Her şube için her grubun satış adedi ayrı toplanır.' },
+                { label: 'Gruplar & eşikler', value: OZEL_GRUPLAR.map(g => `${g.label} (${g.codes.join(', ')}) ≥ ${g.hedef}`).join(' · ') },
+                { label: 'Gerçekleşen', value: 'Sellout satış verisinden (/api/sellout) o şube + gruba ait satılan_adet toplamı.' },
+                { label: 'Durum', value: 'Gerçekleşen ≥ grup eşiği ise "Çift Prim" hak edilir; değilse "kalan" adet gösterilir.' },
+                { label: 'Görünürlük', value: 'Admin tümü · Süpervizör kendi + Jr şubeleri · Jr kendi şubeleri (merch-detay sup_adi/jr_adi eşleşmesi).' },
+              ]}
+            />
             {/* Bilgi bandı */}
             <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
               <div className="flex items-center gap-2 mb-1">
@@ -1559,10 +1584,17 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">{donemLabel(donem)}</span>
               </div>
               <p className="text-[11px] text-emerald-900/80 leading-snug">
-                Şube bazında aşağıdaki gruplardan <b>{OZEL_HEDEF} adet ve üzeri</b> satışa çift prim uygulanır
+                {donemLabel(donem)} döneminde, aşağıdaki ürün gruplarından <b>ŞUBE BAZINDA</b> belirtilen adet
+                ve üzeri satışlara <b>ÇİFT PRİM</b> uygulanır
                 {' '}(<b>yalnızca Bayi Merch</b>; Çetinler Merch satışları dahil değildir).
-                {' '}<b>IPL Grubu</b> ({OZEL_IPL.join(', ')}) &nbsp;•&nbsp; <b>RMS Grubu</b> ({OZEL_RMS.join(', ')}).
               </p>
+              <ul className="mt-1.5 space-y-0.5">
+                {OZEL_GRUPLAR.map(g => (
+                  <li key={g.key} className="text-[11px] text-emerald-900/80 leading-snug">
+                    <b>{g.label}</b> ({g.codes.join(', ')}) — <b>{g.hedef} adet ve üzeri</b>
+                  </li>
+                ))}
+              </ul>
               <p className="text-[11px] font-semibold text-emerald-800 mt-1.5">
                 Çift prim hakkeden şube-grup: {ozelUlasan} / {ozelFiltered.length}
               </p>
@@ -1607,7 +1639,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
             {ozelRows.length === 0 ? (
               <div className="flex items-center justify-center h-32 text-xs text-gray-400">
-                Kapsamınızda henüz IPL / RMS satışı bulunmuyor.
+                Kapsamınızda henüz bu uygulamaya dahil ürün satışı bulunmuyor.
               </div>
             ) : ozelFiltered.length === 0 ? (
               <div className="flex items-center justify-center h-32 text-xs text-gray-400">
@@ -1640,8 +1672,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                         <td className="px-3 py-2 text-gray-600">{r.sube}</td>
                         <td className="px-3 py-2 text-center">
                           <span className={clsx(
-                            'inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                            r.grup === 'IPL' ? 'bg-indigo-100 text-indigo-700' : 'bg-pink-100 text-pink-700'
+                            'inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap',
+                            r.renk
                           )}>{r.grup}</span>
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums text-gray-500">{r.hedef}</td>
