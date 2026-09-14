@@ -17,7 +17,7 @@ import { Profile } from '@/lib/supabase'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
 import { SayfaParametreleri } from '@/components/SayfaParametreleri'
 
-type SubTab = 'sup' | 'jr' | 'merch' | 'top20' | 'satislar' | 'ozel'
+type SubTab = 'sup' | 'jr' | 'merch' | 'top20' | 'satislar' | 'satisgirmeyen' | 'ozel'
 
 // ─── EKSTRA Prim uygulaması (seçili döneme göre çalışır) ───
 // Şube bazında, aşağıdaki ürün gruplarından belirtilen adet ve üzeri satışa
@@ -349,7 +349,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const [adetPrimData, setAdetPrimData] = useState<{ stokKodu: string; bayiMerch: number | null; kosulluDestek: number | null; kategori: string | null }[]>([])
   const [ozelPrimData, setOzelPrimData] = useState<{ stok_kodu: string[] | null; grup_kodu: string[] | null; cari_adi: string[] | null; sube_adi: string[] | null; bayi_merch: number | null; kosullu_destek: number | null; prim_carpan: number | null; tarih_baslangic: string | null; tarih_bitis: string | null }[]>([])
   const [merchHedefData, setMerchHedefData] = useState<{ merch_name: string; grup: string; hedef: number }[]>([])
-  const [merchDetayData, setMerchDetayData] = useState<{ merch_adi: string; merch_grubu: string; sup_adi: string; jr_adi: string; cari_adi: string; sube_adi: string; sube_kod: string }[]>([])
+  const [merchDetayData, setMerchDetayData] = useState<{ merch_adi: string; merch_grubu: string; sup_adi: string; jr_adi: string; cari_adi: string; cari_kod: string; sube_adi: string; sube_kod: string; bsy_kod: string; bsy_adi: string }[]>([])
   const [destekFlags, setDestekFlags] = useState<Record<string, boolean>>({})
   const [satMerchTipi, setSatMerchTipi] = useState('')
   const [satMerch,     setSatMerch]     = useState('')
@@ -582,6 +582,72 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     },
     [merchDetayData]
   )
+
+  // ── Satış Girmeyen Şubeler (otomatik, döneme göre) ───────────
+  // Atanmış şube evreni /api/merch-detay'dan gelir; seçili dönemde
+  // merch_satis'te (satılan_adet>0) görünen şube kodları çıkarılınca
+  // kalan (adet 0) şubeler bulunur. Role göre kolonlanır:
+  //   admin → her süpervizör bir kolon · sup/jr → kendi şubeleri ·
+  //   bsy → kendine bağlı carilerin şubeleri (cari başına kolon).
+  interface SgColumn { title: string; subeler: { subeAdi: string; adet: number }[] }
+  const satisGirmeyenColumns = useMemo<SgColumn[]>(() => {
+    // Dönemde şube başına toplam satış adedi
+    const adetBySube = new Map<string, number>()
+    periodRows.forEach(r => {
+      const sk = (r.sube_kod || '').trim()
+      if (!sk) return
+      adetBySube.set(sk, (adetBySube.get(sk) ?? 0) + r.satilan_adet)
+    })
+
+    // Atanmış benzersiz şubeler (sube_kod bazında ilk kayıt)
+    const subeMap = new Map<string, { subeAdi: string; sup: string; jr: string; bsyKod: string; bsyAdi: string; cariAdi: string }>()
+    merchDetayData.forEach(m => {
+      const sk = (m.sube_kod || '').trim()
+      if (!sk || subeMap.has(sk)) return
+      subeMap.set(sk, {
+        subeAdi: m.sube_adi || sk,
+        sup: m.sup_adi || '',
+        jr: m.jr_adi || '',
+        bsyKod: (m.bsy_kod || '').toUpperCase(),
+        bsyAdi: m.bsy_adi || '',
+        cariAdi: m.cari_adi || '',
+      })
+    })
+
+    // Satışı olmayan (adet ≤ 0) şubeler
+    const zeroSale = [...subeMap.entries()]
+      .filter(([sk]) => (adetBySube.get(sk) ?? 0) <= 0)
+      .map(([sk, v]) => ({ ...v, adet: adetBySube.get(sk) ?? 0 }))
+
+    const sortSube = (a: { subeAdi: string }, b: { subeAdi: string }) => a.subeAdi.localeCompare(b.subeAdi, 'tr')
+    const strip = (arr: typeof zeroSale) => arr.map(s => ({ subeAdi: s.subeAdi, adet: s.adet })).sort(sortSube)
+    const cols: SgColumn[] = []
+
+    if (isBsy) {
+      const kod = BSY_NAME_TO_KOD[normalizeName(currentProfile.full_name)] ?? ''
+      const mine = zeroSale.filter(s =>
+        (kod && s.bsyKod === kod) || (s.bsyAdi && namesMatch(s.bsyAdi, currentProfile.full_name))
+      )
+      const byCari = new Map<string, typeof mine>()
+      mine.forEach(s => {
+        const key = s.cariAdi || '—'
+        if (!byCari.has(key)) byCari.set(key, [])
+        byCari.get(key)!.push(s)
+      })
+      ;[...byCari.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0], 'tr'))
+        .forEach(([cari, subeler]) => cols.push({ title: cari, subeler: strip(subeler) }))
+    } else if (isJr) {
+      cols.push({ title: currentProfile.full_name, subeler: strip(zeroSale.filter(s => s.jr && namesMatch(s.jr, currentProfile.full_name))) })
+    } else if (isSup) {
+      cols.push({ title: currentProfile.full_name, subeler: strip(zeroSale.filter(s => s.sup && namesMatch(s.sup, currentProfile.full_name))) })
+    } else {
+      visibleSups.forEach(sup =>
+        cols.push({ title: sup.full_name, subeler: strip(zeroSale.filter(s => s.sup && namesMatch(s.sup, sup.full_name))) })
+      )
+    }
+    return cols
+  }, [periodRows, merchDetayData, visibleSups, isBsy, isJr, isSup, currentProfile.full_name])
 
   // ── Gerç aggregation ────────────────────────────────────────
   const getGerc = useCallback(
@@ -1197,6 +1263,13 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             subTab === 'satislar' ? 'border-brand-700 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'
           )}
         >Satışlar</button>
+        <button
+          onClick={() => setSubTab('satisgirmeyen')}
+          className={clsx(
+            'px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap',
+            subTab === 'satisgirmeyen' ? 'border-rose-500 text-rose-700' : 'border-transparent text-gray-500 hover:text-gray-800'
+          )}
+        >Satış Girmeyen Şubeler</button>
         {(isAdmin || isSup || isJr) && (
           <button
             onClick={() => setSubTab('ozel')}
@@ -1208,7 +1281,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
         )}
         <div className="flex-1" />
         {/* Target entry button */}
-        {(isAdmin || isSup) && subTab !== 'sup' && subTab !== 'ozel' && (
+        {(isAdmin || isSup) && subTab !== 'sup' && subTab !== 'ozel' && subTab !== 'satisgirmeyen' && (
           <button
             onClick={() => setTargetModal(subTab)}
             className="flex items-center gap-1 px-2 py-1 mb-1 text-[11px] bg-brand-700 text-white rounded-lg hover:bg-brand-600"
@@ -1576,6 +1649,78 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 </tfoot>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* ── Satış Girmeyen Şubeler Takip (otomatik, döneme göre) ── */}
+        {!selloutLoading && subTab === 'satisgirmeyen' && (
+          <div className="p-2 pb-4">
+            <p className="mb-2 px-1 text-[11px] text-gray-500">
+              Seçili dönemde ({donemLabel(donem)}) hiç satışı olmayan şubeler. Atanmış şubeler /api/merch-detay’den,
+              satışlar /api/sellout (export_merch_satis.php)’den otomatik hesaplanır — elle giriş yoktur.
+            </p>
+            {satisGirmeyenColumns.every(c => c.subeler.length === 0) ? (
+              <div className="text-center py-10 text-xs text-gray-400">
+                Bu dönemde satış girmeyen şube bulunmuyor 🎉
+              </div>
+            ) : (
+              <div className="overflow-auto">
+                <table className="border-collapse text-xs">
+                  <thead>
+                    <tr>
+                      <th className="border border-gray-200 bg-gray-50 px-2 py-1 w-8" />
+                      {satisGirmeyenColumns.map((c, i) => (
+                        <th
+                          key={i}
+                          colSpan={2}
+                          className="border border-gray-200 bg-brand-700 text-white px-3 py-1.5 text-center font-semibold whitespace-nowrap"
+                        >
+                          {c.title} <span className="opacity-70 font-normal">({c.subeler.length})</span>
+                        </th>
+                      ))}
+                    </tr>
+                    <tr>
+                      <th className="border border-gray-200 bg-gray-50 px-2 py-1 text-center text-gray-400">#</th>
+                      {satisGirmeyenColumns.map((c, i) => (
+                        <React.Fragment key={i}>
+                          <th className="border border-gray-200 bg-gray-100 px-3 py-1 text-left font-medium text-gray-600 min-w-[190px]">Şube</th>
+                          <th className="border border-gray-200 bg-gray-100 px-2 py-1 text-right font-medium text-gray-600 w-20">Satış Adedi</th>
+                        </React.Fragment>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: Math.max(1, ...satisGirmeyenColumns.map(c => c.subeler.length)) }).map((_, ri) => (
+                      <tr key={ri} className={ri % 2 ? 'bg-gray-50/60' : ''}>
+                        <td className="border border-gray-200 px-2 py-1 text-center text-gray-400 tabular-nums">{ri + 1}</td>
+                        {satisGirmeyenColumns.map((c, ci) => {
+                          const s = c.subeler[ri]
+                          return (
+                            <React.Fragment key={ci}>
+                              <td className="border border-gray-200 px-3 py-1 whitespace-nowrap">{s?.subeAdi ?? ''}</td>
+                              <td className="border border-gray-200 px-2 py-1 text-right tabular-nums text-gray-500">{s ? s.adet : ''}</td>
+                            </React.Fragment>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <SayfaParametreleri
+              visible={isAdmin}
+              baslik="Sellout ▸ Satış Girmeyen Şubeler"
+              aciklama="Seçili dönemde hiç satış girmemiş (adet 0) şubelerin, sorumlu kişiye göre kolonlanmış takibi. Tamamen otomatik; elle giriş yoktur."
+              parametreler={[
+                { label: 'Dönem', value: `Üstteki "Dönem" seçimi (şu an: ${donemLabel(donem)}). Satışsızlık bu döneme göre hesaplanır.` },
+                { label: 'Atanmış şube evreni', value: '/api/merch-detay (export_merch_detay.php) — her şubenin sup/jr/bsy/cari ataması buradan gelir.' },
+                { label: 'Satış verisi', value: '/api/sellout (export_merch_satis.php) — seçili dönemde satılan_adet > 0 olan şube kodları "satış girmiş" sayılır.' },
+                { label: 'Satış girmeyen', value: 'Atanmış şubelerden, dönemde merch_satis’te hiç görünmeyen (toplam adet 0) şubeler. Satış Adedi sütunu doğal olarak 0’dır (satışsızlığı teyit eder).' },
+                { label: 'Görünürlük', value: 'Admin: tüm süpervizörler (her biri bir kolon). Süpervizör: kendi şubeleri. Jr. Süpervizör: kendi şubeleri. BSY: kendine bağlı carilerin şubeleri (cari başına kolon).' },
+                { label: 'Eşleştirme', value: 'İsimler normalizeName ile eşleşir (Türkçe harf + " SV" eki toleranslı); BSY, profil adından BSY koduna çevrilerek merch-detay bsy_kod ile eşleşir.' },
+              ]}
+            />
           </div>
         )}
 
