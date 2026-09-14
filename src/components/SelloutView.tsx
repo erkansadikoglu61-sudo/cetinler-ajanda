@@ -614,19 +614,19 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       })
     })
 
-    // Satışı olmayan (adet ≤ 0) şubeler
-    const zeroSale = [...subeMap.entries()]
-      .filter(([sk]) => (adetBySube.get(sk) ?? 0) <= 0)
+    // Atanmış tüm şubeler + dönem satış adedi (satışsız = 0)
+    const assigned = [...subeMap.entries()]
       .map(([sk, v]) => ({ ...v, adet: adetBySube.get(sk) ?? 0 }))
 
-    const sortSube = (a: { cariAdi: string; subeAdi: string }, b: { cariAdi: string; subeAdi: string }) =>
-      a.cariAdi.localeCompare(b.cariAdi, 'tr') || a.subeAdi.localeCompare(b.subeAdi, 'tr')
-    const strip = (arr: typeof zeroSale) => arr.map(s => ({ subeAdi: s.subeAdi, cariAdi: s.cariAdi, adet: s.adet })).sort(sortSube)
+    // Satış adedine göre ARTAN (önce 0, sonra 1, 2…), sonra cari/şube
+    const bySales = (a: { adet: number; cariAdi: string; subeAdi: string }, b: { adet: number; cariAdi: string; subeAdi: string }) =>
+      a.adet - b.adet || a.cariAdi.localeCompare(b.cariAdi, 'tr') || a.subeAdi.localeCompare(b.subeAdi, 'tr')
+    const strip = (arr: typeof assigned) => arr.map(s => ({ subeAdi: s.subeAdi, cariAdi: s.cariAdi, adet: s.adet })).sort(bySales)
     const cols: SgColumn[] = []
 
     if (isBsy) {
       const kod = BSY_NAME_TO_KOD[normalizeName(currentProfile.full_name)] ?? ''
-      const mine = zeroSale.filter(s =>
+      const mine = assigned.filter(s =>
         (kod && s.bsyKod === kod) || (s.bsyAdi && namesMatch(s.bsyAdi, currentProfile.full_name))
       )
       const byCari = new Map<string, typeof mine>()
@@ -639,12 +639,12 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
         .sort((a, b) => a[0].localeCompare(b[0], 'tr'))
         .forEach(([cari, subeler]) => cols.push({ title: cari, subeler: strip(subeler) }))
     } else if (isJr) {
-      cols.push({ title: currentProfile.full_name, subeler: strip(zeroSale.filter(s => s.jr && namesMatch(s.jr, currentProfile.full_name))) })
+      cols.push({ title: currentProfile.full_name, subeler: strip(assigned.filter(s => s.jr && namesMatch(s.jr, currentProfile.full_name))) })
     } else if (isSup) {
-      cols.push({ title: currentProfile.full_name, subeler: strip(zeroSale.filter(s => s.sup && namesMatch(s.sup, currentProfile.full_name))) })
+      cols.push({ title: currentProfile.full_name, subeler: strip(assigned.filter(s => s.sup && namesMatch(s.sup, currentProfile.full_name))) })
     } else {
       visibleSups.forEach(sup =>
-        cols.push({ title: sup.full_name, subeler: strip(zeroSale.filter(s => s.sup && namesMatch(s.sup, sup.full_name))) })
+        cols.push({ title: sup.full_name, subeler: strip(assigned.filter(s => s.sup && namesMatch(s.sup, sup.full_name))) })
       )
     }
     return cols
@@ -1657,12 +1657,13 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
         {!selloutLoading && subTab === 'satisgirmeyen' && (
           <div className="p-2 pb-4">
             <p className="mb-2 px-1 text-[11px] text-gray-500">
-              Seçili dönemde ({donemLabel(donem)}) hiç satışı olmayan şubeler. Atanmış şubeler /api/merch-detay’den,
-              satışlar /api/sellout (export_merch_satis.php)’den otomatik hesaplanır — elle giriş yoktur.
+              Seçili dönemde ({donemLabel(donem)}) sorumlu kişinin tüm şubeleri, satış adedine göre artan sıralı
+              (önce satış girmeyenler = 0, sonra 1, 2…). Başlıkta: toplam şube · satışlı · girmeyen adedi.
+              Atanmış şubeler /api/merch-detay’den, satışlar /api/sellout (export_merch_satis.php)’den otomatik hesaplanır — elle giriş yoktur.
             </p>
             {satisGirmeyenColumns.every(c => c.subeler.length === 0) ? (
               <div className="text-center py-10 text-xs text-gray-400">
-                Bu dönemde satış girmeyen şube bulunmuyor 🎉
+                Gösterilecek şube bulunamadı.
               </div>
             ) : (
               <div className="overflow-auto">
@@ -1676,7 +1677,10 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                           colSpan={2}
                           className="border border-gray-200 bg-brand-700 text-white px-3 py-1.5 text-center font-semibold whitespace-nowrap"
                         >
-                          {c.title} <span className="opacity-70 font-normal">({c.subeler.length})</span>
+                          <div>{c.title}</div>
+                          <div className="opacity-80 font-normal text-[10px]">
+                            {c.subeler.length} şube · {c.subeler.filter(s => s.adet > 0).length} satışlı · {c.subeler.filter(s => s.adet <= 0).length} girmeyen
+                          </div>
                         </th>
                       ))}
                     </tr>
@@ -1718,8 +1722,9 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
               parametreler={[
                 { label: 'Dönem', value: `Üstteki "Dönem" seçimi (şu an: ${donemLabel(donem)}). Satışsızlık bu döneme göre hesaplanır.` },
                 { label: 'Atanmış şube evreni', value: '/api/merch-detay (export_merch_detay.php) — her şubenin sup/jr/bsy/cari ataması buradan gelir.' },
-                { label: 'Satış verisi', value: '/api/sellout (export_merch_satis.php) — seçili dönemde satılan_adet > 0 olan şube kodları "satış girmiş" sayılır.' },
-                { label: 'Satış girmeyen', value: 'Atanmış şubelerden, dönemde merch_satis’te hiç görünmeyen (toplam adet 0) şubeler. Satış Adedi sütunu doğal olarak 0’dır (satışsızlığı teyit eder).' },
+                { label: 'Satış verisi', value: '/api/sellout (export_merch_satis.php) — seçili dönemde her şubenin satılan_adet toplamı. Satış Adedi sütununda gösterilir.' },
+                { label: 'Sıralama', value: 'Sorumlu kişinin TÜM şubeleri listelenir, satış adedine göre artan (önce 0 = satış girmeyen, sonra 1, 2…), eşitlikte cari/şube adına göre.' },
+                { label: 'Başlık sayıları', value: 'Her kolon başlığında: toplam şube · kaçı satışlı (adet>0) · kaçı girmeyen (adet 0).' },
                 { label: 'Görünürlük', value: 'Admin: tüm süpervizörler (her biri bir kolon). Süpervizör: kendi şubeleri. Jr. Süpervizör: kendi şubeleri. BSY: kendine bağlı carilerin şubeleri (cari başına kolon).' },
                 { label: 'Eşleştirme', value: 'İsimler normalizeName ile eşleşir (Türkçe harf + " SV" eki toleranslı); BSY, profil adından BSY koduna çevrilerek merch-detay bsy_kod ile eşleşir.' },
               ]}
