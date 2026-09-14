@@ -589,7 +589,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   // kalan (adet 0) şubeler bulunur. Role göre kolonlanır:
   //   admin → her süpervizör bir kolon · sup/jr → kendi şubeleri ·
   //   bsy → kendine bağlı carilerin şubeleri (cari başına kolon).
-  interface SgColumn { title: string; subeler: { subeAdi: string; adet: number }[] }
+  interface SgColumn { title: string; subeler: { subeAdi: string; cariAdi: string; adet: number }[] }
   const satisGirmeyenColumns = useMemo<SgColumn[]>(() => {
     // Dönemde şube başına toplam satış adedi
     const adetBySube = new Map<string, number>()
@@ -619,8 +619,9 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       .filter(([sk]) => (adetBySube.get(sk) ?? 0) <= 0)
       .map(([sk, v]) => ({ ...v, adet: adetBySube.get(sk) ?? 0 }))
 
-    const sortSube = (a: { subeAdi: string }, b: { subeAdi: string }) => a.subeAdi.localeCompare(b.subeAdi, 'tr')
-    const strip = (arr: typeof zeroSale) => arr.map(s => ({ subeAdi: s.subeAdi, adet: s.adet })).sort(sortSube)
+    const sortSube = (a: { cariAdi: string; subeAdi: string }, b: { cariAdi: string; subeAdi: string }) =>
+      a.cariAdi.localeCompare(b.cariAdi, 'tr') || a.subeAdi.localeCompare(b.subeAdi, 'tr')
+    const strip = (arr: typeof zeroSale) => arr.map(s => ({ subeAdi: s.subeAdi, cariAdi: s.cariAdi, adet: s.adet })).sort(sortSube)
     const cols: SgColumn[] = []
 
     if (isBsy) {
@@ -1683,7 +1684,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                       <th className="border border-gray-200 bg-gray-50 px-2 py-1 text-center text-gray-400">#</th>
                       {satisGirmeyenColumns.map((c, i) => (
                         <React.Fragment key={i}>
-                          <th className="border border-gray-200 bg-gray-100 px-3 py-1 text-left font-medium text-gray-600 min-w-[190px]">Şube</th>
+                          <th className="border border-gray-200 bg-gray-100 px-3 py-1 text-left font-medium text-gray-600 min-w-[220px]">Cari / Şube</th>
                           <th className="border border-gray-200 bg-gray-100 px-2 py-1 text-right font-medium text-gray-600 w-20">Satış Adedi</th>
                         </React.Fragment>
                       ))}
@@ -1697,7 +1698,9 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                           const s = c.subeler[ri]
                           return (
                             <React.Fragment key={ci}>
-                              <td className="border border-gray-200 px-3 py-1 whitespace-nowrap">{s?.subeAdi ?? ''}</td>
+                              <td className="border border-gray-200 px-3 py-1 whitespace-nowrap">
+                                {s ? [s.cariAdi.trim().split(/\s+/)[0], s.subeAdi].filter(Boolean).join(' ') : ''}
+                              </td>
                               <td className="border border-gray-200 px-2 py-1 text-right tabular-nums text-gray-500">{s ? s.adet : ''}</td>
                             </React.Fragment>
                           )
