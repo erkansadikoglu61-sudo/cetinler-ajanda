@@ -5,6 +5,14 @@ import * as XLSX from 'xlsx'
 import { createClient } from '@supabase/supabase-js'
 import { BSY_KOD_TO_NAME } from '@/lib/bsy'
 
+// 27MB SAHA.xlsx indirilip parse edildiği için ağır bir route.
+// Vercel varsayılan timeout'una takılıp boş tablo dönmesin diye tavanı yükselt.
+export const dynamic     = 'force-dynamic'
+export const maxDuration = 60
+
+// Sadece bu iki sayfa okunur; 102k satırlık "Data" sayfasını parse etmeye gerek yok.
+const NEEDED_SHEETS = ['Tahsilat_Hedef_Datası', 'Gerçekleşen Tahsilat']
+
 const EXCEL_PATH =
   process.env.BSY_EXCEL_PATH ??
   path.join(process.env.HOME ?? '/Users/erkansadikoglu', 'Desktop/SAHA.xlsx')
@@ -62,7 +70,7 @@ export async function GET(req: Request) {
   const buf = await getExcelBuffer()
   if (!buf) return NextResponse.json<TahsilatResponse>({ rows: [], detay: [] })
 
-  const wb = XLSX.read(buf, { type: 'buffer', dense: true })
+  const wb = XLSX.read(buf, { type: 'buffer', dense: true, sheets: NEEDED_SHEETS })
 
   // ── 1. Tahsilat Hedef Datası ────────────────────────────────────
   // Excel'deki tam isim: "Tahsilat_Hedef_Datası" (büyük T, H, D, son İ)
