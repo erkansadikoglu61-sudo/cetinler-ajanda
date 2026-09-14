@@ -599,19 +599,32 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       adetBySube.set(sk, (adetBySube.get(sk) ?? 0) + r.satilan_adet)
     })
 
-    // Atanmış benzersiz şubeler (sube_kod bazında ilk kayıt)
+    // Atanmış benzersiz şubeler (sube_kod bazında). Aynı şube birden çok satırda
+    // gelebilir (Bayi/Çetinler/Destek); Destek satırında sup/jr boş olabildiği
+    // için tek satır alıp geçmek şubeyi yanlışlıkla sahipsiz bırakıyordu.
+    // Bu yüzden satırlar BİRLEŞTİRİLİR: her alan ilk DOLU değerle doldurulur.
     const subeMap = new Map<string, { subeAdi: string; sup: string; jr: string; bsyKod: string; bsyAdi: string; cariAdi: string }>()
     merchDetayData.forEach(m => {
       const sk = (m.sube_kod || '').trim()
-      if (!sk || subeMap.has(sk)) return
-      subeMap.set(sk, {
-        subeAdi: m.sube_adi || sk,
-        sup: m.sup_adi || '',
-        jr: m.jr_adi || '',
-        bsyKod: (m.bsy_kod || '').toUpperCase(),
-        bsyAdi: m.bsy_adi || '',
-        cariAdi: m.cari_adi || '',
-      })
+      if (!sk) return
+      const cur = subeMap.get(sk)
+      if (!cur) {
+        subeMap.set(sk, {
+          subeAdi: m.sube_adi || sk,
+          sup: m.sup_adi || '',
+          jr: m.jr_adi || '',
+          bsyKod: (m.bsy_kod || '').toUpperCase(),
+          bsyAdi: m.bsy_adi || '',
+          cariAdi: m.cari_adi || '',
+        })
+      } else {
+        if (!cur.sup && m.sup_adi) cur.sup = m.sup_adi
+        if (!cur.jr && m.jr_adi) cur.jr = m.jr_adi
+        if (!cur.bsyKod && m.bsy_kod) cur.bsyKod = m.bsy_kod.toUpperCase()
+        if (!cur.bsyAdi && m.bsy_adi) cur.bsyAdi = m.bsy_adi
+        if (!cur.cariAdi && m.cari_adi) cur.cariAdi = m.cari_adi
+        if ((!cur.subeAdi || cur.subeAdi === sk) && m.sube_adi) cur.subeAdi = m.sube_adi
+      }
     })
 
     // Atanmış tüm şubeler + dönem satış adedi (satışsız = 0)
