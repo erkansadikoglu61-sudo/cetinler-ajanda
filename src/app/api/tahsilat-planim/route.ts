@@ -5,6 +5,11 @@ import * as XLSX from 'xlsx'
 import { createClient } from '@supabase/supabase-js'
 import { BSY_KOD_TO_NAME } from '@/lib/bsy'
 
+// 27MB SAHA.xlsx indirilip parse ediliyor ve admin ekranında 10 BSY için paralel
+// çağrılıyor; Vercel timeout'una takılıp boş tablo dönmesin diye tavanı yükselt.
+export const dynamic     = 'force-dynamic'
+export const maxDuration = 60
+
 const EXCEL_PATH =
   process.env.BSY_EXCEL_PATH ??
   path.join(process.env.HOME ?? '/Users/erkansadikoglu', 'Desktop/SAHA.xlsx')
@@ -68,7 +73,8 @@ export async function GET(req: Request) {
   const buf = await getExcelBuffer()
   if (!buf) return NextResponse.json<TahsilatPlanimResponse>({ rows: [] })
 
-  const wb = XLSX.read(buf, { type: 'buffer', dense: true })
+  // Sadece "Tahsilat Planım" sayfası okunur; 100k+ satırlık diğer sayfaları parse etme.
+  const wb = XLSX.read(buf, { type: 'buffer', dense: true, sheets: ['Tahsilat Planım'] })
 
   // "Tahsilat Planım" sekmesini oku
   const sheet = wb.Sheets['Tahsilat Planım']
@@ -144,10 +150,15 @@ export async function GET(req: Request) {
   })
 
   // BSY kodu kolonunu bul (header'dan)
+  // Sayfada kolon "Plasiyer Kodu" ("MB9 / Atilla YILMAZ" formatında) olarak geliyor;
+  // eski "BSY" başlıkları da desteklensin diye hepsini kontrol ediyoruz.
   let bsyKodCol = -1
   for (let c = 0; c < header.length; c++) {
     const h = String(header[c] ?? '').trim().toLowerCase()
-    if (h === 'bsy kod' || h === 'bsy' || h === 'bsy kodu' || h === 'bsy_kod') {
+    if (
+      h === 'bsy kod' || h === 'bsy' || h === 'bsy kodu' || h === 'bsy_kod' ||
+      h === 'plasiyer kodu' || h === 'plasiyer_kodu' || h === 'plasiyer'
+    ) {
       bsyKodCol = c
       break
     }
@@ -164,8 +175,9 @@ export async function GET(req: Request) {
 
     if (!cariKod || !cariIsim) continue
 
-    // BSY kodunu al
-    const rowBsyKod = bsyKodCol >= 0 ? String(r[bsyKodCol] ?? '').trim().toUpperCase() : ''
+    // BSY kodunu al — "MB9 / Atilla YILMAZ" formatında ise slash öncesini al
+    const rowPlasiyer = bsyKodCol >= 0 ? String(r[bsyKodCol] ?? '').trim() : ''
+    const rowBsyKod   = rowPlasiyer ? rowPlasiyer.split('/')[0].trim().toUpperCase() : ''
     const rowBsyAdi = rowBsyKod ? BSY_KOD_TO_NAME[rowBsyKod] : ''
 
     // BSY filtrelemesi - showAll true ise filtre yapma
