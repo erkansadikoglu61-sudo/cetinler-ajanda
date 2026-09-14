@@ -1235,6 +1235,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
         )}
 
         {!selloutLoading && subTab === 'sup' && showSupTab && (
+          <>
           <SelloutTable
             rows={supRows.map(r => {
               const jrCount = jrsOfSupName(r.profile.full_name)
@@ -1252,6 +1253,24 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             showPrim
             kategoriPrimi={PRIM_SUP}
           />
+          <SayfaParametreleri
+            visible={isAdmin}
+            baslik="Sellout ▸ Süpervizör"
+            aciklama="Süpervizörlerin, seçili dönemdeki kategori bazlı sellout satış hedef/gerçekleşme ve prim tablosu. Her süpervizöre kendi + bağlı Jr. Süpervizörlerinin satışları dahildir."
+            parametreler={[
+              { label: 'Dönem', value: `Üstteki "Dönem" seçimi (şu an: ${donemLabel(donem)}). Hedef, gerçekleşen ve primler bu döneme aittir.` },
+              { label: 'Kişi listesi', value: 'Süpervizör rolündeki profiller (Supabase). Admin tümünü görür; süpervizör yalnızca kendi satırını görür.' },
+              { label: 'Kategori grupları', value: 'IPL · Üflemeli · Düzleştirici&Maşa · Epilatör&Baskül&Mutfak · Erkek Bakım · Süpürge · Mutfak ve Diğer (grup_aciklama → GRUP_NORMALIZE eşlemesiyle).' },
+              { label: 'Hedef (Hed.)', value: '"Hedef Gir" ile girilen, dönem bazlı süpervizör hedefleri (Supabase profile_targets).' },
+              { label: 'Gerçekleşen (Gerç.)', value: 'Sellout satışından (/api/sellout) süpervizörün KENDİ + bağlı Jr. Süpervizörlerinin o gruba ait satılan_adet toplamı. İsim eşleşmesi normalizeName ile (Türkçe harf + " SV" eki toleranslı).' },
+              { label: '% ve renkler', value: 'Gerç ÷ Hedef. ≥%100 koyu yeşil, ≥%80 açık yeşil, ≥%60 sarı, <%60 kırmızı.' },
+              { label: 'Kat. Primi (₺)', value: 'IPL 7.500 · Üflemeli 6.500 · Düzleştirici&Maşa 4.000 · Epilatör&Baskül&Mutfak 2.500 · Erkek Bakım 1.500 · Süpürge 7.000 · Mutfak ve Diğer 3.000 (toplam 32.000 · Süpervizör seviyesi = PRIM_SUP).' },
+              { label: 'Prim hesabı', value: 'Hedef 0 → prim yok. Oran <%80 → prim yok. Oran ≥%80 → KatPrimi × min(oran, %100). Yani %100+ tam prim, %80–100 arası oranla (calcPrim, eşik PRIM_ESIGI=%80).' },
+              { label: 'İsim altı sayılar', value: 'jr.sup / şube / merch — /api/merch-detay (PHP) canlı verisinden: süpervizöre bağlı benzersiz Jr. Süpervizör, SUBE_KODU ve "Çetinler Merch" adedi. Bu sayılar döneme bağlı DEĞİL, güncel atama yapısını gösterir.' },
+              { label: 'Toplam sütunu', value: 'Satırdaki tüm grupların Hedef / Gerçekleşen / Prim toplamı.' },
+            ]}
+          />
+          </>
         )}
 
         {!selloutLoading && subTab === 'jr' && showJrTab && (
