@@ -1283,7 +1283,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             'px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap',
             subTab === 'satisgirmeyen' ? 'border-rose-500 text-rose-700' : 'border-transparent text-gray-500 hover:text-gray-800'
           )}
-        >Satış Girmeyen Şubeler</button>
+        >Şube Takibi</button>
         {(isAdmin || isSup || isJr) && (
           <button
             onClick={() => setSubTab('ozel')}
@@ -1730,7 +1730,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             )}
             <SayfaParametreleri
               visible={isAdmin}
-              baslik="Sellout ▸ Satış Girmeyen Şubeler"
+              baslik="Sellout ▸ Şube Takibi"
               aciklama="Seçili dönemde hiç satış girmemiş (adet 0) şubelerin, sorumlu kişiye göre kolonlanmış takibi. Tamamen otomatik; elle giriş yoktur."
               parametreler={[
                 { label: 'Dönem', value: `Üstteki "Dönem" seçimi (şu an: ${donemLabel(donem)}). Satışsızlık bu döneme göre hesaplanır.` },
