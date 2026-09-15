@@ -29,8 +29,8 @@ const OZEL_GRUPLAR: OzelGrup[] = [
   { key: 'RMS',          label: 'RMS Grubu',           badge: 'RMS',          hedef: 5,  codes: ['RMS9200B', 'RMS9200P'],                     renk: 'bg-pink-100 text-pink-700' },
   { key: 'EasyFold',     label: 'EasyFold Serisi',     badge: 'EasyFold',     hedef: 5,  codes: ['RHD7130B', 'RHD7130P'],                     renk: 'bg-sky-100 text-sky-700' },
   { key: 'EasyStraight', label: 'EasyStraight Serisi', badge: 'EasyStraight', hedef: 5,  codes: ['RHS8900B', 'RHS8900P'],                     renk: 'bg-teal-100 text-teal-700' },
-  { key: 'Keratin',      label: 'Keratin Serisi',      badge: 'Keratin',      hedef: 5,  codes: ['RS9500', 'RS9505', 'RC9525', 'RC9532'],     renk: 'bg-amber-100 text-amber-700' },
-  { key: 'ErkekBakim',   label: 'Erkek Bakım',         badge: 'Erkek Bakım',  hedef: 10, codes: ['RPG7500'],                                  renk: 'bg-purple-100 text-purple-700' },
+  { key: 'Keratin',      label: 'Keratin Serisi',      badge: 'Keratin',      hedef: 10, codes: ['RS9500', 'RS9505', 'RC9525', 'RC9532'],     renk: 'bg-amber-100 text-amber-700' },
+  { key: 'ErkekBakim',   label: 'Erkek Bakım',         badge: 'Erkek Bakım',  hedef: 5,  codes: ['RPG7500'],                                  renk: 'bg-purple-100 text-purple-700' },
 ]
 // stok kodu → grup key hızlı arama
 const OZEL_CODE_TO_KEY: Record<string, string> = {}
