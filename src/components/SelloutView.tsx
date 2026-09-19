@@ -170,7 +170,7 @@ interface TargetRow {
 
 function TargetEntryModal({
   title, rows, groups, initialValues, donem, enteredBy, onSave, onClose, saving,
-  showDestekCol, destekInitial, onSaveDestek,
+  showDestekCol, destekInitial, gizleInitial, onSaveDestek,
 }: {
   title: string
   rows: TargetRow[]
@@ -183,7 +183,8 @@ function TargetEntryModal({
   saving: boolean
   showDestekCol?: boolean
   destekInitial?: (key: string) => boolean
-  onSaveDestek?: (flags: { merch_name: string; destek_var: boolean }[]) => Promise<void>
+  gizleInitial?: (key: string) => boolean
+  onSaveDestek?: (flags: { merch_name: string; destek_var: boolean; gizle: boolean }[]) => Promise<void>
 }) {
   const [values, setValues] = useState<Record<string, number>>(() => {
     const init: Record<string, number> = {}
@@ -199,11 +200,21 @@ function TargetEntryModal({
     return init
   })
 
+  const showGizleCol = !!gizleInitial
+  const [gizleValues, setGizleValues] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {}
+    if (showGizleCol && gizleInitial) rows.forEach(r => { init[r.key] = gizleInitial(r.key) })
+    return init
+  })
+
   const set = (key: string, grup: string, val: number) =>
     setValues(p => ({ ...p, [`${key}||${grup}`]: val }))
 
   const setDestek = (key: string, val: boolean) =>
     setDestekValues(p => ({ ...p, [key]: val }))
+
+  const setGizle = (key: string, val: boolean) =>
+    setGizleValues(p => ({ ...p, [key]: val }))
 
   const handleSave = async () => {
     const profileRows: ProfileTarget[] = []
@@ -220,7 +231,11 @@ function TargetEntryModal({
     })
     await onSave(profileRows, merchRows)
     if (showDestekCol && onSaveDestek) {
-      const flags = rows.filter(r => !r.isProfile).map(r => ({ merch_name: r.key, destek_var: destekValues[r.key] ?? false }))
+      const flags = rows.filter(r => !r.isProfile).map(r => ({
+        merch_name: r.key,
+        destek_var: destekValues[r.key] ?? false,
+        gizle: gizleValues[r.key] ?? false,
+      }))
       await onSaveDestek(flags)
     }
   }
@@ -258,6 +273,9 @@ function TargetEntryModal({
                 {showDestekCol && (
                   <th className="text-center px-3 py-2 font-medium text-gray-600 border border-gray-200 min-w-[110px] bg-amber-50">Destek Personeli Var mı?</th>
                 )}
+                {showGizleCol && (
+                  <th className="text-center px-3 py-2 font-medium text-gray-600 border border-gray-200 min-w-[110px] bg-rose-50">Listede Görünmesin</th>
+                )}
                 {groups.map(g => (
                   <th key={g} className="text-center px-3 py-2 font-medium text-gray-600 border border-gray-200 min-w-[80px]">{g}</th>
                 ))}
@@ -280,6 +298,16 @@ function TargetEntryModal({
                           checked={destekValues[r.key] ?? false}
                           onChange={e => setDestek(r.key, e.target.checked)}
                           className="w-4 h-4 accent-amber-500 cursor-pointer"
+                        />
+                      </td>
+                    )}
+                    {showGizleCol && (
+                      <td className="border border-gray-200 p-1 text-center bg-rose-50">
+                        <input
+                          type="checkbox"
+                          checked={gizleValues[r.key] ?? false}
+                          onChange={e => setGizle(r.key, e.target.checked)}
+                          className="w-4 h-4 accent-rose-500 cursor-pointer"
                         />
                       </td>
                     )}
@@ -307,6 +335,7 @@ function TargetEntryModal({
                   Toplam Dağıtılan
                 </td>
                 {showDestekCol && <td className="border border-brand-600 px-3 py-2" />}
+                {showGizleCol && <td className="border border-brand-600 px-3 py-2" />}
                 {groups.map(g => {
                   const colTotal = rows.reduce((s, r) => s + (values[`${r.key}||${g}`] ?? 0), 0)
                   return (
@@ -351,6 +380,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const [merchHedefData, setMerchHedefData] = useState<{ merch_name: string; grup: string; hedef: number }[]>([])
   const [merchDetayData, setMerchDetayData] = useState<{ merch_adi: string; merch_grubu: string; sup_adi: string; jr_adi: string; cari_adi: string; cari_kod: string; sube_adi: string; sube_kod: string; bsy_kod: string; bsy_adi: string }[]>([])
   const [destekFlags, setDestekFlags] = useState<Record<string, boolean>>({})
+  const [gizleFlags,  setGizleFlags]  = useState<Record<string, boolean>>({})
   const [satMerchTipi, setSatMerchTipi] = useState('')
   const [satMerch,     setSatMerch]     = useState('')
   const [satCari,      setSatCari]      = useState('')
@@ -404,11 +434,13 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     fetch(`/api/merch-destek-flag?donem=${donem}`)
       .then(r => r.json())
       .then(d => {
-        const map: Record<string, boolean> = {}
-        for (const f of (d.flags ?? [])) map[f.merch_name] = f.destek_var
-        setDestekFlags(map)
+        const dmap: Record<string, boolean> = {}
+        const gmap: Record<string, boolean> = {}
+        for (const f of (d.flags ?? [])) { dmap[f.merch_name] = f.destek_var; gmap[f.merch_name] = f.gizle ?? false }
+        setDestekFlags(dmap)
+        setGizleFlags(gmap)
       })
-      .catch(() => setDestekFlags({}))
+      .catch(() => { setDestekFlags({}); setGizleFlags({}) })
   }, [active, donem])
 
   const {
@@ -1028,10 +1060,13 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
   // ── Merch table data ─────────────────────────────────────────
   const filteredMerch = useMemo(() => {
-    if (!merchSearch.trim()) return visibleMerch
+    // "Listede Görünmesin" işaretli merchler ana listede gizlenir
+    // (hedef modalında görünmeye devam eder — oradan geri açılabilir).
+    const base = visibleMerch.filter(m => !gizleFlags[m.name])
+    if (!merchSearch.trim()) return base
     const q = merchSearch.toLowerCase()
-    return visibleMerch.filter(m => m.name.toLowerCase().includes(q) || m.supApiName.toLowerCase().includes(q))
-  }, [visibleMerch, merchSearch])
+    return base.filter(m => m.name.toLowerCase().includes(q) || m.supApiName.toLowerCase().includes(q))
+  }, [visibleMerch, merchSearch, gizleFlags])
 
   const merchRows = useMemo(() =>
     filteredMerch.map(m => {
@@ -1933,15 +1968,18 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
           saving={saving}
           showDestekCol={true}
           destekInitial={(key) => destekFlags[key] ?? false}
+          gizleInitial={(key) => gizleFlags[key] ?? false}
           onSaveDestek={async (flags) => {
             await fetch('/api/merch-destek-flag', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ donem, flags }),
             })
-            const map: Record<string, boolean> = {}
-            flags.forEach(f => { map[f.merch_name] = f.destek_var })
-            setDestekFlags(prev => ({ ...prev, ...map }))
+            const dmap: Record<string, boolean> = {}
+            const gmap: Record<string, boolean> = {}
+            flags.forEach(f => { dmap[f.merch_name] = f.destek_var; gmap[f.merch_name] = f.gizle })
+            setDestekFlags(prev => ({ ...prev, ...dmap }))
+            setGizleFlags(prev => ({ ...prev, ...gmap }))
           }}
         />
       )}
