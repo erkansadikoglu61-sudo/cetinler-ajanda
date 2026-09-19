@@ -216,12 +216,19 @@ export async function GET(req: Request) {
 
       let prim = 0
       if (ay >= 5) {
-        prim = calcTieredPrimBsy(
+        const base = calcTieredPrimBsy(
           c.elx, elxK.hedefCiro,
           c.relux, reluxK.hedefCiro,
           compGerc, compHedef,
           tahsilatOran(ay, bsyAdi), params, excluded,
-        ).topPrim
+        )
+        // Eylül 2026'ya ÖZEL: Burak KILIÇ Electrolux primi sabit 100.000 TL
+        // (Relux normal hesaplanır). Ciro/Tahsilat sayfasındaki override ile birebir.
+        if (!excluded && yil === 2026 && ay === 9 && lc(bsyAdi) === lc('Burak KILIÇ')) {
+          prim = 100000 + base.reluxPrim
+        } else {
+          prim = base.topPrim
+        }
       } else {
         prim = excluded ? 0 : ((elxK.hakedilenPrim ?? 0) + (reluxK.hakedilenPrim ?? 0))
       }

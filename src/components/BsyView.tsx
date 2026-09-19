@@ -547,11 +547,19 @@ function BsyKisiTable({
       return { elxPrim:0, reluxPrim:0, topPrim: manuelToplam }
     }
     // ay >= 5: parametrik hesap
-    return calcTieredPrimBsy(
+    const base = calcTieredPrimBsy(
       row.brands['ELECTROLUX'].gercCiro, elx.hedefCiro,
       row.brands['RELUX'].gercCiro, relux.hedefCiro,
       compGerc, compHedef, getTahsilatOran(row.bsyAdi), params, excluded,
     )
+
+    // ── Eylül 2026'ya ÖZEL override: Burak KILIÇ Electrolux primi sabit 100.000 TL ──
+    // Relux kendi parametreleriyle normal hesaplanmaya devam eder. Yalnızca 2026/09.
+    if (!excluded && yil === 2026 && ay === 9 && row.bsyAdi.toLocaleLowerCase('tr') === 'burak kılıç') {
+      return { elxPrim: 100000, reluxPrim: base.reluxPrim, topPrim: 100000 + base.reluxPrim }
+    }
+
+    return base
   }
 
   // Alt toplam hesapları
