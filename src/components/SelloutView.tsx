@@ -1086,6 +1086,16 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     }),
   [filteredMerch, getMerchHedef, periodRows])
 
+  // Admin: listede görünen merchlerin süpervizör (bağlı olduğu kişi) bazında adedi
+  const merchSupCounts = useMemo(() => {
+    const m = new Map<string, number>()   // key: temiz tam ad (SV eki atılmış)
+    filteredMerch.forEach(x => {
+      const clean = (x.supApiName || '').replace(/\bSV\b/gi, '').replace(/\s+/g, ' ').trim() || '—'
+      m.set(clean, (m.get(clean) ?? 0) + 1)
+    })
+    return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'tr'))
+  }, [filteredMerch])
+
   // ── Target entry rows ────────────────────────────────────────
   const supTargetRows = useMemo((): TargetRow[] =>
     (isAdmin ? visibleSups : visibleSups.filter(s => s.id === currentProfile.id))
@@ -1416,7 +1426,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
         {!selloutLoading && subTab === 'merch' && (
           <>
-            <div className="mb-2 flex items-center gap-2">
+            <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
               <input
                 type="text"
                 placeholder="Merch veya Jr. Süpervizör ara…"
@@ -1425,6 +1435,15 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 className="w-full max-w-xs text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-brand-400"
               />
               <span className="text-[10px] text-gray-400">{filteredMerch.length} merch</span>
+              {isAdmin && merchSupCounts.length > 0 && (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-gray-500">
+                  {merchSupCounts.map(([name, n], i) => (
+                    <span key={name} className="whitespace-nowrap">
+                      <b className="text-gray-700">{name.split(' ')[0]}</b> {n} merch{i < merchSupCounts.length - 1 ? ' ·' : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             <SelloutTable
               rows={merchRows.map(r => ({
@@ -1448,6 +1467,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 return { groups: groupTotals, tH: totH, tV: totV, tP: pct(totH, totV), tPrim: totPrim }
               })()}
               showPrim
+              showRowNo
               kategoriPrimi={PRIM_MERCH}
             />
             <SayfaParametreleri
@@ -2005,14 +2025,17 @@ interface FooterData {
 }
 
 function SelloutTable({
-  rows, footer, showPrim, kategoriPrimi,
+  rows, footer, showPrim, kategoriPrimi, showRowNo,
 }: {
   rows: TableRowData[]
   footer?: FooterData
   showPrim: boolean
   kategoriPrimi?: Record<string, number>
+  showRowNo?: boolean
 }) {
   const COLS_PER_GROUP = showPrim ? 4 : 3  // Hed | Gerç | % | [Prim]
+  // Satır no kolonu varsa "Kişi" sütunu 2.5rem (left-10) sağa kaydırılır
+  const kisiLeft = showRowNo ? 'left-10' : 'left-0'
 
   if (rows.length === 0) {
     return <p className="text-xs text-gray-400 text-center py-8">Veri yok</p>
@@ -2026,7 +2049,8 @@ function SelloutTable({
           {/* Row 1: Kategori Primi */}
           {showPrim && kategoriPrimi && (
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="sticky left-0 z-30 bg-gray-50 border-r border-gray-200 px-3 py-1" />
+              {showRowNo && <th className="sticky left-0 z-30 bg-gray-50 border-r border-gray-200 px-2 py-1 w-10" />}
+              <th className={clsx('sticky z-30 bg-gray-50 border-r border-gray-200 px-3 py-1', kisiLeft)} />
               {SELLOUT_GROUPS.map(g => (
                 <th
                   key={g}
@@ -2043,7 +2067,8 @@ function SelloutTable({
           )}
           {/* Row 2: Group names */}
           <tr className="bg-brand-700 text-white">
-            <th className="sticky left-0 z-30 bg-brand-700 text-left px-3 py-2 border-r border-brand-600 min-w-[140px]">Kişi</th>
+            {showRowNo && <th className="sticky left-0 z-30 bg-brand-700 text-center px-2 py-2 border-r border-brand-600 w-10">#</th>}
+            <th className={clsx('sticky z-30 bg-brand-700 text-left px-3 py-2 border-r border-brand-600 min-w-[140px]', kisiLeft)}>Kişi</th>
             {SELLOUT_GROUPS.map(g => (
               <th key={g} colSpan={COLS_PER_GROUP} className="text-center px-2 py-2 border-r border-brand-600 whitespace-nowrap">
                 {g}
@@ -2053,7 +2078,8 @@ function SelloutTable({
           </tr>
           {/* Row 3: Column labels */}
           <tr className="bg-brand-600/80 text-white text-[10px]">
-            <th className="sticky left-0 z-30 bg-brand-600 border-r border-brand-500 px-3 py-1" />
+            {showRowNo && <th className="sticky left-0 z-30 bg-brand-600 border-r border-brand-500 px-2 py-1 w-10" />}
+            <th className={clsx('sticky z-30 bg-brand-600 border-r border-brand-500 px-3 py-1', kisiLeft)} />
             {SELLOUT_GROUPS.map(g => (
               <React.Fragment key={`header-${g}`}>
                 <th className="text-center px-2 py-1 border-r border-brand-500 min-w-[45px]">Hed.</th>
@@ -2072,8 +2098,11 @@ function SelloutTable({
         <tbody>
           {rows.map((r, i) => (
             <tr key={i} className={clsx('border-b border-gray-100 hover:bg-gray-50', i % 2 === 1 && 'bg-gray-50/50')}>
+              {showRowNo && (
+                <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-2 py-2 text-center text-gray-400 tabular-nums w-10">{i + 1}</td>
+              )}
               {/* Name */}
-              <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-3 py-2">
+              <td className={clsx('sticky z-10 bg-white border-r border-gray-200 px-3 py-2', kisiLeft)}>
                 <div className="flex items-center gap-2">
                   {r.color && (
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />
@@ -2126,7 +2155,8 @@ function SelloutTable({
         {footer && (
           <tfoot>
             <tr className="bg-gray-100 font-semibold border-t-2 border-gray-300">
-              <td className="sticky left-0 z-10 bg-gray-100 border-r border-gray-200 px-3 py-2 text-gray-700 text-xs">TOPLAM</td>
+              {showRowNo && <td className="sticky left-0 z-10 bg-gray-100 border-r border-gray-200 px-2 py-2 w-10" />}
+              <td className={clsx('sticky z-10 bg-gray-100 border-r border-gray-200 px-3 py-2 text-gray-700 text-xs', kisiLeft)}>TOPLAM</td>
               {footer.groups.map((g, gi) => (
                 <React.Fragment key={`f-${gi}`}>
                   <td className="text-center px-2 py-2 border-r border-gray-200 text-gray-600">{g.h ? g.h.toLocaleString('tr-TR') : '—'}</td>
