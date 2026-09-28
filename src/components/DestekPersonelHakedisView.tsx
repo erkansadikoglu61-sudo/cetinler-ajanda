@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { RefreshCw, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
 import { GRUP_NORMALIZE } from '@/lib/sellout'
+import { SayfaParametreleri } from '@/components/SayfaParametreleri'
 
 const MONTHS_TR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
 
@@ -279,6 +280,23 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
+      <SayfaParametreleri
+        visible={currentUserRole === 'admin'}
+        baslik="Primler ▸ Destek Personelleri Hakediş"
+        aciklama="Bayi şubelerindeki destek personellerinin listesi, o şubedeki Çetinler Merch'in satışından oluşan koşullu destek primi ve destek personeline elle girilen hakediş tutarları."
+        parametreler={[
+          { label: 'Dönem', value: `Üstteki Yıl + Ay seçimi (şu an: ${MONTHS_TR[ay - 1]} ${yil}). Yalnızca Haziran–Aralık seçilebilir; Haziran öncesi için tablo çalışmaz.` },
+          { label: 'Satır listesi', value: 'Supabase field_personnel tablosunda merch_grubu = "Destek Personeli" olan kişiler (/api/destek-personel-prim). Cari + Şube + Çetinler Merch + Destek Personeli aynıysa tek satır.' },
+          { label: 'Cari / Şube / Süpervizör', value: 'PHP export_merch_detay.php ile şube + cari adı eşleştirilerek zenginleştirilir (cari için ilk 2 kelime yedek eşleşme). Jr. Süpervizör varsa o yazılır, altında yeşil küçük yazıyla üst Süpervizör. Eşleşme yoksa field_personnel\'daki sup/jr alanları kullanılır.' },
+          { label: 'Çetinler Merch', value: 'Aynı şubede export_merch_detay\'da MERCH_TIPI = "Çetinler Merch" olan kişi. Yoksa "-".' },
+          { label: 'Destek Personeli için Oluşan Prim', value: 'Çetinler Merch\'in seçili dönemdeki sellout satışları (/api/sellout, merch_tipi = Çetinler Merch) × ürün bazlı "Koşullu Destek" primi (Adet Prim Tablosu: bsy-excel + adet_prim_override). Kategori bazında: gerçekleşme ≥%100 → tam prim, <%100 → prim × gerçekleşme oranı; kategori hedefi yoksa (0) prim 0.' },
+          { label: 'Hedef', value: 'Sellout ▸ Merch hedefleri (Supabase sellout_targets_merch, seçili dönem, kategori bazında).' },
+          { label: 'Destek Personeli Hakedişi', value: 'Elle girilir; yazmayı bıraktıktan ~1,2 sn sonra otomatik kaydedilir (Supabase destek_hakedis, yıl+ay bazında). Kaydedilmemiş satır sarı, kaydedilen ✓ ile gösterilir. Kayıt bulunamazsa sadece destek personeli adıyla eşleşen kayıt kullanılır.' },
+          { label: 'Toplam satırı', value: 'Oluşan Prim: her Çetinler Merch yalnızca 1 kez toplanır (birden fazla satırda görünse bile). Hakediş: görünen tüm satırların toplamı.' },
+          { label: 'Filtreler', value: 'Cari filtresi yalnızca ekrandaki satırları süzer. Merch Hedefleri\'ndeki "Destek Personeli var mı?" işareti (merch_destek_flag) yalnızca Süpervizör/Jr rolünde uygulanır; admin tüm satırları görür.' },
+          { label: 'Görünürlük', value: 'Admin tüm şubeleri görür; Süpervizör yalnızca kendi şubelerini (supAdi filtresi) görür.' },
+        ]}
+      />
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-100 flex-shrink-0 flex-wrap">
         <span className="text-xs font-bold text-gray-700">Destek Personelleri Hakediş</span>
