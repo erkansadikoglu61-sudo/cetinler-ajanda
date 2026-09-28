@@ -2043,24 +2043,24 @@ function SelloutTable({
 
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-      <table className="text-xs border-collapse min-w-max w-full">
+      <table className="text-xs border-collapse w-full tabular-nums">
         {/* ─ Tüm header satırları tek <thead> içinde → sticky top-0 çalışır ─ */}
         <thead className="sticky top-0 z-20">
           {/* Row 1: Kategori Primi */}
           {showPrim && kategoriPrimi && (
             <tr className="bg-gray-50 border-b border-gray-200">
               {showRowNo && <th className="sticky left-0 z-30 bg-gray-50 border-r border-gray-200 px-2 py-1 w-10" />}
-              <th className={clsx('sticky z-30 bg-gray-50 border-r border-gray-200 px-3 py-1', kisiLeft)} />
+              <th className={clsx('sticky z-30 bg-gray-50 border-r border-gray-200 px-2 py-1', kisiLeft)} />
               {SELLOUT_GROUPS.map(g => (
                 <th
                   key={g}
                   colSpan={COLS_PER_GROUP}
-                  className="text-center px-2 py-1 text-[10px] text-gray-400 font-medium border-r border-gray-200"
+                  className="text-center px-1 py-1 text-[10px] text-gray-400 font-medium border-r border-gray-200 whitespace-nowrap"
                 >
                   Kat. Primi: ₺{(kategoriPrimi[g] ?? 0).toLocaleString('tr-TR')}
                 </th>
               ))}
-              <th colSpan={showPrim ? 4 : 3} className="text-center px-2 py-1 text-[11px] font-bold text-gray-600 border-l border-gray-200">
+              <th colSpan={showPrim ? 4 : 3} className="text-center px-1 py-1 text-[11px] font-bold text-gray-600 border-l border-gray-200 whitespace-nowrap">
                 Kat. Primi: ₺{SELLOUT_GROUPS.reduce((s, g) => s + (kategoriPrimi[g] ?? 0), 0).toLocaleString('tr-TR')}
               </th>
             </tr>
@@ -2068,30 +2068,30 @@ function SelloutTable({
           {/* Row 2: Group names */}
           <tr className="bg-brand-700 text-white">
             {showRowNo && <th className="sticky left-0 z-30 bg-brand-700 text-center px-2 py-2 border-r border-brand-600 w-10">#</th>}
-            <th className={clsx('sticky z-30 bg-brand-700 text-left px-3 py-2 border-r border-brand-600 min-w-[140px]', kisiLeft)}>Kişi</th>
+            <th className={clsx('sticky z-30 bg-brand-700 text-left px-2 py-2 border-r border-brand-600', kisiLeft)}>Kişi</th>
             {SELLOUT_GROUPS.map(g => (
-              <th key={g} colSpan={COLS_PER_GROUP} className="text-center px-2 py-2 border-r border-brand-600 whitespace-nowrap">
+              <th key={g} colSpan={COLS_PER_GROUP} className="text-center px-1 py-1.5 border-r border-brand-600 leading-tight">
                 {g}
               </th>
             ))}
-            <th colSpan={showPrim ? 4 : 3} className="text-center px-2 py-2 whitespace-nowrap">Toplam</th>
+            <th colSpan={showPrim ? 4 : 3} className="text-center px-1 py-1.5 leading-tight">Toplam</th>
           </tr>
           {/* Row 3: Column labels */}
           <tr className="bg-brand-600/80 text-white text-[10px]">
             {showRowNo && <th className="sticky left-0 z-30 bg-brand-600 border-r border-brand-500 px-2 py-1 w-10" />}
-            <th className={clsx('sticky z-30 bg-brand-600 border-r border-brand-500 px-3 py-1', kisiLeft)} />
+            <th className={clsx('sticky z-30 bg-brand-600 border-r border-brand-500 px-2 py-1', kisiLeft)} />
             {SELLOUT_GROUPS.map(g => (
               <React.Fragment key={`header-${g}`}>
-                <th className="text-center px-2 py-1 border-r border-brand-500 min-w-[45px]">Hed.</th>
-                <th className="text-center px-2 py-1 border-r border-brand-500 min-w-[45px]">Gerç.</th>
-                <th className="text-center px-2 py-1 border-r border-brand-500 min-w-[40px]">%</th>
-                {showPrim && <th className="text-center px-2 py-1 border-r border-brand-500 min-w-[60px]">Prim</th>}
+                <th className="text-center px-1 py-1 border-r border-brand-500">Hed.</th>
+                <th className="text-center px-1 py-1 border-r border-brand-500">Gerç.</th>
+                <th className="text-center px-1 py-1 border-r border-brand-500">%</th>
+                {showPrim && <th className="text-center px-1 py-1 border-r border-brand-500">Prim</th>}
               </React.Fragment>
             ))}
-            <th className="text-center px-2 py-1 border-r border-brand-500 min-w-[45px]">Hed.</th>
-            <th className="text-center px-2 py-1 border-r border-brand-500 min-w-[45px]">Gerç.</th>
-            <th className="text-center px-2 py-1 border-r border-brand-500 min-w-[40px]">%</th>
-            {showPrim && <th className="text-center px-2 py-1 min-w-[70px]">Prim</th>}
+            <th className="text-center px-1 py-1 border-r border-brand-500">Hed.</th>
+            <th className="text-center px-1 py-1 border-r border-brand-500">Gerç.</th>
+            <th className="text-center px-1 py-1 border-r border-brand-500">%</th>
+            {showPrim && <th className="text-center px-1 py-1">Prim</th>}
           </tr>
         </thead>
 
@@ -2102,7 +2102,7 @@ function SelloutTable({
                 <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-2 py-2 text-center text-gray-400 tabular-nums w-10">{i + 1}</td>
               )}
               {/* Name */}
-              <td className={clsx('sticky z-10 bg-white border-r border-gray-200 px-3 py-2', kisiLeft)}>
+              <td className={clsx('sticky z-10 bg-white border-r border-gray-200 px-2 py-2', kisiLeft)}>
                 <div className="flex items-center gap-2">
                   {r.color && (
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />
@@ -2123,13 +2123,13 @@ function SelloutTable({
               {/* Group cells */}
               {r.groups.map((g, gi) => (
                 <React.Fragment key={`${i}-${gi}`}>
-                  <td className="text-center px-2 py-1.5 border-r border-gray-100 text-gray-600">{g.h ? g.h.toLocaleString('tr-TR') : '—'}</td>
-                  <td className="text-center px-2 py-1.5 border-r border-gray-100 font-semibold text-gray-800">{g.v.toLocaleString('tr-TR')}</td>
-                  <td className="text-center px-2 py-1.5 border-r border-gray-100">
+                  <td className="text-center px-1.5 py-1.5 whitespace-nowrap border-r border-gray-100 text-gray-600">{g.h ? g.h.toLocaleString('tr-TR') : '—'}</td>
+                  <td className="text-center px-1.5 py-1.5 whitespace-nowrap border-r border-gray-100 font-semibold text-gray-800">{g.v.toLocaleString('tr-TR')}</td>
+                  <td className="text-center px-1.5 py-1.5 whitespace-nowrap border-r border-gray-100">
                     {g.h > 0 ? <PctBadge val={g.p} /> : <span className="text-gray-300">—</span>}
                   </td>
                   {showPrim && (
-                    <td className="text-center px-2 py-1.5 border-r border-gray-100 text-gray-700">
+                    <td className="text-center px-1.5 py-1.5 whitespace-nowrap border-r border-gray-100 text-gray-700">
                       {(g.prim ?? 0) > 0 ? `₺${fmtCur(g.prim!)}` : <span className="text-gray-300">—</span>}
                     </td>
                   )}
@@ -2137,13 +2137,13 @@ function SelloutTable({
               ))}
 
               {/* Totals */}
-              <td className="text-center px-2 py-1.5 border-r border-gray-200 text-gray-600 font-medium">{r.tH ? r.tH.toLocaleString('tr-TR') : '—'}</td>
-              <td className="text-center px-2 py-1.5 border-r border-gray-200 font-bold text-gray-800">{r.tV.toLocaleString('tr-TR')}</td>
-              <td className="text-center px-2 py-1.5 border-r border-gray-200">
+              <td className="text-center px-1.5 py-1.5 whitespace-nowrap border-r border-gray-200 text-gray-600 font-medium">{r.tH ? r.tH.toLocaleString('tr-TR') : '—'}</td>
+              <td className="text-center px-1.5 py-1.5 whitespace-nowrap border-r border-gray-200 font-bold text-gray-800">{r.tV.toLocaleString('tr-TR')}</td>
+              <td className="text-center px-1.5 py-1.5 whitespace-nowrap border-r border-gray-200">
                 {r.tH > 0 ? <PctBadge val={r.tP} /> : <span className="text-gray-300">—</span>}
               </td>
               {showPrim && (
-                <td className="text-center px-2 py-1.5 text-brand-700 font-semibold">
+                <td className="text-center px-1.5 py-1.5 whitespace-nowrap text-brand-700 font-semibold">
                   {(r.tPrim ?? 0) > 0 ? `₺${fmtCur(r.tPrim!)}` : <span className="text-gray-300">—</span>}
                 </td>
               )}
@@ -2156,28 +2156,28 @@ function SelloutTable({
           <tfoot>
             <tr className="bg-gray-100 font-semibold border-t-2 border-gray-300">
               {showRowNo && <td className="sticky left-0 z-10 bg-gray-100 border-r border-gray-200 px-2 py-2 w-10" />}
-              <td className={clsx('sticky z-10 bg-gray-100 border-r border-gray-200 px-3 py-2 text-gray-700 text-xs', kisiLeft)}>TOPLAM</td>
+              <td className={clsx('sticky z-10 bg-gray-100 border-r border-gray-200 px-2 py-2 text-gray-700 text-xs', kisiLeft)}>TOPLAM</td>
               {footer.groups.map((g, gi) => (
                 <React.Fragment key={`f-${gi}`}>
-                  <td className="text-center px-2 py-2 border-r border-gray-200 text-gray-600">{g.h ? g.h.toLocaleString('tr-TR') : '—'}</td>
-                  <td className="text-center px-2 py-2 border-r border-gray-200 text-gray-800">{g.v.toLocaleString('tr-TR')}</td>
-                  <td className="text-center px-2 py-2 border-r border-gray-200">
+                  <td className="text-center px-1.5 py-2 whitespace-nowrap border-r border-gray-200 text-gray-600">{g.h ? g.h.toLocaleString('tr-TR') : '—'}</td>
+                  <td className="text-center px-1.5 py-2 whitespace-nowrap border-r border-gray-200 text-gray-800">{g.v.toLocaleString('tr-TR')}</td>
+                  <td className="text-center px-1.5 py-2 whitespace-nowrap border-r border-gray-200">
                     {g.h > 0 ? <PctBadge val={g.p} /> : <span className="text-gray-300">—</span>}
                   </td>
                   {showPrim && (
-                    <td className="text-center px-2 py-2 border-r border-gray-200 text-brand-700">
+                    <td className="text-center px-1.5 py-2 whitespace-nowrap border-r border-gray-200 text-brand-700">
                       {(g.prim ?? 0) > 0 ? `₺${fmtCur(g.prim!)}` : '—'}
                     </td>
                   )}
                 </React.Fragment>
               ))}
-              <td className="text-center px-2 py-2 border-r border-gray-200 text-gray-700">{footer.tH ? footer.tH.toLocaleString('tr-TR') : '—'}</td>
-              <td className="text-center px-2 py-2 border-r border-gray-200 text-gray-800">{footer.tV.toLocaleString('tr-TR')}</td>
-              <td className="text-center px-2 py-2 border-r border-gray-200">
+              <td className="text-center px-1.5 py-2 whitespace-nowrap border-r border-gray-200 text-gray-700">{footer.tH ? footer.tH.toLocaleString('tr-TR') : '—'}</td>
+              <td className="text-center px-1.5 py-2 whitespace-nowrap border-r border-gray-200 text-gray-800">{footer.tV.toLocaleString('tr-TR')}</td>
+              <td className="text-center px-1.5 py-2 whitespace-nowrap border-r border-gray-200">
                 {footer.tH > 0 ? <PctBadge val={footer.tP} /> : '—'}
               </td>
               {showPrim && (
-                <td className="text-center px-2 py-2 text-brand-700">
+                <td className="text-center px-1.5 py-2 whitespace-nowrap text-brand-700">
                   {(footer.tPrim ?? 0) > 0 ? `₺${fmtCur(footer.tPrim!)}` : '—'}
                 </td>
               )}
