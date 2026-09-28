@@ -144,7 +144,7 @@ function Top20Table({
 
 // ─── helpers ───
 function pct(hedef: number, gerc: number) {
-  return hedef > 0 ? Math.round((gerc / hedef) * 100) : 0
+  return hedef > 0 ? (gerc / hedef) * 100 : 0
 }
 
 function PctBadge({ val }: { val: number }) {
@@ -155,7 +155,7 @@ function PctBadge({ val }: { val: number }) {
         : val >= 80  ? 'bg-green-100 text-green-800'
         : val >= 60  ? 'bg-yellow-100 text-yellow-800'
         :              'bg-red-100   text-red-700'
-    )}>%{val}</span>
+    )}>%{val.toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
   )
 }
 
