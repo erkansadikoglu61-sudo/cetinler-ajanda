@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import * as XLSX from 'xlsx'
-import { AdetPrimRow } from '@/lib/adet-prim-defaults'
+import { loadAdetPrimRates } from '@/lib/adetPrimRates'
 
 function getSupabase() {
   return createClient(
@@ -20,74 +19,9 @@ export async function GET(req: Request) {
   try {
     const sb = getSupabase()
 
-    // 1. SAHA.xlsx'den Adet Primleri sayfasını çek
-    const { data: excelData, error: excelError } = await sb.storage
-      .from('bsy-excel')
-      .download('SAHA.xlsx')
-
-    if (excelError) {
-      console.error('Excel download error:', excelError)
-      return NextResponse.json({ rows: [] })
-    }
-
-    const buffer = Buffer.from(await excelData.arrayBuffer())
-    const wb = XLSX.read(buffer, { type: 'buffer' })
-
-    if (!wb.SheetNames.includes('Adet Primleri')) {
-      console.error('Adet Primleri sheet not found. Available sheets:', wb.SheetNames)
-      return NextResponse.json({ rows: [] })
-    }
-
-    const ws = wb.Sheets['Adet Primleri']
-    const jsonData: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
-
-    if (jsonData.length < 2) {
-      return NextResponse.json({ rows: [] })
-    }
-
-    // 2. Header mapping — başlık satırını bul (ilk 5 satırda tara)
-    let headerRowIdx = 0
-    for (let i = 0; i < Math.min(5, jsonData.length); i++) {
-      const rowStr = jsonData[i].map((c: any) => String(c ?? '').toLowerCase()).join(' ')
-      if (rowStr.includes('stok') && (rowStr.includes('kod') || rowStr.includes('kategori'))) {
-        headerRowIdx = i
-        break
-      }
-    }
-
-    const headerRow = jsonData[headerRowIdx]
-    const cols: { [key: string]: number } = {}
-
-    headerRow.forEach((h: any, c: number) => {
-      const hs = String(h ?? '').toLowerCase().trim()
-      if (hs.includes('marka')) cols['marka'] = c
-      if (hs.includes('kategori')) cols['kategori'] = c
-      if (hs.includes('stok') && hs.includes('kod')) cols['stokKodu'] = c
-      if (hs.includes('bayi') && hs.includes('merch')) cols['bayiMerch'] = c
-      if (hs.includes('koşullu') || hs.includes('kosullu') || hs.includes('destek')) cols['kosulluDestek'] = c
-    })
-
-    // 3. Parse rows
-    const primData: Record<string, AdetPrimRow> = {}
-
-    for (let r = headerRowIdx + 1; r < jsonData.length; r++) {
-      const row = jsonData[r]
-      if (!row || row.length === 0) continue
-
-      const stokKodu = cols['stokKodu'] >= 0 ? String(row[cols['stokKodu']] ?? '').trim() : ''
-      const kategori = cols['kategori'] >= 0 ? String(row[cols['kategori']] ?? '').trim() : ''
-      const bayiMerch = cols['bayiMerch'] >= 0 ? parseFloat(String(row[cols['bayiMerch']] ?? '0')) || null : null
-      const kosulluDestek = cols['kosulluDestek'] >= 0 ? parseFloat(String(row[cols['kosulluDestek']] ?? '0')) || null : null
-
-      if (stokKodu && stokKodu.toLowerCase() !== 'stok kodu' && stokKodu.toLowerCase() !== 'stok_kodu') {
-        primData[stokKodu] = {
-          stokKodu,
-          kategori: kategori || null,
-          bayiMerch,
-          kosulluDestek
-        }
-      }
-    }
+    // 1-3. Oranlar: SAHA.xlsx "Adet Primleri" + ay bazlı adet_prim_override.
+    // Ortak fonksiyon — Prim Ödeme (bayi-merch-prim) ve prim-analiz de aynısını kullanır.
+    const primData = await loadAdetPrimRates(sb, yil, ay)
 
     // 4. Fetch kategoriler from PHP API (eğer Excel'de yoksa)
     const phpUrl = process.env.PHP_API_URL
@@ -127,36 +61,6 @@ export async function GET(req: Request) {
       } catch (e) {
         console.error('PHP kategori fetch error:', e)
       }
-    }
-
-    // 5. Fetch DB overrides (kullanıcı düzenlemeleri)
-    try {
-      const { data: overrides } = await sb
-        .from('adet_prim_override')
-        .select('stok_kodu, bayi_merch, kosullu_destek')
-        .eq('yil', yil)
-        .eq('ay', ay)
-
-      if (overrides) {
-        for (const row of overrides) {
-          if (primData[row.stok_kodu]) {
-            primData[row.stok_kodu] = {
-              ...primData[row.stok_kodu],
-              bayiMerch:     row.bayi_merch,
-              kosulluDestek: row.kosullu_destek,
-            }
-          } else {
-            primData[row.stok_kodu] = {
-              stokKodu:      row.stok_kodu,
-              kategori:      null,
-              bayiMerch:     row.bayi_merch,
-              kosulluDestek: row.kosullu_destek,
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error('DB override fetch error:', e)
     }
 
     return NextResponse.json({ rows: Object.values(primData) })

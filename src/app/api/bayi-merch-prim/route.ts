@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { ADET_PRIM_DEFAULTS } from '@/lib/adet-prim-defaults'
+import { loadBayiMerchRateMap } from '@/lib/adetPrimRates'
 import { createClient } from '@supabase/supabase-js'
 import { parseHtmlTableByHeader, num, fetchPhpHtml, tarihToIso } from '@/lib/merchSatis'
 
@@ -28,23 +28,10 @@ export async function GET(req: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  // 1. Genel prim oranları: defaults → adet_prim_override ile üzerine yaz
-  const primMap = new Map<string, number | null>()
-  for (const r of ADET_PRIM_DEFAULTS) {
-    primMap.set(r.stokKodu, r.bayiMerch)
-  }
-  try {
-    const { data } = await sb
-      .from('adet_prim_override')
-      .select('stok_kodu, bayi_merch')
-      .eq('yil', yil)
-      .eq('ay', ay)
-    if (data) {
-      for (const row of data) {
-        primMap.set(row.stok_kodu, row.bayi_merch)
-      }
-    }
-  } catch { /* use defaults */ }
+  // 1. Genel prim oranları: 2026-08'den itibaren Sellout ▸ Satışlar ile birebir
+  //    aynı kaynak (SAHA.xlsx + adet_prim_override); öncesi eski mantık
+  //    (bkz. lib/adetPrimRates loadBayiMerchRateMap).
+  const primMap = await loadBayiMerchRateMap(sb, yil, ay)
 
   // 2. Özel prim kuralları (prim_ozel) — cari/şube/stok bazlı overrides
   interface OzelPrimRow {
