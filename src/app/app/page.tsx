@@ -2009,7 +2009,11 @@ export default function AppPage() {
     if (!currentProfile) return { primSupervisorFilter: [] as string[], primBsyKod: null as string | null }
     if (currentProfile.role === 'admin') return { primSupervisorFilter: null, primBsyKod: null }
     if (currentProfile.role === 'manager') return { primSupervisorFilter: null, primBsyKod: null }  // Yönetici tüm verileri görür (Prim Analiz)
-    if (currentProfile.role === 'sup') return { primSupervisorFilter: [currentProfile.full_name], primBsyKod: null }
+    if (currentProfile.role === 'sup') {
+      // Süpervizör kendi + kendine bağlı Jr. Süpervizörlerin şube satırlarını görür
+      const myJrNames = team.filter(p => p.role === 'jr' && p.manager_id === currentProfile.id).map(p => p.full_name)
+      return { primSupervisorFilter: [currentProfile.full_name, ...myJrNames], primBsyKod: null }
+    }
     if (currentProfile.role === 'ik')  return { primSupervisorFilter: null, primBsyKod: null }  // IK tüm verileri görür
 if (currentProfile.role === 'bsy') {
       // BSY_NAME_TO_KOD: lowercase isim → kod (KB1, IB1, vb.)
@@ -2017,7 +2021,7 @@ if (currentProfile.role === 'bsy') {
       return { primSupervisorFilter: null, primBsyKod: bsyKod }
     }
     return { primSupervisorFilter: [] as string[], primBsyKod: null as string | null }
-  }, [currentProfile])
+  }, [currentProfile, team])
 
   // Auth redirect
   useEffect(() => {

@@ -9,6 +9,7 @@ import clsx from 'clsx'
 import * as XLSX from 'xlsx'
 import { ADET_PRIM_DEFAULTS } from '@/lib/adet-prim-defaults'
 import { generateAdetPrimPdf } from '@/lib/pdf'
+import { namesMatch } from '@/lib/sellout'
 
 const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
                    'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
@@ -1307,7 +1308,8 @@ export function BayiMerchHakdis({
     // BSY kodu filtresi (BSY rolü — kendi bağlı carileri)
     if (bsyKodFilter !== null && r.bsyKod !== bsyKodFilter) return false
     // Süpervizör filtresi (Süpervizör rolü)
-    if (supervisorFilter !== null && !supervisorFilter.includes(r.supervizor)) return false
+    // (namesMatch: PHP'deki " SV" eki ve büyük/küçük harf/Türkçe karakter farkı toleranslı)
+    if (supervisorFilter !== null && !supervisorFilter.some(sf => namesMatch(sf, r.supervizor))) return false
     if (cariQ && !r.cariAdi.toLowerCase().includes(cariQ.toLowerCase())) return false
     if (subeQ && !r.subeAdi.toLowerCase().includes(subeQ.toLowerCase())) return false
     return true
