@@ -16,6 +16,7 @@ import {
 import { Profile } from '@/lib/supabase'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
 import { SayfaParametreleri } from '@/components/SayfaParametreleri'
+import { SelloutAciklama } from '@/components/SelloutAciklama'
 
 type SubTab = 'sup' | 'jr' | 'merch' | 'top20' | 'satislar' | 'satisgirmeyen' | 'ozel'
 
@@ -1368,6 +1369,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
         {!selloutLoading && subTab === 'sup' && showSupTab && (
           <>
+          <SelloutAciklama donem={donem} sekme="sup" isAdmin={isAdmin} profileId={currentProfile.id} />
           <SelloutTable
             rows={supRows.map(r => {
               const jrCount = jrsOfSupName(r.profile.full_name)
@@ -1406,6 +1408,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
         )}
 
         {!selloutLoading && subTab === 'jr' && showJrTab && (
+          <>
+          <SelloutAciklama donem={donem} sekme="jr" isAdmin={isAdmin} profileId={currentProfile.id} />
           <SelloutTable
             rows={jrRows.map(r => {
               const subeCount = subesOfJr(r.profile.full_name)
@@ -1422,6 +1426,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             showPrim
             kategoriPrimi={PRIM_JR}
           />
+          </>
         )}
 
         {!selloutLoading && subTab === 'merch' && (
@@ -1445,6 +1450,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 </div>
               )}
             </div>
+            <SelloutAciklama donem={donem} sekme="merch" isAdmin={isAdmin} profileId={currentProfile.id} />
             <SelloutTable
               rows={merchRows.map(r => ({
                 label:     r.name,
