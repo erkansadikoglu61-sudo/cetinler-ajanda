@@ -29,6 +29,7 @@ const TIP_BADGE: Record<PrimTip, string> = {
 }
 
 interface OdemeRec { odendi: boolean; odeme_tarihi: string | null }
+interface EkRec { tutar: number; aciklama: string }
 
 export function NihaiPrimListesi({
   currentProfile,
@@ -50,12 +51,16 @@ export function NihaiPrimListesi({
   const [targetsByAy, setTargetsByAy] = useState<Record<number, { p: NPProfileTarget[]; m: NPMerchTarget[] }>>({})
   const [merchDetay, setMerchDetay] = useState<NPMerchDetay[]>([])
   const [odeme, setOdeme] = useState<Record<string, OdemeRec>>({})
+  // Ek (performans) primi — admin/İK elle girer; hesaplanan prime eklenir
+  const [ek, setEk] = useState<Record<string, EkRec>>({})
   const [loadingAll, setLoadingAll] = useState(true)
 
   // Düzenleme modalı
   const [edit, setEdit] = useState<{ tip: PrimTip; ad: string; ay: number; prim: number } | null>(null)
   const [editOdendi, setEditOdendi] = useState(false)
   const [editTarih, setEditTarih] = useState('')
+  const [editEk, setEditEk] = useState('')
+  const [editEkAciklama, setEditEkAciklama] = useState('')
   const [saving, setSaving] = useState(false)
 
   // Toplu ödeme modalı
@@ -74,9 +79,10 @@ export function NihaiPrimListesi({
     const load = async () => {
       try {
         const aylar = Array.from({ length: 12 }, (_, i) => i + 1)
-        const [bsyRes, odemeRes, mdRes, ...targetRes] = await Promise.all([
+        const [bsyRes, odemeRes, ekRes, mdRes, ...targetRes] = await Promise.all([
           fetch(`/api/nihai-prim-bsy?yil=${yil}`).then(r => r.json()).catch(() => ({ rows: [] })),
           fetch(`/api/nihai-prim-odeme?yil=${yil}`).then(r => r.json()).catch(() => ({ rows: [] })),
+          fetch(`/api/nihai-prim-ek?yil=${yil}`).then(r => r.json()).catch(() => ({ rows: [] })),
           fetch('/api/merch-detay').then(r => r.json()).catch(() => ({ data: [] })),
           ...aylar.map(ay =>
             fetch(`/api/sellout-targets?donem=${yil}-${mm(ay)}`).then(r => r.json()).catch(() => ({ profile_targets: [], merch_targets: [] }))
@@ -95,6 +101,11 @@ export function NihaiPrimListesi({
           omap[okey(r.ay, r.kullanici_tipi, r.kullanici_adi)] = { odendi: r.odendi, odeme_tarihi: r.odeme_tarihi }
         }
         setOdeme(omap)
+        const emap: Record<string, EkRec> = {}
+        for (const r of (ekRes.rows ?? [])) {
+          emap[okey(r.ay, r.kullanici_tipi, r.kullanici_adi)] = { tutar: Number(r.tutar) || 0, aciklama: r.aciklama ?? '' }
+        }
+        setEk(emap)
       } finally {
         if (!iptal) setLoadingAll(false)
       }
@@ -136,9 +147,17 @@ export function NihaiPrimListesi({
       }
     }
 
-    // Sıfır satırları gizle (tüm aylar 0)
+    // Yalnızca ek primi olan (hesaplanan primi 0) kişiler de listelensin
+    for (const k of Object.keys(ek)) {
+      if ((ek[k]?.tutar ?? 0) <= 0) continue
+      const [, tip, ad] = k.split('||') as [string, PrimTip, string]
+      if (!map.has(rowKey(tip, ad))) map.set(rowKey(tip, ad), { tip, ad, aylar: {} })
+    }
+
+    // Sıfır satırları gizle (tüm aylar 0 ve ek prim yok)
     let all = [...map.values()].filter(r =>
-      Object.values(r.aylar).some(v => (v ?? 0) > 0)
+      Object.values(r.aylar).some(v => (v ?? 0) > 0) ||
+      NP_MONTHS_TR.some((_, i) => (ek[okey(i + 1, r.tip, r.ad)]?.tutar ?? 0) > 0)
     )
 
     // ── Rol görünürlüğü ──
@@ -175,19 +194,23 @@ export function NihaiPrimListesi({
     )
     return all
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bsyRows, selloutRows, targetsByAy, merchDetay, team, currentProfile.id, currentProfile.role, yil])
+  }, [bsyRows, selloutRows, targetsByAy, merchDetay, team, ek, currentProfile.id, currentProfile.role, yil])
+
+  // Hücre tutarı = hesaplanan prim + ek (performans) primi
+  const ekOf = (r: { tip: string; ad: string }, ay: number) => ek[okey(ay, r.tip, r.ad)]?.tutar ?? 0
+  const totalOf = (r: NihaiPrimRow, ay: number) => (r.aylar[ay] ?? 0) + ekOf(r, ay)
 
   const yilTotal = (ay: number) =>
-    rows.reduce((s, r) => s + (r.aylar[ay] ?? 0), 0)
+    rows.reduce((s, r) => s + totalOf(r, ay), 0)
 
   const exportExcel = () => {
     const header = ['Tip', 'Ad Soyad', ...NP_MONTHS_TR, 'Toplam']
     const data = rows.map(r => {
       const aylar = NP_MONTHS_TR.map((_, i) => {
-        const v = r.aylar[i + 1] ?? 0
+        const v = totalOf(r, i + 1)
         return v > 0 ? Math.round(v) : ''
       })
-      const toplam = NP_MONTHS_TR.reduce((s, _, i) => s + (r.aylar[i + 1] ?? 0), 0)
+      const toplam = NP_MONTHS_TR.reduce((s, _, i) => s + totalOf(r, i + 1), 0)
       return [r.tip, r.ad, ...aylar, Math.round(toplam)]
     })
     const totalRow = ['', 'TOPLAM',
@@ -212,18 +235,53 @@ export function NihaiPrimListesi({
   }
 
   const openCell = (r: NihaiPrimRow, ay: number) => {
-    const prim = r.aylar[ay] ?? 0
-    if (prim <= 0) return
+    const prim = r.aylar[ay] ?? 0          // hesaplanan prim (ek hariç)
+    // Tutarı olmayan hücreyi yalnızca admin/İK açar (ek prim girmek için)
+    if (prim + ekOf(r, ay) <= 0 && !canEdit) return
     const rec = odeme[okey(ay, r.tip, r.ad)]
+    const ekRec = ek[okey(ay, r.tip, r.ad)]
     setEdit({ tip: r.tip, ad: r.ad, ay, prim })
+    setEditEk(ekRec?.tutar ? String(ekRec.tutar) : '')
+    setEditEkAciklama(ekRec?.aciklama ?? '')
     setEditOdendi(rec?.odendi ?? false)
     setEditTarih(rec?.odeme_tarihi ?? new Date().toISOString().slice(0, 10))
   }
 
   const saveOdeme = async () => {
     if (!edit) return
+    const k = okey(edit.ay, edit.tip, edit.ad)
+    const ekTutar = Math.max(0, Math.round(parseFloat(editEk.replace(/\./g, '').replace(',', '.')) || 0))
+    const ekAciklama = editEkAciklama.trim()
+    const ekDegisti = ekTutar !== (ek[k]?.tutar ?? 0) || ekAciklama !== (ek[k]?.aciklama ?? '')
     setSaving(true)
     try {
+      // 1. Ek prim (değiştiyse)
+      if (ekDegisti) {
+        const r1 = await fetch('/api/nihai-prim-ek', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            yil, ay: edit.ay, kullanici_tipi: edit.tip, kullanici_adi: edit.ad,
+            tutar: ekTutar, aciklama: ekAciklama, updated_by: currentProfile.id,
+          }),
+        })
+        if (!r1.ok) {
+          const j = await r1.json().catch(() => ({}))
+          alert(j.error ?? 'Ek prim kaydedilemedi')
+          return
+        }
+        setEk(prev => {
+          const next = { ...prev }
+          if (ekTutar > 0) next[k] = { tutar: ekTutar, aciklama: ekAciklama }
+          else delete next[k]
+          return next
+        })
+      }
+      // 2. Ödendi bilgisi (toplam tutar yoksa ve önceden kayıt da yoksa atla)
+      if (edit.prim + ekTutar <= 0 && !odeme[k]) {
+        setEdit(null)
+        return
+      }
       const res = await fetch('/api/nihai-prim-odeme', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -251,9 +309,10 @@ export function NihaiPrimListesi({
   // ── Toplu ödeme ──
   const pKey = (tip: string, ad: string) => `${tip}||${ad}`
   const bulkList = useMemo(() =>
-    rows.filter(r => (r.aylar[bulkAy] ?? 0) > 0)
-        .map(r => ({ tip: r.tip, ad: r.ad, prim: Math.round(r.aylar[bulkAy] ?? 0) })),
-    [rows, bulkAy]
+    rows.filter(r => totalOf(r, bulkAy) > 0)
+        .map(r => ({ tip: r.tip, ad: r.ad, prim: Math.round(totalOf(r, bulkAy)) })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, bulkAy, ek]
   )
 
   // Modal açıkken / ay değişince mevcut ödeme durumunu doldur
@@ -262,7 +321,7 @@ export function NihaiPrimListesi({
     const chk: Record<string, boolean> = {}
     let foundDate = ''
     for (const r of rows) {
-      if ((r.aylar[bulkAy] ?? 0) <= 0) continue
+      if (totalOf(r, bulkAy) <= 0) continue
       const rec = odeme[okey(bulkAy, r.tip, r.ad)]
       chk[pKey(r.tip, r.ad)] = !!rec?.odendi
       if (rec?.odeme_tarihi && !foundDate) foundDate = rec.odeme_tarihi
@@ -377,27 +436,42 @@ export function NihaiPrimListesi({
                     <td className="sticky left-[70px] z-10 bg-white border-r border-gray-200 px-3 py-1.5 font-medium text-gray-800 whitespace-nowrap">{r.ad}</td>
                     {NP_MONTHS_TR.map((_, i) => {
                       const ay = i + 1
-                      const prim = r.aylar[ay] ?? 0
+                      const hesap = r.aylar[ay] ?? 0
+                      const ekT = ekOf(r, ay)
+                      const prim = hesap + ekT
                       const rec = odeme[okey(ay, r.tip, r.ad)]
                       const paid = !!rec?.odendi
                       if (prim <= 0) {
-                        return <td key={i} className="text-center px-3 py-1.5 border-r border-gray-100 text-gray-300">—</td>
+                        return (
+                          <td
+                            key={i}
+                            onClick={canEdit ? () => openCell(r, ay) : undefined}
+                            className={clsx('text-center px-3 py-1.5 border-r border-gray-100 text-gray-300', canEdit && 'cursor-pointer hover:bg-sky-50 hover:text-sky-500')}
+                            title={canEdit ? 'Ek (performans) primi eklemek için tıklayın' : undefined}
+                          >—</td>
+                        )
                       }
+                      const ekNot = ekT > 0
+                        ? `\nHesaplanan: ${fmtCur(hesap)} · Ek prim: ${fmtCur(ekT)}${ek[okey(ay, r.tip, r.ad)]?.aciklama ? ' (' + ek[okey(ay, r.tip, r.ad)].aciklama + ')' : ''}`
+                        : ''
                       return (
                         <td
                           key={i}
                           onClick={() => openCell(r, ay)}
                           className={clsx(
                             'px-2 py-1.5 border-r border-gray-100 text-right cursor-pointer transition-colors',
-                            paid ? 'bg-green-100 hover:bg-green-200' : 'bg-amber-50 hover:bg-amber-100'
+                            paid ? 'bg-green-100 hover:bg-green-200' : ekT > 0 ? 'bg-sky-100 hover:bg-sky-200' : 'bg-amber-50 hover:bg-amber-100'
                           )}
-                          title={paid
+                          title={(paid
                             ? `Ödendi${rec?.odeme_tarihi ? ' · ' + rec.odeme_tarihi.split('-').reverse().join('.') : ''}`
-                            : 'Ödenmedi — düzenlemek için tıklayın'}
+                            : 'Ödenmedi — düzenlemek için tıklayın') + ekNot}
                         >
-                          <div className={clsx('font-semibold', paid ? 'text-green-800' : 'text-amber-800')}>
+                          <div className={clsx('font-semibold', paid ? 'text-green-800' : ekT > 0 ? 'text-sky-800' : 'text-amber-800')}>
                             {fmtCur(prim)}
                           </div>
+                          {ekT > 0 && (
+                            <div className="text-[9px] font-semibold text-sky-700 leading-tight">+{fmtCur(ekT)} ek</div>
+                          )}
                           {paid && rec?.odeme_tarihi && (
                             <div className="text-[9px] text-green-700 leading-tight">
                               {rec.odeme_tarihi.split('-').reverse().join('.')}
@@ -407,7 +481,7 @@ export function NihaiPrimListesi({
                       )
                     })}
                     <td className="px-3 py-1.5 text-right font-bold text-purple-800 bg-purple-50/60">
-                      {(() => { const t = NP_MONTHS_TR.reduce((s, _, i) => s + (r.aylar[i + 1] ?? 0), 0); return t > 0 ? fmtCur(t) : '—' })()}
+                      {(() => { const t = NP_MONTHS_TR.reduce((s, _, i) => s + totalOf(r, i + 1), 0); return t > 0 ? fmtCur(t) : '—' })()}
                     </td>
                   </tr>
                 ))}
@@ -434,7 +508,7 @@ export function NihaiPrimListesi({
             </table>
           </div>
           <p className="text-[10px] text-gray-400 mt-2">
-            Yeşil = ödendi, sarı = ödenmedi. {canEdit ? 'Tutara tıklayarak ödendi bilgisini ve tarihini girebilirsiniz.' : 'Ödendi bilgisi yalnızca admin ve İnsan Kaynakları tarafından girilir.'}
+            Yeşil = ödendi, sarı = ödenmedi, mavi = ek (performans) primi içeriyor (ödenmedi). {canEdit ? 'Tutara tıklayarak ödendi bilgisini, tarihini ve ek primi girebilirsiniz; boş (—) hücreye tıklayarak da ek prim ekleyebilirsiniz.' : 'Ödendi bilgisi ve ek prim yalnızca admin ve İnsan Kaynakları tarafından girilir.'}
           </p>
         </div>
       )}
@@ -451,13 +525,52 @@ export function NihaiPrimListesi({
               <div className="text-gray-600">
                 <span className="font-semibold text-gray-800">{edit.ad}</span> · {edit.tip}
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-500">{NP_MONTHS_TR[edit.ay - 1]} {yil}</span>
-                <span className="font-bold text-purple-700">{fmtCur(edit.prim)}</span>
-              </div>
+              {(() => {
+                const ekCur = canEdit
+                  ? Math.max(0, Math.round(parseFloat(editEk.replace(/\./g, '').replace(',', '.')) || 0))
+                  : (ek[okey(edit.ay, edit.tip, edit.ad)]?.tutar ?? 0)
+                return (
+                  <div className="space-y-1">
+                    <div className="text-gray-500">{NP_MONTHS_TR[edit.ay - 1]} {yil}</div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500">Hesaplanan prim</span>
+                      <span className="font-medium text-gray-700">{fmtCur(edit.prim)}</span>
+                    </div>
+                    {ekCur > 0 && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-sky-700">Ek (performans) primi</span>
+                        <span className="font-medium text-sky-700">+{fmtCur(ekCur)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between border-t border-gray-100 pt-1">
+                      <span className="text-gray-600 font-medium">Toplam</span>
+                      <span className="font-bold text-purple-700">{fmtCur(edit.prim + ekCur)}</span>
+                    </div>
+                  </div>
+                )
+              })()}
 
               {canEdit ? (
                 <>
+                  <div className="rounded-lg border border-sky-200 bg-sky-50 p-2.5 space-y-2">
+                    <label className="block text-xs font-semibold text-sky-800">Ek (performans) primi ₺</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={editEk}
+                      onChange={e => setEditEk(e.target.value)}
+                      placeholder="0"
+                      className="w-full border border-sky-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-sky-400 bg-white"
+                    />
+                    <input
+                      type="text"
+                      value={editEkAciklama}
+                      onChange={e => setEditEkAciklama(e.target.value)}
+                      placeholder="Açıklama (ör. Performans primi)"
+                      className="w-full border border-sky-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-sky-400 bg-white"
+                    />
+                    <p className="text-[10px] text-sky-700">Hesaplanan prime eklenir. Silmek için boş bırakın / 0 yazın.</p>
+                  </div>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={editOdendi} onChange={e => setEditOdendi(e.target.checked)} />
                     <span className="text-gray-700">Ödendi</span>
