@@ -14,15 +14,20 @@ const EASYFOLD: OzelGrup     = { key: 'EasyFold',     label: 'EasyFold Serisi', 
 const EASYSTRAIGHT: OzelGrup = { key: 'EasyStraight', label: 'EasyStraight Serisi', badge: 'EasyStraight', hedef: 5,  codes: ['RHS8900B', 'RHS8900P'],                     renk: 'bg-teal-100 text-teal-700' }
 const KERATIN: OzelGrup      = { key: 'Keratin',      label: 'Keratin Serisi',      badge: 'Keratin',      hedef: 10, codes: ['RS9500', 'RS9505', 'RC9525', 'RC9532'],     renk: 'bg-amber-100 text-amber-700' }
 const ERKEK: OzelGrup        = { key: 'ErkekBakim',   label: 'Erkek Bakım',         badge: 'Erkek Bakım',  hedef: 5,  codes: ['RPG7500'],                                  renk: 'bg-purple-100 text-purple-700' }
+// 2026-10: RMS'e RMS9200V eklendi; Keratin kodları RS9500, RS9505, RS6600, RS6625
+const RMS_EKIM: OzelGrup     = { ...RMS,     codes: ['RMS9200B', 'RMS9200P', 'RMS9200V'] }
+const KERATIN_EKIM: OzelGrup = { ...KERATIN, codes: ['RS9500', 'RS9505', 'RS6600', 'RS6625'] }
 
 export const OZEL_CARPAN = 2
 
 /** Dönemde ('YYYY-MM') geçerli EKSTRA prim grupları.
- *  2026-08: yalnız IPL + RMS · 2026-09 ve sonrası: 6 grup · öncesi: yok. */
+ *  2026-08: yalnız IPL + RMS · 2026-09: 6 grup · 2026-10 ve sonrası: 6 grup
+ *  (güncel RMS/Keratin kodları) · öncesi: yok. */
 export function getOzelGruplar(donem: string): OzelGrup[] {
   if (donem < '2026-08') return []
   if (donem === '2026-08') return [IPL, RMS]
-  return [IPL, RMS, EASYFOLD, EASYSTRAIGHT, KERATIN, ERKEK]
+  if (donem === '2026-09') return [IPL, RMS, EASYFOLD, EASYSTRAIGHT, KERATIN, ERKEK]
+  return [IPL, RMS_EKIM, EASYFOLD, EASYSTRAIGHT, KERATIN_EKIM, ERKEK]
 }
 
 export function ozelSubeKey(cari: string, sube: string): string {
