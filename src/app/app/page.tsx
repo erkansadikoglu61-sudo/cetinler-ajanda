@@ -2291,7 +2291,7 @@ if (currentProfile.role === 'bsy') {
               {/* Primler — admin + BSY + Süpervizör + İnsan Kaynakları + Jr (nihai prim) */}
               {(currentProfile?.role === 'admin' || isBsy || isSup || isIk || isJr) && (
                 <button
-                  onClick={() => { if (!['prim-cetinler-merch','adet-prim','bayi-merch','destek-hakedis','prim-odeme','prim-analiz'].includes(tab)) setTab(isIk ? 'prim-odeme' : isJr ? 'prim-cetinler-merch' : 'adet-prim') }}
+                  onClick={() => { if (!['prim-cetinler-merch','adet-prim','bayi-merch','destek-hakedis','prim-odeme','prim-analiz'].includes(tab)) setTab(isIk ? 'prim-odeme' : 'prim-cetinler-merch') }}
                   className={clsx(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
                     ['prim-cetinler-merch','adet-prim','bayi-merch','destek-hakedis','prim-odeme','prim-analiz'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
@@ -2425,9 +2425,8 @@ if (currentProfile.role === 'bsy') {
                 children: [
                   { key: 'prim-cetinler-merch' as const, label: 'Bsy-Süpervizör-Jr.Süpervizör-Çetinler Merch', roles: ['admin','ik','bsy','sup','jr'] },
                 ] },
-              { key: 'grup-bayi', label: 'Bayi Merch', roles: ['admin','bsy','sup'],
+              { key: 'grup-bayi', label: 'Bayi Merch Prim Hakedişleri', roles: ['admin','bsy','sup'],
                 children: [
-                  { key: 'adet-prim'  as const, label: 'Adet Prim Tablosu',           roles: ['admin','bsy','sup'] },
                   { key: 'bayi-merch' as const, label: 'Bayi Merch Prim Hakedişleri', roles: ['admin','bsy','sup'] },
                 ] },
               { key: 'grup-destek', label: 'Destek Personeli', roles: ['admin','sup'],
@@ -2441,6 +2440,10 @@ if (currentProfile.role === 'bsy') {
               { key: 'prim-analiz', label: 'Prim Analiz', roles: ['admin','manager'],
                 children: [
                   { key: 'prim-analiz' as const, label: 'Prim Analiz', roles: ['admin','manager'] },
+                ] },
+              { key: 'adet-prim', label: 'Adet Prim Tablosu', roles: ['admin','bsy','sup'],
+                children: [
+                  { key: 'adet-prim' as const, label: 'Adet Prim Tablosu', roles: ['admin','bsy','sup'] },
                 ] },
             ] as const)
             const visibleGroups = primGroups.filter(g => (g.roles as readonly string[]).includes(role))
@@ -2709,7 +2712,7 @@ if (currentProfile.role === 'bsy') {
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
-              onClick={() => key === 'month' ? (!['month','week','day'].includes(tab) && setTab('month')) : key === 'report' ? (!['report','personelli-nokta-analiz'].includes(tab) && setTab('report')) : key === 'adet-prim' ? setTab(isIk ? 'prim-odeme' : isJr ? 'prim-cetinler-merch' : 'adet-prim') : setTab(key)}
+              onClick={() => key === 'month' ? (!['month','week','day'].includes(tab) && setTab('month')) : key === 'report' ? (!['report','personelli-nokta-analiz'].includes(tab) && setTab('report')) : key === 'adet-prim' ? setTab(isIk ? 'prim-odeme' : 'prim-cetinler-merch') : setTab(key)}
               className={clsx(
                 'flex flex-col items-center justify-center gap-0.5 transition-colors',
                 (tab === key ||
