@@ -32,10 +32,11 @@ import { AdetPrimTablosu, BayiMerchHakdis, PrimOdemeListesi, PrimAnalizView } fr
 import { AnalizView } from '@/components/AnalizView'
 import { AdminDashboardView } from '@/components/AdminDashboardView'
 import { DestekPersonelHakedisView } from '@/components/DestekPersonelHakedisView'
+import { DigerPrimView } from '@/components/DigerPrimView'
 import { TahsilatTakvimiView } from '@/components/TahsilatTakvimiView'
 import { NihaiPrimListesi } from '@/components/NihaiPrimListesi'
 import { PersonelliNoktaAnalizView } from '@/components/PersonelliNoktaAnalizView'
-type TabType = 'month' | 'week' | 'day' | 'report' | 'personelli-nokta-analiz' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'destek-hakedis' | 'prim-odeme' | 'prim-analiz' | 'prim-cetinler-merch' | 'analiz' | 'tahsilat-planim' | 'tahsilat-takvimi' | 'dashboard'
+type TabType = 'month' | 'week' | 'day' | 'report' | 'personelli-nokta-analiz' | 'visits' | 'sellout' | 'bsy' | 'kpi' | 'genel-raporlar' | 'noktalar' | 'kullanicilar' | 'sellinout' | 'adet-prim' | 'bayi-merch' | 'destek-hakedis' | 'diger-prim' | 'prim-odeme' | 'prim-analiz' | 'prim-cetinler-merch' | 'analiz' | 'tahsilat-planim' | 'tahsilat-takvimi' | 'dashboard'
 
 // Renk hex'ine alpha ekle
 function hexWithAlpha(hex: string, alpha: string) {
@@ -2291,10 +2292,10 @@ if (currentProfile.role === 'bsy') {
               {/* Primler — admin + BSY + Süpervizör + İnsan Kaynakları + Jr (nihai prim) */}
               {(currentProfile?.role === 'admin' || isBsy || isSup || isIk || isJr) && (
                 <button
-                  onClick={() => { if (!['prim-cetinler-merch','adet-prim','bayi-merch','destek-hakedis','prim-odeme','prim-analiz'].includes(tab)) setTab(isIk ? 'prim-odeme' : 'prim-cetinler-merch') }}
+                  onClick={() => { if (!['prim-cetinler-merch','adet-prim','bayi-merch','destek-hakedis','diger-prim','prim-odeme','prim-analiz'].includes(tab)) setTab(isIk ? 'prim-odeme' : 'prim-cetinler-merch') }}
                   className={clsx(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                    ['prim-cetinler-merch','adet-prim','bayi-merch','destek-hakedis','prim-odeme','prim-analiz'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                    ['prim-cetinler-merch','adet-prim','bayi-merch','destek-hakedis','diger-prim','prim-odeme','prim-analiz'].includes(tab) ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100'
                   )}
                 >
                   <Activity size={15} /> Primler
@@ -2418,7 +2419,7 @@ if (currentProfile.role === 'bsy') {
             </div>
           )}
           {/* Primler alt sekmeleri (2 seviyeli: gruplar + grup içi sekmeler) */}
-          {(currentProfile?.role === 'admin' || isBsy || isSup || isIk || isJr || isManager) && ['prim-cetinler-merch','adet-prim','bayi-merch','destek-hakedis','prim-odeme','prim-analiz'].includes(tab) && (() => {
+          {(currentProfile?.role === 'admin' || isBsy || isSup || isIk || isJr || isManager) && ['prim-cetinler-merch','adet-prim','bayi-merch','destek-hakedis','diger-prim','prim-odeme','prim-analiz'].includes(tab) && (() => {
             const role = currentProfile?.role ?? ''
             const primGroups = ([
               { key: 'grup-cetinler', label: 'Bsy-Süpervizör-Jr.Süpervizör-Çetinler Merch', roles: ['admin','ik','bsy','sup','jr'],
@@ -2432,6 +2433,10 @@ if (currentProfile.role === 'bsy') {
               { key: 'grup-destek', label: 'Destek Personeli', roles: ['admin','sup'],
                 children: [
                   { key: 'destek-hakedis' as const, label: 'Destek Personelleri Hakediş', roles: ['admin','sup'] },
+                ] },
+              { key: 'diger-prim', label: 'Diğer', roles: ['admin'],
+                children: [
+                  { key: 'diger-prim' as const, label: 'Diğer', roles: ['admin'] },
                 ] },
               { key: 'prim-odeme', label: 'Prim Ödeme Listesi', roles: ['admin','bsy','sup','ik'],
                 children: [
@@ -2654,6 +2659,11 @@ if (currentProfile.role === 'bsy') {
               />
             </div>
           )}
+          {tab === 'diger-prim' && currentProfile?.role === 'admin' && (
+            <div className="flex-1 overflow-hidden flex flex-col h-full">
+              <DigerPrimView userId={currentProfile.id} />
+            </div>
+          )}
           {tab === 'prim-odeme' && (currentProfile?.role === 'admin' || isBsy || isSup || isIk) && (
             <div className="flex-1 overflow-hidden flex flex-col h-full">
               <PrimOdemeListesi
@@ -2674,7 +2684,7 @@ if (currentProfile.role === 'bsy') {
       )}
 
       {/* FAB — sadece takvim erişimi olan kullanıcılar takvim sekmelerinde görünür */}
-      {hasCalendarAccess && tab !== 'report' && tab !== 'personelli-nokta-analiz' && tab !== 'visits' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && tab !== 'tahsilat-planim' && tab !== 'dashboard' && tab !== 'destek-hakedis' && tab !== 'prim-odeme' && tab !== 'prim-analiz' && tab !== 'prim-cetinler-merch' && (
+      {hasCalendarAccess && tab !== 'report' && tab !== 'personelli-nokta-analiz' && tab !== 'visits' && tab !== 'sellout' && tab !== 'bsy' && tab !== 'kpi' && tab !== 'genel-raporlar' && tab !== 'noktalar' && tab !== 'kullanicilar' && tab !== 'sellinout' && tab !== 'adet-prim' && tab !== 'bayi-merch' && tab !== 'analiz' && tab !== 'tahsilat-planim' && tab !== 'dashboard' && tab !== 'destek-hakedis' && tab !== 'diger-prim' && tab !== 'prim-odeme' && tab !== 'prim-analiz' && tab !== 'prim-cetinler-merch' && (
         <button
           onClick={handleAddTask}
           className="fixed bottom-24 md:bottom-6 right-4 w-12 h-12 md:w-14 md:h-14 bg-brand-500 rounded-full shadow-lg flex items-center justify-center text-white z-30 btn-active safe-bottom"
@@ -2720,7 +2730,7 @@ if (currentProfile.role === 'bsy') {
                   (key === 'report' && tab === 'personelli-nokta-analiz') ||
                   (key === 'bsy' && ['bsy','kpi','genel-raporlar'].includes(tab)) ||
                   (key === 'noktalar' && tab === 'kullanicilar') ||
-                  (key === 'adet-prim' && ['bayi-merch','destek-personel','destek-hakedis','prim-odeme','prim-analiz','prim-cetinler-merch'].includes(tab)))
+                  (key === 'adet-prim' && ['bayi-merch','destek-personel','destek-hakedis','diger-prim','prim-odeme','prim-analiz','prim-cetinler-merch'].includes(tab)))
                   ? 'text-brand-500' : 'text-gray-400'
               )}
             >
