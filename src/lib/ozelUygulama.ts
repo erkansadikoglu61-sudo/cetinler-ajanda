@@ -12,9 +12,9 @@ const IPL: OzelGrup          = { key: 'IPL',          label: 'IPL Grubu',       
 const RMS: OzelGrup          = { key: 'RMS',          label: 'RMS Grubu',           badge: 'RMS',          hedef: 5,  codes: ['RMS9200B', 'RMS9200P'],                     renk: 'bg-pink-100 text-pink-700' }
 const EASYFOLD: OzelGrup     = { key: 'EasyFold',     label: 'EasyFold Serisi',     badge: 'EasyFold',     hedef: 5,  codes: ['RHD7130B', 'RHD7130P'],                     renk: 'bg-sky-100 text-sky-700' }
 const EASYSTRAIGHT: OzelGrup = { key: 'EasyStraight', label: 'EasyStraight Serisi', badge: 'EasyStraight', hedef: 5,  codes: ['RHS8900B', 'RHS8900P'],                     renk: 'bg-teal-100 text-teal-700' }
-const KERATIN: OzelGrup      = { key: 'Keratin',      label: 'Keratin Serisi',      badge: 'Keratin',      hedef: 10, codes: ['RS9500', 'RS9505', 'RC9525', 'RC9532'],     renk: 'bg-amber-100 text-amber-700' }
+const KERATIN: OzelGrup      = { key: 'Keratin',      label: 'Düzleştirici Grubu',  badge: 'Düzleştirici', hedef: 10, codes: ['RS9500', 'RS9505', 'RC9525', 'RC9532'],     renk: 'bg-amber-100 text-amber-700' }
 const ERKEK: OzelGrup        = { key: 'ErkekBakim',   label: 'Erkek Bakım',         badge: 'Erkek Bakım',  hedef: 5,  codes: ['RPG7500'],                                  renk: 'bg-purple-100 text-purple-700' }
-// 2026-10: RMS'e RMS9200V eklendi; Keratin kodları RS9500, RS9505, RS6600, RS6625
+// 2026-10: RMS'e RMS9200V eklendi; Düzleştirici (eski Keratin) kodları RS9500, RS9505, RS6600, RS6625
 const RMS_EKIM: OzelGrup     = { ...RMS,     codes: ['RMS9200B', 'RMS9200P', 'RMS9200V'] }
 const KERATIN_EKIM: OzelGrup = { ...KERATIN, codes: ['RS9500', 'RS9505', 'RS6600', 'RS6625'] }
 
