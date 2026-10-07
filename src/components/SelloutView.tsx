@@ -17,26 +17,11 @@ import { Profile } from '@/lib/supabase'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
 import { SayfaParametreleri } from '@/components/SayfaParametreleri'
 import { SelloutAciklama } from '@/components/SelloutAciklama'
+import { getOzelGruplar, ozelSubeAdetleri, buildOzelCarpan } from '@/lib/ozelUygulama'
 
 type SubTab = 'sup' | 'jr' | 'merch' | 'top20' | 'satislar' | 'satisgirmeyen' | 'ozel'
 
-// ─── EKSTRA Prim uygulaması (seçili döneme göre çalışır) ───
-// Şube bazında, aşağıdaki ürün gruplarından belirtilen adet ve üzeri satışa
-// çift prim uygulanır (yalnızca Bayi Merch). Grup/kod/eşik burada tanımlanır;
-// bilgi metni ve tablo bu tanımdan üretilir (tek kaynak).
-interface OzelGrup { key: string; label: string; badge: string; codes: string[]; hedef: number; renk: string }
-const OZEL_GRUPLAR: OzelGrup[] = [
-  { key: 'IPL',          label: 'IPL Grubu',           badge: 'IPL',          hedef: 5,  codes: ['IPL9650', 'IPL9750', 'IPL9850', 'IPL9950'], renk: 'bg-indigo-100 text-indigo-700' },
-  { key: 'RMS',          label: 'RMS Grubu',           badge: 'RMS',          hedef: 5,  codes: ['RMS9200B', 'RMS9200P'],                     renk: 'bg-pink-100 text-pink-700' },
-  { key: 'EasyFold',     label: 'EasyFold Serisi',     badge: 'EasyFold',     hedef: 5,  codes: ['RHD7130B', 'RHD7130P'],                     renk: 'bg-sky-100 text-sky-700' },
-  { key: 'EasyStraight', label: 'EasyStraight Serisi', badge: 'EasyStraight', hedef: 5,  codes: ['RHS8900B', 'RHS8900P'],                     renk: 'bg-teal-100 text-teal-700' },
-  { key: 'Keratin',      label: 'Keratin Serisi',      badge: 'Keratin',      hedef: 10, codes: ['RS9500', 'RS9505', 'RC9525', 'RC9532'],     renk: 'bg-amber-100 text-amber-700' },
-  { key: 'ErkekBakim',   label: 'Erkek Bakım',         badge: 'Erkek Bakım',  hedef: 5,  codes: ['RPG7500'],                                  renk: 'bg-purple-100 text-purple-700' },
-]
-// stok kodu → grup key hızlı arama
-const OZEL_CODE_TO_KEY: Record<string, string> = {}
-OZEL_GRUPLAR.forEach(g => g.codes.forEach(c => { OZEL_CODE_TO_KEY[c.toUpperCase()] = g.key }))
-const OZEL_GRUP_BY_KEY: Record<string, OzelGrup> = Object.fromEntries(OZEL_GRUPLAR.map(g => [g.key, g]))
+// EKSTRA Prim grupları/eşikleri ve çift prim çarpanı: lib/ozelUygulama (tek kaynak).
 
 // PHP TARIH ("DD.MM.YYYY") veya "YYYY-MM-DD" → karşılaştırılabilir "YYYY-MM-DD".
 // Parse edilemezse '' döner (o zaman ay bazlı karşılaştırmaya düşülür).
@@ -787,14 +772,20 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
   // Bayi merch prim oranı (standart + özel ek / çarpan). Merch tipinden bağımsız —
   // özel kural o cari/stok/tarihe uygulanır.
-  const getEffectiveBayiMerch = useCallback((stokKodu: string, grupKodu: string, cariIsim: string, subeAdi: string, tarih: string): number => {
+  // EKSTRA prim (Özel Uygulama Takip): şube grup eşiğine ulaştıysa Bayi Merch
+  // satırlarında ilgili stokların primi × 2 (lib/ozelUygulama).
+  const ozelCarpan = useMemo(() => buildOzelCarpan(allRows.map(r => ({
+    cari: r.cari_isim, sube: r.sube_adi, stokKodu: r.stok_kodu, adet: r.satilan_adet, merchTipi: r.merch_tipi, donem: r.donem,
+  })), donem), [allRows, donem])
+
+  const getEffectiveBayiMerch = useCallback((stokKodu: string, grupKodu: string, cariIsim: string, subeAdi: string, tarih: string, merchTipi: string): number => {
     const standardRate = adetPrimMap.get(stokKodu)?.bayiMerch ?? 0
     const rule = findOzel(stokKodu, grupKodu, cariIsim, subeAdi, tarih)
-    if (!rule) return standardRate
-    if (rule.prim_carpan != null) return standardRate * rule.prim_carpan
-    if (rule.bayi_merch  != null) return standardRate + rule.bayi_merch
-    return standardRate
-  }, [adetPrimMap, findOzel])
+    let rate = standardRate
+    if (rule?.prim_carpan != null) rate = standardRate * rule.prim_carpan
+    else if (rule?.bayi_merch != null) rate = standardRate + rule.bayi_merch
+    return rate * ozelCarpan(cariIsim, subeAdi, stokKodu, merchTipi)
+  }, [adetPrimMap, findOzel, ozelCarpan])
 
   // Koşullu destek prim oranı (standart + özel koşullu destek ek / çarpan).
   const getEffectiveKosulluDestek = useCallback((stokKodu: string, grupKodu: string, cariIsim: string, subeAdi: string, tarih: string): number => {
@@ -865,7 +856,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       const primData = adetPrimMap.get(row.stok_kodu || '') || { bayiMerch: 0, kosulluDestek: 0, kategori: '' }
       const satisAdedi = row.satilan_adet || 0
 
-      const bayiMerchPrimAdet = getEffectiveBayiMerch(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '', row.tarih || '')
+      const bayiMerchPrimAdet = getEffectiveBayiMerch(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '', row.tarih || '', row.merch_tipi || '')
       const bayiMerchHakedis = bayiMerchPrimAdet * satisAdedi
 
       const destekVarMi = row.merch_tipi === 'Çetinler Merch' && !!destekFlags[row.merch_personel || '']
@@ -915,7 +906,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       toplamAdet += adet
       const stk = r.stok_kodu || '', grp = (r.grup_kodu || '').toUpperCase()
       const cari = r.cari_isim || '', sube = r.sube_adi || '', tarih = r.tarih || ''
-      bayiHakedis += getEffectiveBayiMerch(stk, grp, cari, sube, tarih) * adet
+      bayiHakedis += getEffectiveBayiMerch(stk, grp, cari, sube, tarih, r.merch_tipi || '') * adet
       if (r.merch_tipi === 'Çetinler Merch' && destekFlags[r.merch_personel || '']) {
         const dp = getEffectiveKosulluDestek(stk, grp, cari, sube, tarih)
         destekHakedis += dp * adet
@@ -1150,8 +1141,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     // Seçili döneme göre çalışır (özel uygulama aylık farklılık gösterebilir).
     // Prim yalnızca Bayi Merch için geçerli — Çetinler Merch satışları sayılmaz
     // (yalnızca Çetinler Merch olan şubeler tabloya girmez).
-    const augRows = allRows.filter(r => r.donem === donem && r.merch_tipi === 'Bayi Merch')
-
+    const gruplar = getOzelGruplar(donem)
     // merch-detay: norm(cari)||norm(sube) → { sup, jr }
     const detay = new Map<string, { sup: string; jr: string }>()
     merchDetayData.forEach(d => {
@@ -1159,17 +1149,10 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       if (!detay.has(k)) detay.set(k, { sup: d.sup_adi || '', jr: d.jr_adi || '' })
     })
 
-    // Şube (cari+sube) bazında her özel grup için adet
-    const groups = new Map<string, { cari: string; sube: string; adet: Record<string, number> }>()
-    augRows.forEach(r => {
-      const code = (r.stok_kodu || '').toUpperCase()
-      const gkey = OZEL_CODE_TO_KEY[code]
-      if (!gkey) return
-      const k = `${normalizeName(r.cari_isim)}||${normalizeName(r.sube_adi)}`
-      const g = groups.get(k) ?? { cari: r.cari_isim, sube: r.sube_adi, adet: {} }
-      g.adet[gkey] = (g.adet[gkey] ?? 0) + r.satilan_adet
-      groups.set(k, g)
-    })
+    // Şube (cari+sube) bazında her özel grup için adet (yalnızca Bayi Merch)
+    const groups = ozelSubeAdetleri(allRows.map(r => ({
+      cari: r.cari_isim, sube: r.sube_adi, stokKodu: r.stok_kodu, adet: r.satilan_adet, merchTipi: r.merch_tipi, donem: r.donem,
+    })), donem)
 
     type Row = { cari: string; sube: string; grup: string; renk: string; hedef: number; gerc: number; kalan: number; ulasti: boolean }
     const out: Row[] = []
@@ -1181,7 +1164,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       else if (isJr) visible = !!info && namesMatch(info.jr, currentProfile.full_name)
       if (!visible) continue
 
-      for (const grp of OZEL_GRUPLAR) {
+      for (const grp of gruplar) {
         const gerc = g.adet[grp.key] ?? 0
         if (gerc <= 0) continue
         out.push({
@@ -1623,7 +1606,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                       const satisAdedi = row.satilan_adet || 0
 
                       // 1. Bayi Merch Adet Primi (özel prim kuralı varsa uygula — merch tipinden bağımsız)
-                      const bayiMerchPrimAdet = getEffectiveBayiMerch(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '', row.tarih || '')
+                      const bayiMerchPrimAdet = getEffectiveBayiMerch(row.stok_kodu || '', (row.grup_kodu || '').toUpperCase(), row.cari_isim || '', row.sube_adi || '', row.tarih || '', row.merch_tipi || '')
 
                       // 2. Bayi Merch Prim Hakedişi
                       const bayiMerchHakedis = bayiMerchPrimAdet * satisAdedi
@@ -1817,7 +1800,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 { label: 'Dönem', value: `Üstteki "Dönem" seçimi (şu an: ${donemLabel(donem)}). Satışlar bu döneme göre süzülür.` },
                 { label: 'Kapsam', value: 'Yalnızca Bayi Merch satışları sayılır; Çetinler Merch satışları dahil edilmez.' },
                 { label: 'Gruplama', value: 'Şube bazında (Cari + Şube). Her şube için her grubun satış adedi ayrı toplanır.' },
-                { label: 'Gruplar & eşikler', value: OZEL_GRUPLAR.map(g => `${g.label} (${g.codes.join(', ')}) ≥ ${g.hedef}`).join(' · ') },
+                { label: 'Gruplar & eşikler', value: getOzelGruplar(donem).map(g => `${g.label} (${g.codes.join(', ')}) ≥ ${g.hedef}`).join(' · ') },
                 { label: 'Gerçekleşen', value: 'Sellout satış verisinden (/api/sellout) o şube + gruba ait satılan_adet toplamı.' },
                 { label: 'Durum', value: 'Gerçekleşen ≥ grup eşiği ise "Çift Prim" hak edilir; değilse "kalan" adet gösterilir.' },
                 { label: 'Görünürlük', value: 'Admin tümü · Süpervizör kendi + Jr şubeleri · Jr kendi şubeleri (merch-detay sup_adi/jr_adi eşleşmesi).' },
@@ -1835,7 +1818,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 {' '}(<b>yalnızca Bayi Merch</b>; Çetinler Merch satışları dahil değildir).
               </p>
               <ul className="mt-1.5 space-y-0.5">
-                {OZEL_GRUPLAR.map(g => (
+                {getOzelGruplar(donem).map(g => (
                   <li key={g.key} className="text-[11px] text-emerald-900/80 leading-snug">
                     <b>{g.label}</b> ({g.codes.join(', ')}) — <b>{g.hedef} adet ve üzeri</b>
                   </li>

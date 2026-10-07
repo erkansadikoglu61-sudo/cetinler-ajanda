@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { loadBayiMerchRateMap } from '@/lib/adetPrimRates'
 import { createClient } from '@supabase/supabase-js'
+import { buildOzelCarpan } from '@/lib/ozelUygulama'
 import { parseHtmlTableByHeader, num, fetchPhpHtml, tarihToIso } from '@/lib/merchSatis'
 
 export const maxDuration = 30
@@ -101,6 +102,11 @@ export async function GET(req: Request) {
 
   // 3. Parse HTML table rows — başlık ismine göre ayrıştır
   const { rows: rawRows } = parseHtmlTableByHeader(html)
+  // EKSTRA prim (Özel Uygulama Takip): şube grup eşiğine ulaştıysa ilgili stoklarda prim × 2
+  const ozelCarpan = buildOzelCarpan(rawRows.map(r => ({
+    cari: r['CARI_ISIM'] ?? '', sube: r['SUBE_ADI'] ?? '', stokKodu: r['STOK_KODU'] ?? '',
+    adet: num(r['SATILAN_ADET']), merchTipi: r['MERCH_TIPI'] ?? '', donem: r['DONEM'] ?? '',
+  })), donem)
   const aggMap = new Map<string, { supervizor: string; cariAdi: string; subeAdi: string; bayiMerch: string; primHakdis: number; satisAdet: number; bsyKod: string }>()
 
   for (const row of rawRows) {
@@ -134,7 +140,7 @@ export async function GET(req: Request) {
     } else {
       bayiMerchPrim = standardRate
     }
-    const prim = bayiMerchPrim != null ? satisAdet * bayiMerchPrim : 0
+    const prim = bayiMerchPrim != null ? satisAdet * bayiMerchPrim * ozelCarpan(cariIsim, subeAdi, stokKodu, 'Bayi Merch') : 0
 
     const key = `${row['SUPERVISOR_ADI'] ?? ''}||${cariIsim}||${subeAdi}||${merchPersonel}`
 

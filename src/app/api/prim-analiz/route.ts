@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { loadBayiMerchRateMap } from '@/lib/adetPrimRates'
 import { createClient } from '@supabase/supabase-js'
+import { buildOzelCarpan } from '@/lib/ozelUygulama'
 import { parseHtmlTableByHeader, num, fetchPhpHtml, tarihToIso } from '@/lib/merchSatis'
 
 export const maxDuration = 30
@@ -90,6 +91,11 @@ export async function GET(req: Request) {
   }
 
   const { rows: rawRows } = parseHtmlTableByHeader(html)
+  // EKSTRA prim (Özel Uygulama Takip): şube grup eşiğine ulaştıysa ilgili stoklarda prim × 2
+  const ozelCarpan = buildOzelCarpan(rawRows.map(r => ({
+    cari: r['CARI_ISIM'] ?? '', sube: r['SUBE_ADI'] ?? '', stokKodu: r['STOK_KODU'] ?? '',
+    adet: num(r['SATILAN_ADET']), merchTipi: r['MERCH_TIPI'] ?? '', donem: r['DONEM'] ?? '',
+  })), donem)
   // Aggregate by cariAdi + subeAdi + stokKodu (preserve stok detail)
   const aggMap = new Map<string, PrimAnalizRow>()
 
@@ -114,7 +120,7 @@ export async function GET(req: Request) {
     } else {
       rate = standardRate
     }
-    const prim = rate != null ? satisAdet * rate : 0
+    const prim = rate != null ? satisAdet * rate * ozelCarpan(cariIsim, subeAdi, stokKodu, 'Bayi Merch') : 0
     if (prim === 0) continue
 
     // Marka, ürün adına göre değil GRUP_KODU'na göre belirlenir.
