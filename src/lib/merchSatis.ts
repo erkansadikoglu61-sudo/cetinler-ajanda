@@ -79,6 +79,38 @@ export function decodeHtml(s: string): string {
 
 export type MerchSatisRow = Record<string, string>
 
+// ── Süpervizör yeniden atama (satış verisi) ──────────────────────────
+// Atilla Yılmaz'ın ekibi: aşağıdaki personelin 2026-01..2026-09 arası TÜM
+// satışları (merch tipi ne olursa olsun) Atilla Yılmaz'a yazılır; satış diğer
+// süpervizörden düşer (her satış tek kez sayılır). 2026-10 ve sonrası satış
+// verisindeki yetkilendirme (SUPERVISOR_ADI) aynen kullanılır.
+// Tüm satış tüketicileri (sellout, prim, analiz…) parseHtmlTableByHeader'dan
+// geçtiği için tek noktada uygulanır.
+const SUP_OVERRIDES: { sup: string; from: string; to: string; merchler: string[] }[] = [
+  {
+    sup: 'Atilla Yılmaz SV', from: '2026-01', to: '2026-09',
+    merchler: [
+      'Dilan Yıkılmaz', 'Betül Keser', 'Aslı Gökmen', 'Hafize Gökçe', 'Hanife Yüksel',
+      'Şerife Karaahmetoğlu', 'Beyhan Bülbül Özlü', 'Neslihan Bulut', 'Ceren Ela Koçbay',
+      'Emine Şen', 'Özen Özdil', 'Güldem Tunçöz', 'Pınar Avcı',
+    ],
+  },
+]
+const normKisi = (s: string) => (s ?? '').replace(/İ/g, 'I').toLowerCase()
+  .replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ş/g, 's').replace(/ç/g, 'c')
+  .replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/\s+/g, ' ').trim()
+const SUP_OVERRIDE_SETS = SUP_OVERRIDES.map(o => ({ ...o, set: new Set(o.merchler.map(normKisi)) }))
+
+/** Satış satırı (MERCH_PERSONEL + DONEM + SUPERVISOR_ADI) ise yeniden atamayı uygular. */
+function applySupervisorOverride(row: MerchSatisRow): void {
+  if (!('SUPERVISOR_ADI' in row) || !('MERCH_PERSONEL' in row) || !('DONEM' in row)) return
+  const donem = row['DONEM']
+  const kisi = normKisi(row['MERCH_PERSONEL'])
+  for (const o of SUP_OVERRIDE_SETS) {
+    if (donem >= o.from && donem <= o.to && o.set.has(kisi)) { row['SUPERVISOR_ADI'] = o.sup; return }
+  }
+}
+
 export interface ParsedHtmlTable {
   headers: string[]
   rows: MerchSatisRow[]
@@ -121,6 +153,7 @@ export function parseHtmlTableByHeader(html: string): ParsedHtmlTable {
     for (let c = 0; c < headers.length; c++) {
       row[headers[c]] = cells[c] ?? ''
     }
+    applySupervisorOverride(row)
     rows.push(row)
   }
 
