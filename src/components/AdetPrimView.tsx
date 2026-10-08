@@ -806,8 +806,11 @@ function duzeltIsim(name: string): string {
 //   allow : verilirse YALNIZCA bu merch'lere ödeme yapılır; yoksa hiçbirine.
 //   yil   : verilirse yalnızca bu yılda geçerli.
 //   aylar : verilirse yalnızca bu aylarda geçerli (1-12).
-const ODEME_ISTISNALARI: { cari: string; allow?: string[]; yil?: number; aylar?: number[] }[] = [
+// deny: yalnızca listedeki merch'ler ödenmez (diğerleri sonraki kurallara düşer).
+// from: 'YYYY-MM' — bu dönemden itibaren geçerli.
+const ODEME_ISTISNALARI: { cari: string; allow?: string[]; deny?: string[]; yil?: number; aylar?: number[]; from?: string }[] = [
   { cari: 'uğurlu perakende' },                                     // tüm merch'ler → ödenmez
+  { cari: 'kolay home', deny: ['Fazilet Aydın'], from: '2026-08' }, // Ağu 2026 ve sonrası → ödenmez
   { cari: 'kolay home', allow: ['Gülser Çevik', 'Fazilet Aydın', 'Büşra Çalcalı'] }, // yalnızca bu üçü ödenir
   { cari: 'çınarlar dtm', yil: 2026, aylar: [6, 7, 8] },            // Haz/Tem/Ağu 2026 → ödenmez
 ]
@@ -830,8 +833,13 @@ function hesaplaOdenecek(r: PrimOdemeRow, yil: number, ay: number): number {
     if (!cari.includes(normOdeme(k.cari))) continue
     if (k.yil != null && k.yil !== yil) continue
     if (k.aylar && !k.aylar.includes(ay)) continue
-    if (!k.allow || k.allow.length === 0) return 0
+    if (k.from && `${yil}-${String(ay).padStart(2, '0')}` < k.from) continue
     const merch = normOdeme(r.merchAdi)
+    if (k.deny) {
+      if (k.deny.some(d => normOdeme(d) === merch)) return 0
+      continue
+    }
+    if (!k.allow || k.allow.length === 0) return 0
     return k.allow.some(a => normOdeme(a) === merch) ? r.hakedis : 0
   }
   return r.hakedis
