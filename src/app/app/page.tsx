@@ -2669,6 +2669,7 @@ if (currentProfile.role === 'bsy') {
               <PrimOdemeListesi
                 supervisorFilter={primSupervisorFilter}
                 bsyKodFilter={primBsyKod}
+                userId={currentProfile.id}
               />
             </div>
           )}

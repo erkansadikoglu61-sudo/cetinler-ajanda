@@ -10,6 +10,8 @@ const MERCH_SATIS_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_sa
 // Primler ▸ Diğer — manuel prim hakediş girişleri (diger_prim tablosu).
 // GET    ?donem=YYYY-MM&user=<profileId>            → { rows, subeAdet }
 //        subeAdet: { 'norm(cari)||norm(sube)': dönemdeki toplam satış adedi } (export_merch_satis)
+// GET    ?donem=YYYY-MM&user=<profileId>&mode=odeme → { rows } (Prim Ödeme Listesi; satış verisi çekilmez)
+//        Prim Ödeme'yi gören roller okuyabilir (admin/bsy/sup/ik); rol filtresi istemcide.
 // POST   { row: {id?, donem, kullanici_adi, grup, cari_adi, sube_adi, gorev, sube_adet, hakedis}, updated_by } → upsert
 // DELETE ?id=<uuid>&user=<profileId>                → sil
 // Yalnızca admin; profil rolü sunucuda doğrulanır.
@@ -23,11 +25,15 @@ function getSupabase() {
 
 type Sb = ReturnType<typeof getSupabase>
 
-async function isAdmin(sb: Sb, userId: string | null | undefined): Promise<boolean> {
-  if (!userId) return false
+async function roleOf(sb: Sb, userId: string | null | undefined): Promise<string | null> {
+  if (!userId) return null
   const { data } = await sb.from('profiles').select('role').eq('id', userId).single()
-  return data?.role === 'admin'
+  return (data?.role as string) ?? null
 }
+async function isAdmin(sb: Sb, userId: string | null | undefined): Promise<boolean> {
+  return (await roleOf(sb, userId)) === 'admin'
+}
+const ODEME_ROLLERI = ['admin', 'bsy', 'sup', 'ik']
 
 const COLS = 'id, donem, kullanici_adi, grup, cari_adi, sube_adi, gorev, sube_adet, hakedis, updated_at'
 
@@ -36,9 +42,14 @@ export async function GET(req: Request) {
   const donem = sp.get('donem') ?? ''
   if (!/^\d{4}-\d{2}$/.test(donem)) return NextResponse.json({ error: 'donem geçersiz' }, { status: 400 })
   const sb = getSupabase()
-  if (!(await isAdmin(sb, sp.get('user')))) return NextResponse.json({ error: 'Bu işlem için yetkiniz yok' }, { status: 403 })
+  const odeme = sp.get('mode') === 'odeme'
+  const role = await roleOf(sb, sp.get('user'))
+  if (odeme ? !ODEME_ROLLERI.includes(role ?? '') : role !== 'admin') {
+    return NextResponse.json({ error: 'Bu işlem için yetkiniz yok' }, { status: 403 })
+  }
   const { data, error } = await sb.from('diger_prim').select(COLS).eq('donem', donem).order('created_at')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (odeme) return NextResponse.json({ rows: data ?? [] })
 
   // Dönemde şube (cari+şube) bazında toplam satış adedi — "Şubenin Adeti" otomatik
   const subeAdet: Record<string, number> = {}

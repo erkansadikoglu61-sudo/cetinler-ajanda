@@ -772,6 +772,7 @@ interface PrimOdemeRow {
   bsyKod:    string
   iban:      string
   tc:        string   // TC Kimlik No (merch-detay PHP'den)
+  manuel?:   boolean  // Primler ▸ Diğer'den gelen manuel kayıt
 }
 
 // "Ad Soyad SV" → "ad soyad" (normalize for comparison)
@@ -828,6 +829,8 @@ function formatIban(raw: string): { text: string; valid: boolean } {
 // Bir satır için ödenecek tutarı hesapla (istisna varsa 0, yoksa hakediş).
 // yil/ay: dönem bazlı istisnalar için (ör. Çınarlar DTM Haz/Tem/Ağu 2026).
 function hesaplaOdenecek(r: PrimOdemeRow, yil: number, ay: number): number {
+  // Diğer (manuel) kayıtlar admin tarafından bilinçli girilir → istisna uygulanmaz
+  if (r.manuel) return r.hakedis
   const cari = normOdeme(r.cariAdi)
   for (const k of ODEME_ISTISNALARI) {
     if (!cari.includes(normOdeme(k.cari))) continue
@@ -848,9 +851,11 @@ function hesaplaOdenecek(r: PrimOdemeRow, yil: number, ay: number): number {
 export function PrimOdemeListesi({
   supervisorFilter = null,
   bsyKodFilter = null,
+  userId,
 }: {
   supervisorFilter?: string[] | null
   bsyKodFilter?: string | null
+  userId: string                       // Diğer (manuel) kayıtları okumak için yetki
 }) {
   const now = new Date()
   const [yil, setYil]         = useState(now.getFullYear())
@@ -900,12 +905,16 @@ export function PrimOdemeListesi({
     setLoading(true)
     setError(null)
     try {
-      const [bayiRes, destekRes, detayRes] = await Promise.all([
+      const donem = `${yil}-${String(ay).padStart(2, '0')}`
+      const [bayiRes, destekRes, detayRes, digerRes] = await Promise.all([
         fetch(`/api/bayi-merch-prim?yil=${yil}&ay=${ay}`),
         fetch(`/api/destek-hakedis?yil=${yil}&ay=${ay}`),
         fetch('/api/merch-detay'),
+        fetch(`/api/diger-prim?donem=${donem}&user=${userId}&mode=odeme`),
       ])
       const [bayiData, destekData, detayData] = await Promise.all([bayiRes.json(), destekRes.json(), detayRes.json()])
+      // Diğer kayıtları yüklenemezse (ör. yetki) liste yine de gösterilir
+      const digerData = digerRes.ok ? await digerRes.json() : { rows: [] }
       if (!bayiRes.ok) throw new Error(bayiData.error ?? 'Bayi Merch yükleme hatası')
 
       // merch-detay'ı STABİL kimlik MERCH_ID etrafında indexle. Soyisim/IBAN
@@ -963,6 +972,35 @@ export function PrimOdemeListesi({
         })
       }
 
+      // Diğer (Primler ▸ Diğer manuel girişleri). Süpervizör/BSY, cari+şube'den
+      // merch-detay üzerinden çözülür (rol filtreleri bunlara göre çalışır).
+      const subeBilgi = new Map<string, { sup: string; bsy: string }>()
+      for (const d of (detayData.data ?? [])) {
+        const k = `${normOdeme(d.cari_adi as string)}||${normOdeme(d.sube_adi as string)}`
+        const cur = subeBilgi.get(k) ?? { sup: '', bsy: '' }
+        subeBilgi.set(k, {
+          sup: cur.sup || (d.sup_adi as string) || (d.jr_adi as string) || '',
+          bsy: cur.bsy || (d.bsy_kod as string) || '',
+        })
+      }
+      for (const d of (digerData.rows ?? [])) {
+        if ((d.hakedis ?? 0) <= 0) continue
+        const m = cozMerch(d.kullanici_adi as string)
+        const sb = subeBilgi.get(`${normOdeme(d.cari_adi)}||${normOdeme(d.sube_adi)}`)
+        combined.push({
+          merchTipi: (d.grup as string) || 'Diğer',
+          merchAdi:  m.ad,
+          hakedis:   Number(d.hakedis),
+          cariAdi:   d.cari_adi ?? '',
+          subeAdi:   d.sube_adi ?? '',
+          supAdi:    resolveSupName(sb?.sup ?? ''),
+          bsyKod:    sb?.bsy ?? '',
+          iban:      m.iban,
+          tc:        m.tc,
+          manuel:    true,
+        })
+      }
+
       setAllRows(combined)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -970,7 +1008,7 @@ export function PrimOdemeListesi({
       setLoading(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [yil, ay, bsyKodFilter])
+  }, [yil, ay, bsyKodFilter, userId])
 
   useEffect(() => { load() }, [load])
 
@@ -1193,10 +1231,18 @@ export function PrimOdemeListesi({
                         'text-[10px] px-1.5 py-0.5 rounded-full font-medium',
                         row.merchTipi === 'Destek Personeli'
                           ? 'bg-violet-100 text-violet-700'
-                          : 'bg-blue-100 text-blue-700'
+                          : row.merchTipi === 'Çetinler Merch'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : row.merchTipi === 'Diğer'
+                              ? 'bg-gray-200 text-gray-700'
+                              : 'bg-blue-100 text-blue-700'
                       )}>
                         {row.merchTipi}
                       </span>
+                      {row.manuel && row.merchTipi !== 'Diğer' && (
+                        <span className="ml-1 text-[9px] px-1 py-0.5 rounded bg-gray-200 text-gray-600 font-medium"
+                          title="Primler ▸ Diğer'den manuel girilen kayıt">Diğer</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">
                       {row.merchAdi}
