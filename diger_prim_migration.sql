@@ -6,6 +6,7 @@ create table if not exists public.diger_prim (
   id            uuid primary key default gen_random_uuid(),
   donem         text not null,                 -- 'YYYY-MM'
   kullanici_adi text not null default '',
+  grup          text not null default '',   -- Bayi Merch / Çetinler Merch / Destek Personeli / Diğer
   cari_adi      text not null default '',
   sube_adi      text not null default '',
   gorev         text not null default '',
@@ -20,3 +21,6 @@ create index if not exists diger_prim_donem_idx on public.diger_prim (donem);
 
 alter table public.diger_prim enable row level security;
 -- Politika yok: tüm okuma/yazma service role (API route) üzerinden yapılır.
+
+-- Sonradan eklenen kolon (tablo daha önce oluşturulduysa):
+alter table public.diger_prim add column if not exists grup text not null default '';

@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { parseHtmlTableByHeader, num, fetchPhpHtml } from '@/lib/merchSatis'
+import { normalizeName } from '@/lib/sellout'
+
+export const maxDuration = 60
+
+const MERCH_SATIS_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
 
 // Primler ▸ Diğer — manuel prim hakediş girişleri (diger_prim tablosu).
-// GET    ?donem=YYYY-MM&user=<profileId>            → { rows }
-// POST   { row: {id?, donem, kullanici_adi, cari_adi, sube_adi, gorev, sube_adet, hakedis}, updated_by } → upsert
+// GET    ?donem=YYYY-MM&user=<profileId>            → { rows, subeAdet }
+//        subeAdet: { 'norm(cari)||norm(sube)': dönemdeki toplam satış adedi } (export_merch_satis)
+// POST   { row: {id?, donem, kullanici_adi, grup, cari_adi, sube_adi, gorev, sube_adet, hakedis}, updated_by } → upsert
 // DELETE ?id=<uuid>&user=<profileId>                → sil
 // Yalnızca admin; profil rolü sunucuda doğrulanır.
 
@@ -22,7 +29,7 @@ async function isAdmin(sb: Sb, userId: string | null | undefined): Promise<boole
   return data?.role === 'admin'
 }
 
-const COLS = 'id, donem, kullanici_adi, cari_adi, sube_adi, gorev, sube_adet, hakedis, updated_at'
+const COLS = 'id, donem, kullanici_adi, grup, cari_adi, sube_adi, gorev, sube_adet, hakedis, updated_at'
 
 export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams
@@ -32,13 +39,25 @@ export async function GET(req: Request) {
   if (!(await isAdmin(sb, sp.get('user')))) return NextResponse.json({ error: 'Bu işlem için yetkiniz yok' }, { status: 403 })
   const { data, error } = await sb.from('diger_prim').select(COLS).eq('donem', donem).order('created_at')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ rows: data ?? [] })
+
+  // Dönemde şube (cari+şube) bazında toplam satış adedi — "Şubenin Adeti" otomatik
+  const subeAdet: Record<string, number> = {}
+  try {
+    const { rows } = parseHtmlTableByHeader(await fetchPhpHtml(MERCH_SATIS_URL))
+    for (const r of rows) {
+      if (r['DONEM'] !== donem) continue
+      const k = `${normalizeName(r['CARI_ISIM'] ?? '')}||${normalizeName(r['SUBE_ADI'] ?? '')}`
+      subeAdet[k] = (subeAdet[k] ?? 0) + num(r['SATILAN_ADET'])
+    }
+  } catch { /* satış verisi alınamazsa adetler boş kalır */ }
+
+  return NextResponse.json({ rows: data ?? [], subeAdet })
 }
 
 export async function POST(req: Request) {
   try {
     const { row, updated_by } = await req.json() as {
-      row: { id?: string; donem: string; kullanici_adi: string; cari_adi: string; sube_adi: string; gorev: string; sube_adet: number; hakedis: number }
+      row: { id?: string; donem: string; kullanici_adi: string; grup: string; cari_adi: string; sube_adi: string; gorev: string; sube_adet: number; hakedis: number }
       updated_by?: string
     }
     const sb = getSupabase()
@@ -48,6 +67,7 @@ export async function POST(req: Request) {
     const rec = {
       donem:         row.donem,
       kullanici_adi: (row.kullanici_adi ?? '').trim(),
+      grup:          (row.grup ?? '').trim(),
       cari_adi:      (row.cari_adi ?? '').trim(),
       sube_adi:      (row.sube_adi ?? '').trim(),
       gorev:         (row.gorev ?? '').trim(),

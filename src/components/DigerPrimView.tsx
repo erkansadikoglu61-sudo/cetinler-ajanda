@@ -7,25 +7,37 @@ import { normalizeName } from '@/lib/sellout'
 
 // ─── Primler ▸ Diğer ──────────────────────────────────────────────
 // Manuel prim hakediş girişi (yalnızca admin). Dönem bazlı satırlar:
-// Kullanıcı Adı · Cari Adı/Şubesi (modal ile seçilir) · Görevi · Şubenin Adeti · Hakediş.
+// Kullanıcı Adı · Grubu · Cari Adı · Şube (modal ile seçilir) · Görevi · Şubenin Adeti · Hakediş.
+// Kullanıcı adı personel listesinde (/api/merch-detay) varsa grup + cari + şube otomatik dolar.
+// Şubenin Adeti otomatik: dönemde o şubenin toplam satış adedi (/api/diger-prim subeAdet).
 // Veri: /api/diger-prim (diger_prim tablosu). Cari/şube listesi: /api/bsy-cari-sube.
 
 const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
+const GRUPLAR = ['Bayi Merch', 'Çetinler Merch', 'Destek Personeli', 'Diğer']
+const GRUP_RENK: Record<string, string> = {
+  'Bayi Merch':       'bg-blue-50 text-blue-700 border-blue-200',
+  'Çetinler Merch':   'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Destek Personeli': 'bg-amber-50 text-amber-700 border-amber-200',
+  'Diğer':            'bg-gray-50 text-gray-700 border-gray-200',
+}
 
 interface DigerRow {
   id?: string
   key: string            // React key (yeni satırlarda id yok)
   kullanici_adi: string
+  grup: string
   cari_adi: string
   sube_adi: string
   gorev: string
-  sube_adet: string      // input için string tutulur
-  hakedis: string
+  hakedis: string        // input için string tutulur
   dirty: boolean
   saving: boolean
 }
 
 interface CariSube { cari_adi: string; sube_adi: string }
+interface Personel { merch_adi: string; merch_grubu: string; cari_adi: string; sube_adi: string }
+
+const subeKey = (cari: string, sube: string) => `${normalizeName(cari)}||${normalizeName(sube)}`
 
 const toNum = (s: string) => {
   const n = parseFloat((s || '').replace(/\./g, '').replace(',', '.'))
@@ -42,7 +54,31 @@ export function DigerPrimView({ userId }: { userId: string }) {
   const [rows,    setRows]    = useState<DigerRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
-  const [pickFor, setPickFor] = useState<string | null>(null)   // modal açık olan satırın key'i
+  const [subeAdet, setSubeAdet] = useState<Record<string, number>>({})
+  const [grupFilter, setGrupFilter] = useState('')
+  const [personel, setPersonel] = useState<Personel[]>([])
+  // Cari/şube modalı: açık olan satır + (kişinin birden çok şubesi varsa) yalnızca o seçenekler
+  const [pick, setPick] = useState<{ key: string; only?: CariSube[] } | null>(null)
+
+  // Personel listesi (otomatik doldurma için) — bir kez
+  useEffect(() => {
+    fetch('/api/merch-detay').then(r => r.json()).then(d => setPersonel(d.data ?? [])).catch(() => {})
+  }, [])
+
+  // normalize(ad) → kişinin kayıtları
+  const personelByName = useMemo(() => {
+    const m = new Map<string, Personel[]>()
+    personel.forEach(p => {
+      if (!p.merch_adi) return
+      const k = normalizeName(p.merch_adi)
+      m.set(k, [...(m.get(k) ?? []), p])
+    })
+    return m
+  }, [personel])
+  const personelNames = useMemo(
+    () => [...new Set(personel.map(p => p.merch_adi).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr')),
+    [personel]
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -51,10 +87,10 @@ export function DigerPrimView({ userId }: { userId: string }) {
       const res  = await fetch(`/api/diger-prim?donem=${donem}&user=${userId}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Yükleme hatası')
-      setRows((data.rows ?? []).map((r: { id: string; kullanici_adi: string; cari_adi: string; sube_adi: string; gorev: string; sube_adet: number; hakedis: number }) => ({
+      setSubeAdet(data.subeAdet ?? {})
+      setRows((data.rows ?? []).map((r: { id: string; kullanici_adi: string; grup: string; cari_adi: string; sube_adi: string; gorev: string; hakedis: number }) => ({
         id: r.id, key: r.id,
-        kullanici_adi: r.kullanici_adi, cari_adi: r.cari_adi, sube_adi: r.sube_adi, gorev: r.gorev,
-        sube_adet: r.sube_adet ? String(r.sube_adet) : '',
+        kullanici_adi: r.kullanici_adi, grup: r.grup ?? '', cari_adi: r.cari_adi, sube_adi: r.sube_adi, gorev: r.gorev,
         hakedis:   r.hakedis   ? String(r.hakedis).replace('.', ',') : '',
         dirty: false, saving: false,
       })))
@@ -72,9 +108,27 @@ export function DigerPrimView({ userId }: { userId: string }) {
 
   const edit = (key: string, p: Partial<DigerRow>) => patch(key, { ...p, dirty: true })
 
+  const adetOf = (r: { cari_adi: string; sube_adi: string }) =>
+    r.cari_adi ? (subeAdet[subeKey(r.cari_adi, r.sube_adi)] ?? 0) : 0
+
+  // Kullanıcı adı yazıldığında: personel listesinde varsa grup + cari + şube otomatik
+  const onKullanici = (key: string, value: string) => {
+    const kayitlar = personelByName.get(normalizeName(value))
+    if (!kayitlar?.length) { edit(key, { kullanici_adi: value }); return }
+    const grup = GRUPLAR.includes(kayitlar[0].merch_grubu) ? kayitlar[0].merch_grubu : ''
+    const subeler = [...new Map(kayitlar.filter(k => k.cari_adi)
+      .map(k => [subeKey(k.cari_adi, k.sube_adi), { cari_adi: k.cari_adi, sube_adi: k.sube_adi }])).values()]
+    if (subeler.length === 1) {
+      edit(key, { kullanici_adi: value, ...(grup && { grup }), ...subeler[0] })
+    } else {
+      edit(key, { kullanici_adi: value, ...(grup && { grup }) })
+      if (subeler.length > 1) setPick({ key, only: subeler })   // birden çok şube → seçtir
+    }
+  }
+
   const addRow = () => setRows(rs => [...rs, {
-    key: `new-${Date.now()}`, kullanici_adi: '', cari_adi: '', sube_adi: '', gorev: '',
-    sube_adet: '', hakedis: '', dirty: true, saving: false,
+    key: `new-${Date.now()}`, kullanici_adi: '', grup: grupFilter, cari_adi: '', sube_adi: '', gorev: '',
+    hakedis: '', dirty: true, saving: false,
   }])
 
   const saveRow = async (r: DigerRow) => {
@@ -88,8 +142,8 @@ export function DigerPrimView({ userId }: { userId: string }) {
           updated_by: userId,
           row: {
             id: r.id, donem,
-            kullanici_adi: r.kullanici_adi, cari_adi: r.cari_adi, sube_adi: r.sube_adi, gorev: r.gorev,
-            sube_adet: toNum(r.sube_adet), hakedis: toNum(r.hakedis),
+            kullanici_adi: r.kullanici_adi, grup: r.grup, cari_adi: r.cari_adi, sube_adi: r.sube_adi, gorev: r.gorev,
+            sube_adet: adetOf(r), hakedis: toNum(r.hakedis),
           },
         }),
       })
@@ -115,8 +169,9 @@ export function DigerPrimView({ userId }: { userId: string }) {
     setRows(rs => rs.filter(x => x.key !== r.key))
   }
 
-  const toplamAdet    = rows.reduce((s, r) => s + toNum(r.sube_adet), 0)
-  const toplamHakedis = rows.reduce((s, r) => s + toNum(r.hakedis), 0)
+  const visible       = rows.filter(r => !grupFilter || r.grup === grupFilter)
+  const toplamAdet    = visible.reduce((s, r) => s + adetOf(r), 0)
+  const toplamHakedis = visible.reduce((s, r) => s + toNum(r.hakedis), 0)
   const dirtyCount    = rows.filter(r => r.dirty).length
 
   const inputCls = 'w-full px-2 py-1 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:border-brand-400'
@@ -147,6 +202,16 @@ export function DigerPrimView({ userId }: { userId: string }) {
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
         </button>
 
+        {/* Grup filtresi */}
+        <div className="relative">
+          <select value={grupFilter} onChange={e => setGrupFilter(e.target.value)}
+            className="appearance-none pl-2 pr-6 py-1 text-xs border border-gray-200 rounded-lg bg-white font-medium text-brand-700 focus:outline-none">
+            <option value="">Tüm Gruplar</option>
+            {GRUPLAR.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+          <ChevronDown size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        </div>
+
         <button onClick={addRow}
           className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-brand-500 text-white text-xs font-medium hover:bg-brand-600">
           <Plus size={12} /> Satır Ekle
@@ -157,7 +222,7 @@ export function DigerPrimView({ userId }: { userId: string }) {
         )}
         {rows.length > 0 && (
           <span className="text-[10px] text-gray-400 ml-1">
-            {rows.length} satır · Toplam: {fmtTl(toplamHakedis)}
+            {visible.length}{visible.length !== rows.length ? `/${rows.length}` : ''} satır · Toplam: {fmtTl(toplamHakedis)}
           </span>
         )}
       </div>
@@ -174,7 +239,9 @@ export function DigerPrimView({ userId }: { userId: string }) {
                 <tr className="bg-gray-800 text-white">
                   <th className="text-left px-3 py-2.5 font-semibold w-6">#</th>
                   <th className="text-left px-3 py-2.5 font-semibold min-w-[160px]">Kullanıcı Adı</th>
-                  <th className="text-left px-3 py-2.5 font-semibold min-w-[260px]">Cari Adı / Şubesi</th>
+                  <th className="text-left px-3 py-2.5 font-semibold min-w-[140px]">Grubu</th>
+                  <th className="text-left px-3 py-2.5 font-semibold min-w-[220px]">Cari Adı</th>
+                  <th className="text-left px-3 py-2.5 font-semibold min-w-[130px]">Şube</th>
                   <th className="text-left px-3 py-2.5 font-semibold min-w-[140px]">Görevi</th>
                   <th className="text-right px-3 py-2.5 font-semibold min-w-[100px]">Şubenin Adeti</th>
                   <th className="text-right px-3 py-2.5 font-semibold min-w-[120px]">Hakediş (₺)</th>
@@ -182,34 +249,44 @@ export function DigerPrimView({ userId }: { userId: string }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.length === 0 ? (
+                {visible.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-10 text-gray-400">
-                      {MONTHS_TR[ay - 1]} {yil} için kayıt yok. &quot;Satır Ekle&quot; ile başlayın.
+                    <td colSpan={9} className="text-center py-10 text-gray-400">
+                      {MONTHS_TR[ay - 1]} {yil}{grupFilter && ` · ${grupFilter}`} için kayıt yok. &quot;Satır Ekle&quot; ile başlayın.
                     </td>
                   </tr>
-                ) : rows.map((r, idx) => (
+                ) : visible.map((r, idx) => (
                   <tr key={r.key} className={clsx('border-b border-gray-100 last:border-0', r.dirty && 'bg-amber-50/40')}>
                     <td className="px-3 py-1.5 text-gray-400 font-mono">{idx + 1}</td>
                     <td className="px-2 py-1.5">
-                      <input className={inputCls} value={r.kullanici_adi} placeholder="Ad Soyad"
-                        onChange={e => edit(r.key, { kullanici_adi: e.target.value })} />
+                      <input className={inputCls} value={r.kullanici_adi} placeholder="Ad Soyad" list="diger-personel"
+                        onChange={e => onKullanici(r.key, e.target.value)} />
                     </td>
                     <td className="px-2 py-1.5">
-                      <button onClick={() => setPickFor(r.key)}
-                        className={clsx(inputCls, 'text-left truncate hover:border-brand-400', !r.cari_adi && 'text-gray-400')}>
-                        {r.cari_adi
-                          ? <><span className="font-medium text-gray-800">{r.cari_adi}</span>{r.sube_adi && <span className="text-gray-500"> / {r.sube_adi}</span>}</>
-                          : 'Cari / şube seçin…'}
+                      <select value={r.grup} onChange={e => edit(r.key, { grup: e.target.value })}
+                        className={clsx(inputCls, 'font-medium', r.grup ? GRUP_RENK[r.grup] : 'text-gray-400')}>
+                        <option value="">Seçin…</option>
+                        {GRUPLAR.map(g => <option key={g} value={g}>{g}</option>)}
+                      </select>
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <button onClick={() => setPick({ key: r.key })} title={r.cari_adi}
+                        className={clsx(inputCls, 'text-left truncate hover:border-brand-400', r.cari_adi ? 'font-medium text-gray-800' : 'text-gray-400')}>
+                        {r.cari_adi || 'Cari seçin…'}
+                      </button>
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <button onClick={() => setPick({ key: r.key })} title={r.sube_adi}
+                        className={clsx(inputCls, 'text-left truncate hover:border-brand-400', r.sube_adi ? 'text-gray-700' : 'text-gray-400')}>
+                        {r.sube_adi || 'Şube seçin…'}
                       </button>
                     </td>
                     <td className="px-2 py-1.5">
                       <input className={inputCls} value={r.gorev} placeholder="Görevi"
                         onChange={e => edit(r.key, { gorev: e.target.value })} />
                     </td>
-                    <td className="px-2 py-1.5">
-                      <input className={clsx(inputCls, 'text-right tabular-nums')} inputMode="numeric" value={r.sube_adet} placeholder="0"
-                        onChange={e => edit(r.key, { sube_adet: e.target.value.replace(/[^\d]/g, '') })} />
+                    <td className="px-3 py-1.5 text-right tabular-nums text-gray-700" title="Dönemde şubenin toplam satış adedi (otomatik)">
+                      {r.cari_adi ? adetOf(r).toLocaleString('tr-TR') : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-2 py-1.5">
                       <input className={clsx(inputCls, 'text-right tabular-nums')} inputMode="decimal" value={r.hakedis} placeholder="0"
@@ -232,10 +309,10 @@ export function DigerPrimView({ userId }: { userId: string }) {
                   </tr>
                 ))}
               </tbody>
-              {rows.length > 0 && (
+              {visible.length > 0 && (
                 <tfoot>
                   <tr className="bg-gray-800 text-white text-[10px] font-semibold">
-                    <td className="px-3 py-2" colSpan={4}>Toplam</td>
+                    <td className="px-3 py-2" colSpan={6}>Toplam</td>
                     <td className="px-3 py-2 text-right tabular-nums">{toplamAdet.toLocaleString('tr-TR')}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-bold">{fmtTl(toplamHakedis)}</td>
                     <td></td>
@@ -247,10 +324,15 @@ export function DigerPrimView({ userId }: { userId: string }) {
         )}
       </div>
 
-      {pickFor && (
+      <datalist id="diger-personel">
+        {personelNames.map(n => <option key={n} value={n} />)}
+      </datalist>
+
+      {pick && (
         <CariSubeModal
-          onClose={() => setPickFor(null)}
-          onSelect={cs => { edit(pickFor, { cari_adi: cs.cari_adi, sube_adi: cs.sube_adi }); setPickFor(null) }}
+          only={pick.only}
+          onClose={() => setPick(null)}
+          onSelect={cs => { edit(pick.key, { cari_adi: cs.cari_adi, sube_adi: cs.sube_adi }); setPick(null) }}
         />
       )}
     </div>
@@ -260,14 +342,16 @@ export function DigerPrimView({ userId }: { userId: string }) {
 // ─── Cari / Şube seçim modalı ─────────────────────────────────────
 let cariSubeCache: CariSube[] | null = null
 
-function CariSubeModal({ onClose, onSelect }: { onClose: () => void; onSelect: (cs: CariSube) => void }) {
-  const [list,    setList]    = useState<CariSube[]>(cariSubeCache ?? [])
-  const [loading, setLoading] = useState(!cariSubeCache)
+function CariSubeModal({ only, onClose, onSelect }: { only?: CariSube[]; onClose: () => void; onSelect: (cs: CariSube) => void }) {
+  // only: kullanıcının kayıtlı şubeleri (birden çoksa) — yalnızca bunlar listelenir
+  const [all,     setAll]     = useState<CariSube[]>(cariSubeCache ?? [])
+  const [loading, setLoading] = useState(!only && !cariSubeCache)
+  const list = only ?? all
   const [error,   setError]   = useState<string | null>(null)
   const [q,       setQ]       = useState('')
 
   useEffect(() => {
-    if (cariSubeCache) return
+    if (only || cariSubeCache) return
     fetch('/api/bsy-cari-sube')
       .then(r => r.json())
       .then(d => {
@@ -276,11 +360,11 @@ function CariSubeModal({ onClose, onSelect }: { onClose: () => void; onSelect: (
           .map(x => ({ cari_adi: x.cari_adi, sube_adi: x.sube_adi }))
           .sort((a, b) => a.cari_adi.localeCompare(b.cari_adi, 'tr') || a.sube_adi.localeCompare(b.sube_adi, 'tr'))
         cariSubeCache = data
-        setList(data)
+        setAll(data)
       })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false))
-  }, [])
+  }, [only])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -301,7 +385,7 @@ function CariSubeModal({ onClose, onSelect }: { onClose: () => void; onSelect: (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <span className="text-sm font-bold text-gray-800">Cari / Şube Seç</span>
+          <span className="text-sm font-bold text-gray-800">{only ? 'Kullanıcının şubelerinden seçin' : 'Cari / Şube Seç'}</span>
           <button onClick={onClose} className="p-1 rounded-md hover:bg-gray-100 text-gray-400"><X size={16} /></button>
         </div>
         <div className="px-4 py-2 border-b border-gray-100">
