@@ -621,10 +621,15 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     // gelebilir (Bayi/Çetinler/Destek); Destek satırında sup/jr boş olabildiği
     // için tek satır alıp geçmek şubeyi yanlışlıkla sahipsiz bırakıyordu.
     // Bu yüzden satırlar BİRLEŞTİRİLİR: her alan ilk DOLU değerle doldurulur.
-    const subeMap = new Map<string, { subeAdi: string; sup: string; jr: string; bsyKod: string; bsyAdi: string; cariAdi: string }>()
+    // Sahiplik önceliği: Merch (Çetinler/Bayi) satırının sup/jr'ı, Destek Personeli
+    // satırınınkinden önce gelir. B2B'de şube yeni süpervizöre geçtiğinde destek
+    // satırları eski süpervizörde kalabiliyor (ör. EVKUR ANTALYA: Çetinler Merch
+    // Gülcan Bayer, Destek Personeli satırları hâlâ Atilla Yılmaz).
+    const subeMap = new Map<string, { subeAdi: string; sup: string; jr: string; bsyKod: string; bsyAdi: string; cariAdi: string; supMerch: boolean }>()
     merchDetayData.forEach(m => {
       const sk = (m.sube_kod || '').trim()
       if (!sk) return
+      const isMerch = m.merch_grubu !== 'Destek Personeli'
       const cur = subeMap.get(sk)
       if (!cur) {
         subeMap.set(sk, {
@@ -634,10 +639,18 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
           bsyKod: (m.bsy_kod || '').toUpperCase(),
           bsyAdi: m.bsy_adi || '',
           cariAdi: m.cari_adi || '',
+          supMerch: isMerch && !!m.sup_adi,
         })
       } else {
-        if (!cur.sup && m.sup_adi) cur.sup = m.sup_adi
-        if (!cur.jr && m.jr_adi) cur.jr = m.jr_adi
+        if (isMerch && !cur.supMerch && m.sup_adi) {
+          // Destek satırından gelen sahipliği Merch satırıyla değiştir (sup+jr birlikte)
+          cur.sup = m.sup_adi
+          cur.jr = m.jr_adi || ''
+          cur.supMerch = true
+        } else {
+          if (!cur.sup && m.sup_adi) cur.sup = m.sup_adi
+          if (!cur.jr && m.jr_adi && (!cur.supMerch || isMerch)) cur.jr = m.jr_adi
+        }
         if (!cur.bsyKod && m.bsy_kod) cur.bsyKod = m.bsy_kod.toUpperCase()
         if (!cur.bsyAdi && m.bsy_adi) cur.bsyAdi = m.bsy_adi
         if (!cur.cariAdi && m.cari_adi) cur.cariAdi = m.cari_adi
