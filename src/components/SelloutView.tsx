@@ -649,9 +649,9 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     const assigned = [...subeMap.entries()]
       .map(([sk, v]) => ({ ...v, adet: adetBySube.get(sk) ?? 0 }))
 
-    // Satış adedine göre ARTAN (önce 0, sonra 1, 2…), sonra cari/şube
+    // Satış adedine göre AZALAN (en çok satan üstte, satış girmeyenler = 0 en altta), sonra cari/şube
     const bySales = (a: { adet: number; cariAdi: string; subeAdi: string }, b: { adet: number; cariAdi: string; subeAdi: string }) =>
-      a.adet - b.adet || a.cariAdi.localeCompare(b.cariAdi, 'tr') || a.subeAdi.localeCompare(b.subeAdi, 'tr')
+      b.adet - a.adet || a.cariAdi.localeCompare(b.cariAdi, 'tr') || a.subeAdi.localeCompare(b.subeAdi, 'tr')
     const strip = (arr: typeof assigned) => arr.map(s => ({ subeAdi: s.subeAdi, cariAdi: s.cariAdi, adet: s.adet })).sort(bySales)
     const cols: SgColumn[] = []
 
@@ -1714,8 +1714,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
         {!selloutLoading && subTab === 'satisgirmeyen' && (
           <div className="p-2 pb-4">
             <p className="mb-2 px-1 text-[11px] text-gray-500">
-              Seçili dönemde ({donemLabel(donem)}) sorumlu kişinin tüm şubeleri, satış adedine göre artan sıralı
-              (önce satış girmeyenler = 0, sonra 1, 2…). Başlıkta: toplam şube · satışlı · girmeyen adedi.
+              Seçili dönemde ({donemLabel(donem)}) sorumlu kişinin tüm şubeleri, satış adedine göre büyükten küçüğe sıralı
+              (satış girmeyenler = 0 en altta). Başlıkta: toplam şube · satışlı · girmeyen adedi.
               Atanmış şubeler /api/merch-detay’den, satışlar /api/sellout (export_merch_satis.php)’den otomatik hesaplanır — elle giriş yoktur.
             </p>
             {satisGirmeyenColumns.every(c => c.subeler.length === 0) ? (
@@ -1780,7 +1780,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 { label: 'Dönem', value: `Üstteki "Dönem" seçimi (şu an: ${donemLabel(donem)}). Satışsızlık bu döneme göre hesaplanır.` },
                 { label: 'Atanmış şube evreni', value: '/api/merch-detay (export_merch_detay.php) — her şubenin sup/jr/bsy/cari ataması buradan gelir.' },
                 { label: 'Satış verisi', value: '/api/sellout (export_merch_satis.php) — seçili dönemde her şubenin satılan_adet toplamı. Satış Adedi sütununda gösterilir.' },
-                { label: 'Sıralama', value: 'Sorumlu kişinin TÜM şubeleri listelenir, satış adedine göre artan (önce 0 = satış girmeyen, sonra 1, 2…), eşitlikte cari/şube adına göre.' },
+                { label: 'Sıralama', value: 'Sorumlu kişinin TÜM şubeleri listelenir, satış adedine göre büyükten küçüğe (satış girmeyenler = 0 en altta), eşitlikte cari/şube adına göre.' },
                 { label: 'Başlık sayıları', value: 'Her kolon başlığında: toplam şube · kaçı satışlı (adet>0) · kaçı girmeyen (adet 0).' },
                 { label: 'Görünürlük', value: 'Admin: tüm süpervizörler (her biri bir kolon). Süpervizör: kendi şubeleri. Jr. Süpervizör: kendi şubeleri. BSY: kendine bağlı carilerin şubeleri (cari başına kolon).' },
                 { label: 'Eşleştirme', value: 'İsimler normalizeName ile eşleşir (Türkçe harf + " SV" eki toleranslı); BSY, profil adından BSY koduna çevrilerek merch-detay bsy_kod ile eşleşir.' },
