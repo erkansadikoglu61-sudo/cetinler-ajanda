@@ -131,7 +131,7 @@ export function NihaiPrimListesi({
       const periodRows = selloutRows.filter(r => r.donem === `${yil}-${mm(ay)}`)
       if (periodRows.length === 0 && t.p.length === 0 && t.m.length === 0) continue
       const persons = computeSelloutPrimForMonth({
-        periodRows, profileTargets: t.p, merchTargets: t.m, merchDetay, team,
+        periodRows, profileTargets: t.p, merchTargets: t.m, merchDetay, team, donem: `${yil}-${mm(ay)}`,
       })
       for (const p of persons) {
         const k = rowKey(p.tip, p.ad)

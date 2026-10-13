@@ -1004,7 +1004,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
         const h = getProfileHedef(sup.id, g)
         const v = getGerc(apiNames, g)
         const p = pct(h, v)
-        const prim = calcPrim(h, v, PRIM_SUP[g])
+        const prim = calcPrim(h, v, PRIM_SUP[g], donem)
         return { g, h, v, p, prim }
       })
       const tH = groups.reduce((s, x) => s + x.h, 0)
@@ -1013,7 +1013,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       const tPrim = groups.reduce((s, x) => s + x.prim, 0)
       return { profile: sup, groups, tH, tV, tP, tPrim }
     })
-  }, [visibleSups, isAdmin, currentProfile.id, jrsOf, getProfileHedef, getGerc])
+  }, [visibleSups, isAdmin, currentProfile.id, jrsOf, getProfileHedef, getGerc, donem])
 
   // Sup totals footer
   const supFooter = useMemo(() => {
@@ -1038,7 +1038,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
         const h = getProfileHedef(jr.id, g)
         const v = getGerc([jr.full_name], g)
         const p = pct(h, v)
-        const prim = calcPrim(h, v, PRIM_JR[g])
+        const prim = calcPrim(h, v, PRIM_JR[g], donem)
         return { g, h, v, p, prim }
       })
       const tH = groups.reduce((s, x) => s + x.h, 0)
@@ -1047,7 +1047,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       const tPrim = groups.reduce((s, x) => s + x.prim, 0)
       return { profile: jr, sup, groups, tH, tV, tP, tPrim }
     })
-  }, [visibleJrs, isAdmin, isSup, currentProfile.id, team, getProfileHedef, getGerc])
+  }, [visibleJrs, isAdmin, isSup, currentProfile.id, team, getProfileHedef, getGerc, donem])
 
   // Jr totals footer
   const jrFooter = useMemo(() => {
@@ -1081,7 +1081,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
           .filter(r => r.merch_personel === m.name && GRUP_NORMALIZE[r.grup_aciklama] === g)
           .reduce((s, r) => s + r.satilan_adet, 0)
         const p    = pct(h, v)
-        const prim = calcPrim(h, v, PRIM_MERCH[g])
+        const prim = calcPrim(h, v, PRIM_MERCH[g], donem)
         return { g, h, v, p, prim }
       })
       const tH    = groups.reduce((s, x) => s + x.h, 0)
@@ -1089,7 +1089,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       const tPrim = groups.reduce((s, x) => s + x.prim, 0)
       return { name: m.name, supApiName: m.supApiName, cariIsim: m.cariIsim, subeAdi: m.subeAdi, groups, tH, tV, tP: pct(tH, tV), tPrim }
     }),
-  [filteredMerch, getMerchHedef, periodRows])
+  [filteredMerch, getMerchHedef, periodRows, donem])
 
   // Admin: listede görünen merchlerin süpervizör (bağlı olduğu kişi) bazında adedi
   const merchSupCounts = useMemo(() => {
@@ -1395,7 +1395,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
               { label: 'Gerçekleşen (Gerç.)', value: 'Sellout satışından (/api/sellout) süpervizörün KENDİ + bağlı Jr. Süpervizörlerinin o gruba ait satılan_adet toplamı. İsim eşleşmesi normalizeName ile (Türkçe harf + " SV" eki toleranslı).' },
               { label: '% ve renkler', value: 'Gerç ÷ Hedef. ≥%100 koyu yeşil, ≥%80 açık yeşil, ≥%60 sarı, <%60 kırmızı.' },
               { label: 'Kat. Primi (₺)', value: 'IPL 7.500 · Üflemeli 6.500 · Düzleştirici&Maşa 4.000 · Epilatör&Baskül&Mutfak 2.500 · Erkek Bakım 1.500 · Süpürge 7.000 · Mutfak ve Diğer 3.000 (toplam 32.000 · Süpervizör seviyesi = PRIM_SUP).' },
-              { label: 'Prim hesabı', value: 'Hedef 0 → prim yok. Oran <%80 → prim yok. Oran ≥%80 → KatPrimi × min(oran, %100). Yani %100+ tam prim, %80–100 arası oranla (calcPrim, eşik PRIM_ESIGI=%80).' },
+              { label: 'Prim hesabı', value: 'Hedef 0 → prim yok. Oran <%80 → prim yok. Oran ≥%80 → KatPrimi × min(oran, %100). Yani %100+ tam prim, %80–100 arası oranla (calcPrim, eşik PRIM_ESIGI=%80). Ekim 2026 özel uygulama: %80+ → KatPrimi×1,25 · %100+ → ×1,75 · %130+ → ×2,25 (OZEL_KATEGORI_PRIM).' },
               { label: 'İsim altı sayılar', value: 'jr.sup / şube / merch — /api/merch-detay (PHP) canlı verisinden: süpervizöre bağlı benzersiz Jr. Süpervizör, SUBE_KODU ve "Çetinler Merch" adedi. Bu sayılar döneme bağlı DEĞİL, güncel atama yapısını gösterir.' },
               { label: 'Toplam sütunu', value: 'Satırdaki tüm grupların Hedef / Gerçekleşen / Prim toplamı.' },
             ]}
@@ -1485,7 +1485,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 { label: 'Gerçekleşen (Gerç.)', value: 'Sellout satış verisinden (/api/sellout) o merch + gruba ait satılan_adet toplamı.' },
                 { label: '% ve renkler', value: 'Gerç ÷ Hedef. ≥%100 koyu yeşil, ≥%80 açık yeşil, ≥%60 sarı, <%60 kırmızı.' },
                 { label: 'Kat. Primi (₺)', value: 'IPL 3.750 · Üflemeli 3.250 · Düzleştirici&Maşa 2.000 · Epilatör&Baskül&Mutfak 1.250 · Erkek Bakım 1.250 · Süpürge 3.750 · Mutfak ve Diğer 1.250 (Merch seviyesi = PRIM_MERCH).' },
-                { label: 'Prim hesabı', value: 'Hedef 0 → prim yok. Oran <%80 → prim yok. Oran ≥%80 → KatPrimi × min(oran, %100). Yani %100+ tam prim, %80–100 arası oranla (calcPrim).' },
+                { label: 'Prim hesabı', value: 'Hedef 0 → prim yok. Oran <%80 → prim yok. Oran ≥%80 → KatPrimi × min(oran, %100). Yani %100+ tam prim, %80–100 arası oranla (calcPrim). Ekim 2026 özel uygulama: %80+ → KatPrimi×1,25 · %100+ → ×1,75 · %130+ → ×2,25 (OZEL_KATEGORI_PRIM).' },
                 { label: 'Toplam sütunu', value: 'Satırdaki tüm grupların Hedef / Gerçekleşen / Prim toplamı.' },
               ]}
             />
