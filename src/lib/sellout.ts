@@ -105,9 +105,9 @@ export function namesMatch(a: string, b: string): boolean {
 }
 
 // ─── Dönem bazlı özel kategori primi uygulaması ───────────────────
-// Listelenen dönemde kategori primi, kategori gerçekleşme oranının düştüğü
-// basamağın katıyla ödenir (Kategori_Primi × kat). Basamaklar büyükten küçüğe.
-// Süpervizör, Jr. Süpervizör ve Çetinler Merch için geçerli.
+// Listelenen dönemde normal hesaplanan kategori primi (aşağıdaki calcPrim
+// formülü), kategori gerçekleşme oranının düştüğü basamağın katıyla çarpılır.
+// Basamaklar büyükten küçüğe. Süpervizör, Jr. Süpervizör ve Çetinler Merch için.
 export const OZEL_KATEGORI_PRIM: Record<string, { min: number; kat: number }[]> = {
   '2026-10': [
     { min: 1.30, kat: 2.25 },
@@ -118,18 +118,14 @@ export const OZEL_KATEGORI_PRIM: Record<string, { min: number; kat: number }[]> 
 
 /**
  * Prim = Kategori_Primi × min(Gerç/Hedef, 1.0)  — sadece Gerç/Hedef ≥ %80 ise.
- * donem ('YYYY-MM') OZEL_KATEGORI_PRIM'de varsa: Kategori_Primi × basamak katı.
+ * donem ('YYYY-MM') OZEL_KATEGORI_PRIM'de varsa bu prim, oranın basamak katıyla çarpılır.
  */
 export function calcPrim(hedef: number, gerc: number, kategoriPrimi: number, donem?: string): number {
   if (hedef === 0) return 0
   const ratio = gerc / hedef
-  const ozel = donem ? OZEL_KATEGORI_PRIM[donem] : undefined
-  if (ozel) {
-    const b = ozel.find(x => ratio >= x.min)
-    return b ? Math.round(kategoriPrimi * b.kat * 100) / 100 : 0
-  }
   if (ratio < PRIM_ESIGI) return 0
-  return Math.round(kategoriPrimi * Math.min(ratio, 1.0) * 100) / 100
+  const kat = (donem ? OZEL_KATEGORI_PRIM[donem] : undefined)?.find(x => ratio >= x.min)?.kat ?? 1
+  return Math.round(kategoriPrimi * Math.min(ratio, 1.0) * kat * 100) / 100
 }
 
 export function fmtCur(n: number): string {
