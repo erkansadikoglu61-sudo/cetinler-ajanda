@@ -361,6 +361,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   )
   const [targetModal, setTargetModal] = useState<SubTab | null>(null)
   const [merchSearch, setMerchSearch] = useState('')
+  const [merchSupId, setMerchSupId] = useState('')   // Merch sekmesi süpervizör filtresi (profil id)
   const [adetPrimData, setAdetPrimData] = useState<{ stokKodu: string; bayiMerch: number | null; kosulluDestek: number | null; kategori: string | null }[]>([])
   const [ozelPrimData, setOzelPrimData] = useState<{ stok_kodu: string[] | null; grup_kodu: string[] | null; cari_adi: string[] | null; sube_adi: string[] | null; bayi_merch: number | null; kosullu_destek: number | null; prim_carpan: number | null; tarih_baslangic: string | null; tarih_bitis: string | null }[]>([])
   const [merchHedefData, setMerchHedefData] = useState<{ merch_name: string; grup: string; hedef: number }[]>([])
@@ -1067,11 +1068,17 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const filteredMerch = useMemo(() => {
     // "Listede Görünmesin" işaretli merchler ana listede gizlenir
     // (hedef modalında görünmeye devam eder — oradan geri açılabilir).
-    const base = visibleMerch.filter(m => !gizleFlags[m.name])
+    let base = visibleMerch.filter(m => !gizleFlags[m.name])
+    // Süpervizör filtresi: süpervizörün kendisine + Jr.'larına bağlı merchler
+    const sup = merchSupId ? visibleSups.find(p => p.id === merchSupId) : undefined
+    if (sup) {
+      const names = [sup.full_name, ...jrsOf(sup.id).map(j => j.full_name)]
+      base = base.filter(m => names.some(n => namesMatch(n, m.supApiName)))
+    }
     if (!merchSearch.trim()) return base
     const q = merchSearch.toLowerCase()
     return base.filter(m => m.name.toLowerCase().includes(q) || m.supApiName.toLowerCase().includes(q))
-  }, [visibleMerch, merchSearch, gizleFlags])
+  }, [visibleMerch, merchSearch, gizleFlags, merchSupId, visibleSups, jrsOf])
 
   const merchRows = useMemo(() =>
     filteredMerch.map(m => {
@@ -1435,6 +1442,18 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 onChange={e => setMerchSearch(e.target.value)}
                 className="w-full max-w-xs text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-brand-400"
               />
+              {visibleSups.length > 1 && (
+                <select
+                  value={merchSupId}
+                  onChange={e => setMerchSupId(e.target.value)}
+                  className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-brand-400"
+                >
+                  <option value="">Tüm Süpervizörler</option>
+                  {[...visibleSups]
+                    .sort((a, b) => a.full_name.localeCompare(b.full_name, 'tr'))
+                    .map(sp => <option key={sp.id} value={sp.id}>{sp.full_name}</option>)}
+                </select>
+              )}
               <span className="text-[10px] text-gray-400">{filteredMerch.length} merch</span>
               {isAdmin && merchSupCounts.length > 0 && (
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-gray-500">
