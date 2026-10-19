@@ -67,6 +67,13 @@ async function loadBaseRates(sb: SupabaseClient): Promise<Record<string, AdetPri
   }
 }
 
+// SAHA.xlsx'te olmayan (sonradan eklenen) stokların kategorisi. Override'da
+// kategori seçilmemişse ve Excel'de de yoksa buradan gelir.
+const EK_KATEGORI: Record<string, string> = {
+  IPL9750P: 'IPL Grubu',
+  RMS9200V: 'Üflemeli Grup',
+}
+
 /** Belirli ay için nihai oranlar: Excel (veya defaults) + adet_prim_override. */
 export async function loadAdetPrimRates(sb: SupabaseClient, yil: number, ay: number): Promise<Record<string, AdetPrimRow>> {
   const primData = await loadBaseRates(sb)
@@ -96,6 +103,9 @@ export async function loadAdetPrimRates(sb: SupabaseClient, yil: number, ay: num
     }
   } catch (e) {
     console.error('DB override fetch error:', e)
+  }
+  for (const r of Object.values(primData)) {
+    if (!r.kategori && EK_KATEGORI[r.stokKodu]) r.kategori = EK_KATEGORI[r.stokKodu]
   }
   return primData
 }
