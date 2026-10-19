@@ -71,15 +71,25 @@ async function loadBaseRates(sb: SupabaseClient): Promise<Record<string, AdetPri
 export async function loadAdetPrimRates(sb: SupabaseClient, yil: number, ay: number): Promise<Record<string, AdetPrimRow>> {
   const primData = await loadBaseRates(sb)
   try {
-    const { data: overrides } = await sb
+    // kategori kolonu: elle eklenen (Excel'de olmayan) stokların kategorisi.
+    // Kolon henüz yoksa (migration çalışmadıysa) eski sorguya düşülür.
+    let res = await sb
       .from('adet_prim_override')
-      .select('stok_kodu, bayi_merch, kosullu_destek')
+      .select('stok_kodu, bayi_merch, kosullu_destek, kategori')
       .eq('yil', yil)
       .eq('ay', ay)
+    if (res.error) {
+      res = await sb
+        .from('adet_prim_override')
+        .select('stok_kodu, bayi_merch, kosullu_destek')
+        .eq('yil', yil)
+        .eq('ay', ay) as typeof res
+    }
+    const overrides = res.data as { stok_kodu: string; bayi_merch: number | null; kosullu_destek: number | null; kategori?: string | null }[] | null
     for (const row of overrides ?? []) {
       primData[row.stok_kodu] = {
         stokKodu:      row.stok_kodu,
-        kategori:      primData[row.stok_kodu]?.kategori ?? null,
+        kategori:      row.kategori || primData[row.stok_kodu]?.kategori || null,
         bayiMerch:     row.bayi_merch,
         kosulluDestek: row.kosullu_destek,
       }

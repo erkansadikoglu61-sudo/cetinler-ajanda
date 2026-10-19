@@ -538,6 +538,9 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
   }
 
   const displayRows = editing ? draft : rows
+  // Kategori seçenekleri: kayıtlı satırlardaki kategoriler (düzenleme sırasında sabit kalsın diye rows'tan)
+  const kategoriOptions = [...new Set(rows.map(r => r.kategori).filter(Boolean) as string[])]
+    .sort((a, b) => a.localeCompare(b, 'tr'))
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -659,7 +662,20 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
                   )}>
                     <td className="px-4 py-2 text-gray-400 font-mono">{idx + 1}</td>
                     <td className="px-4 py-2 font-mono font-semibold text-gray-800">{row.stokKodu}</td>
-                    <td className="px-4 py-2 text-gray-700">{row.kategori ?? <span className="text-gray-300">—</span>}</td>
+                    {editing ? (
+                      <td className="px-2 py-1.5">
+                        <select
+                          value={row.kategori ?? ''}
+                          onChange={e => setDraft(prev => prev.map((r, i) => i !== idx ? r : { ...r, kategori: e.target.value || null }))}
+                          className="w-full border border-blue-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-brand-400 bg-white"
+                        >
+                          <option value="">— Seç —</option>
+                          {kategoriOptions.map(k => <option key={k} value={k}>{k}</option>)}
+                        </select>
+                      </td>
+                    ) : (
+                      <td className="px-4 py-2 text-gray-700">{row.kategori ?? <span className="text-gray-300">—</span>}</td>
+                    )}
 
                     {editing ? (
                       <>
@@ -713,7 +729,7 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
                         className="w-full border border-blue-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-brand-400 bg-white"
                       >
                         <option value="">— Seç —</option>
-                        {[...new Set(displayRows.map(r => r.kategori).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, 'tr')).map(k => (
+                        {kategoriOptions.map(k => (
                           <option key={k} value={k}>{k}</option>
                         ))}
                       </select>

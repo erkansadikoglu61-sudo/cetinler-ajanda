@@ -71,14 +71,14 @@ export async function GET(req: Request) {
 }
 
 // PUT /api/adet-prim
-// Body: { yil, ay, rows: [{stokKodu, bayiMerch, kosulluDestek}] }
+// Body: { yil, ay, rows: [{stokKodu, kategori?, bayiMerch, kosulluDestek}] }
 // Upserts per-month overrides
 export async function PUT(req: Request) {
   try {
     const body = await req.json() as {
       yil:  number
       ay:   number
-      rows: { stokKodu: string; bayiMerch: number | null; kosulluDestek: number | null }[]
+      rows: { stokKodu: string; kategori?: string | null; bayiMerch: number | null; kosulluDestek: number | null }[]
     }
 
     const sb = getSupabase()
@@ -88,12 +88,19 @@ export async function PUT(req: Request) {
       ay:            body.ay,
       bayi_merch:    r.bayiMerch,
       kosullu_destek: r.kosulluDestek,
+      kategori:      r.kategori?.trim() || null,
       updated_at:    new Date().toISOString(),
     }))
 
-    const { error } = await sb
+    let { error } = await sb
       .from('adet_prim_override')
       .upsert(upsertRows, { onConflict: 'stok_kodu,yil,ay' })
+    // kategori kolonu henüz yoksa (migration çalışmadıysa) kategorisiz kaydet
+    if (error && /kategori/i.test(error.message)) {
+      ({ error } = await sb
+        .from('adet_prim_override')
+        .upsert(upsertRows.map(({ kategori: _k, ...r }) => r), { onConflict: 'stok_kodu,yil,ay' }))
+    }
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true })
