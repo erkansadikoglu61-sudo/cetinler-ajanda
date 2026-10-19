@@ -688,9 +688,11 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     } else if (isSup) {
       cols.push({ title: currentProfile.full_name, subeler: strip(assigned.filter(s => s.sup && namesMatch(s.sup, currentProfile.full_name))) })
     } else {
-      visibleSups.forEach(sup =>
-        cols.push({ title: sup.full_name, subeler: strip(assigned.filter(s => s.sup && namesMatch(s.sup, sup.full_name))) })
-      )
+      // Atanmış şubesi olmayan süpervizör (ör. ayrılan) kolon olarak gösterilmez
+      visibleSups.forEach(sup => {
+        const subeler = strip(assigned.filter(s => s.sup && namesMatch(s.sup, sup.full_name)))
+        if (subeler.length > 0) cols.push({ title: sup.full_name, subeler })
+      })
     }
     return cols
   }, [periodRows, merchDetayData, visibleSups, isBsy, isJr, isSup, currentProfile.full_name])
