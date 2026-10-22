@@ -2139,8 +2139,8 @@ if (currentProfile.role === 'bsy') {
   return (
     <div className="flex h-screen bg-white safe-top">
 
-      {/* Sol Sidebar – sadece masaüstü ve dashboard dışındaki sekmelerde, manager görmesin */}
-      {!isManager && tab !== 'dashboard' && (
+      {/* Sol Sidebar – sadece masaüstü ve dashboard dışındaki sekmelerde, manager / Çetinler Merch görmesin */}
+      {!isManager && !isMerch && tab !== 'dashboard' && (
       <aside className="hidden md:flex flex-col w-56 border-r border-gray-200 bg-gray-50 shrink-0">
         <Sidebar
           currentProfile={currentProfile}
@@ -2335,6 +2335,8 @@ if (currentProfile.role === 'bsy') {
               </div>
             )}
 
+            {/* İstatistikler — Çetinler Merch görmez */}
+            {!isMerch && (
             <button
               onClick={() => setShowStats(true)}
               className="p-2 text-gray-600 min-h-[44px] min-w-[44px] flex items-center justify-center"
@@ -2342,6 +2344,7 @@ if (currentProfile.role === 'bsy') {
             >
               <BarChart2 size={20} />
             </button>
+            )}
 
             {/* Kullanıcı adı ve çıkış - sağ üst köşe */}
             <div className="ml-auto flex items-center gap-2 pl-3 border-l">
@@ -2767,7 +2770,7 @@ if (currentProfile.role === 'bsy') {
         />
       )}
 
-      {showStats && (
+      {showStats && !isMerch && (
         <StatsSheet
           team={team}
           visibleIds={ids}
