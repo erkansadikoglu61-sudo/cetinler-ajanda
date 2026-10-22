@@ -609,7 +609,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   //   admin → her süpervizör bir kolon · sup/jr → kendi şubeleri ·
   //   bsy → kendine bağlı carilerin şubeleri (cari başına kolon).
   interface SgColumn { title: string; subeler: { subeAdi: string; cariAdi: string; adet: number }[] }
-  const satisGirmeyenColumns = useMemo<SgColumn[]>(() => {
+  const satisGirmeyenBase = useMemo<SgColumn[]>(() => {
     // Dönemde şube başına toplam satış adedi
     const adetBySube = new Map<string, number>()
     periodRows.forEach(r => {
@@ -696,6 +696,20 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     }
     return cols
   }, [periodRows, merchDetayData, visibleSups, isBsy, isJr, isSup, currentProfile.full_name])
+
+  // Şube Takibi cari filtresi — seçenekler kullanıcının gördüğü şubelerden
+  const [sgCari, setSgCari] = useState('')
+  const sgCariOptions = useMemo(
+    () => [...new Set(satisGirmeyenBase.flatMap(c => c.subeler.map(x => x.cariAdi)).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'tr')),
+    [satisGirmeyenBase]
+  )
+  const satisGirmeyenColumns = useMemo<SgColumn[]>(() => {
+    if (!sgCari) return satisGirmeyenBase
+    const cols = satisGirmeyenBase.map(c => ({ ...c, subeler: c.subeler.filter(x => x.cariAdi === sgCari) }))
+    // Çok kolonlu görünümde (admin/BSY) carinin şubesi olmayan kolonlar gizlenir
+    return cols.length > 1 ? cols.filter(c => c.subeler.length > 0) : cols
+  }, [satisGirmeyenBase, sgCari])
 
   // ── Gerç aggregation ────────────────────────────────────────
   const getGerc = useCallback(
@@ -1762,6 +1776,18 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
               (satış girmeyenler = 0 en altta). Başlıkta: toplam şube · satışlı · girmeyen adedi.
               Atanmış şubeler /api/merch-detay’den, satışlar /api/sellout (export_merch_satis.php)’den otomatik hesaplanır — elle giriş yoktur.
             </p>
+            {sgCariOptions.length > 1 && (
+              <div className="mb-2 px-1">
+                <select
+                  value={sgCari}
+                  onChange={e => setSgCari(e.target.value)}
+                  className="max-w-sm text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-brand-400"
+                >
+                  <option value="">Tüm Cariler</option>
+                  {sgCariOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
             {satisGirmeyenColumns.every(c => c.subeler.length === 0) ? (
               <div className="text-center py-10 text-xs text-gray-400">
                 Gösterilecek şube bulunamadı.
