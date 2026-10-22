@@ -898,7 +898,10 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       'Destek Per. Adet Primi', 'Çet. Merch Kat. Gerç. %', 'Çet. Merch Gerç.Oranına Göre Prim',
     ]
 
-    const aoa: (string | number)[][] = [headers]
+    // Çetinler Merch kullanıcısı: BSY'den sonraki prim kolonları (10–14) yok
+    const gizli = isMerch ? new Set([10, 11, 12, 13, 14]) : new Set<number>()
+    const kolon = <T,>(arr: T[]) => arr.filter((_, i) => !gizli.has(i))
+    const aoa: (string | number)[][] = [kolon(headers)]
 
     for (const row of satislarRows) {
       const primData = adetPrimMap.get(row.stok_kodu || '') || { bayiMerch: 0, kosulluDestek: 0, kategori: '' }
@@ -925,26 +928,26 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
       const r2 = (n: number) => Math.round(n * 100) / 100
 
-      aoa.push([
+      aoa.push(kolon([
         row.merch_personel || '', row.cari_isim || '', row.sube_adi || '',
         row.stok_adi || '', row.stok_kodu || '', row.grup_aciklama || '',
         satisAdedi, row.supervisor_adi || '', row.merch_tipi || '', row.bsy || '',
         r2(bayiMerchPrimAdet), r2(bayiMerchHakedis),
         r2(destekPrimAdet), r2(cetinlerMerchGercOran), r2(cetinlerMerchPrim),
-      ])
+      ]))
     }
 
     const ws = XLSX.utils.aoa_to_sheet(aoa)
     // Kolon genişlikleri
-    ws['!cols'] = [
+    ws['!cols'] = kolon([
       { wch: 18 }, { wch: 34 }, { wch: 16 }, { wch: 34 }, { wch: 12 }, { wch: 18 },
       { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 8 },
       { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 22 },
-    ]
+    ])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Satışlar')
     XLSX.writeFile(wb, `Satislar_${donem}.xlsx`)
-  }, [satislarRows, adetPrimMap, getEffectiveBayiMerch, getEffectiveKosulluDestek, destekFlags, merchKategoriPerformans, donem])
+  }, [satislarRows, adetPrimMap, getEffectiveBayiMerch, getEffectiveKosulluDestek, destekFlags, merchKategoriPerformans, donem, isMerch])
 
   // ── Satışlar alt toplamları (satır hesabıyla birebir aynı — özel prim + gün bazlı) ──
   const satislarTotals = useMemo(() => {
@@ -1648,11 +1651,14 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                     <th className="px-3 py-2.5 text-left font-semibold min-w-[120px]">Süpervizör</th>
                     <th className="px-3 py-2.5 text-left font-semibold min-w-[100px]">Merch Tipi</th>
                     <th className="px-3 py-2.5 text-left font-semibold min-w-[80px]">BSY</th>
+                    {/* Çetinler Merch kullanıcısı BSY'den sonraki prim kolonlarını görmez */}
+                    {!isMerch && (<>
                     <th className="px-3 py-2.5 text-right font-semibold min-w-[110px] bg-blue-700">Bayi Merch Adet Primi</th>
                     <th className="px-3 py-2.5 text-right font-semibold min-w-[130px] bg-blue-800">Bayi Merch Prim Hakedişi</th>
                     <th className="px-3 py-2.5 text-right font-semibold min-w-[140px] bg-purple-700">Destek Per. Adet Primi</th>
                     <th className="px-3 py-2.5 text-right font-semibold min-w-[140px] bg-green-700">Çet. Merch Kat. Gerç. %</th>
                     <th className="px-3 py-2.5 text-right font-semibold min-w-[160px] bg-green-800">Çet. Merch Gerç.Oranına Göre Prim</th>
+                    </>)}
                   </tr>
                   {/* ── Üst toplam satırı ── */}
                   {(() => {
@@ -1666,11 +1672,13 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                         <td colSpan={3} className="px-3 py-1.5 text-center text-gray-300 text-[10px]">
                           {satislarRows.length.toLocaleString('tr-TR')} kayıt
                         </td>
+                        {!isMerch && (<>
                         <td className="px-3 py-1.5 text-right tabular-nums bg-blue-800">—</td>
                         <td className="px-3 py-1.5 text-right tabular-nums bg-blue-800">{fmt2(satislarTotals.bayiHakedis)}</td>
                         <td className="px-3 py-1.5 text-right tabular-nums bg-purple-800">{fmt2(satislarTotals.destekHakedis)}</td>
                         <td className="px-3 py-1.5 text-right tabular-nums bg-green-800">—</td>
                         <td className="px-3 py-1.5 text-right tabular-nums bg-green-800">{fmt2(satislarTotals.cetinlerPrim)}</td>
+                        </>)}
                       </tr>
                     )
                   })()}
@@ -1678,7 +1686,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 <tbody>
                   {satislarRows.length === 0 ? (
                     <tr>
-                      <td colSpan={15} className="px-4 py-8 text-center text-gray-400 text-[11px]">
+                      <td colSpan={isMerch ? 10 : 15} className="px-4 py-8 text-center text-gray-400 text-[11px]">
                         Bu dönem için satış verisi yok
                       </td>
                     </tr>
@@ -1747,6 +1755,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                           <td className="px-3 py-2 font-mono text-gray-700 text-[11px]">{row.bsy || '—'}</td>
 
                           {/* YENİ KOLONLAR */}
+                          {!isMerch && (<>
                           <td className="px-3 py-2 text-right tabular-nums text-blue-700 font-medium bg-blue-50">
                             {bayiMerchPrimAdet > 0 ? `${bayiMerchPrimAdet.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺` : '—'}
                           </td>
@@ -1762,6 +1771,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                           <td className="px-3 py-2 text-right tabular-nums text-green-800 font-bold bg-green-100">
                             {cetinlerMerchPrim > 0 ? `${cetinlerMerchPrim.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺` : '—'}
                           </td>
+                          </>)}
                         </tr>
                       )
                     })
@@ -1779,11 +1789,13 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                         <td colSpan={3} className="px-3 py-2.5 text-center text-[10px]">
                           {satislarRows.length.toLocaleString('tr-TR')} kayıt
                         </td>
+                        {!isMerch && (<>
                         <td className="px-3 py-2.5 text-right tabular-nums bg-blue-900">—</td>
                         <td className="px-3 py-2.5 text-right tabular-nums bg-blue-900">{fmt2(satislarTotals.bayiHakedis)}</td>
                         <td className="px-3 py-2.5 text-right tabular-nums bg-purple-900">{fmt2(satislarTotals.destekHakedis)}</td>
                         <td className="px-3 py-2.5 text-right tabular-nums bg-green-900">—</td>
                         <td className="px-3 py-2.5 text-right tabular-nums bg-green-900">{fmt2(satislarTotals.cetinlerPrim)}</td>
+                        </>)}
                       </tr>
                     )
                   })()}
