@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
-  Search, X, ChevronDown, RefreshCw, User, Users, Check,
+  Search, X, ChevronDown, RefreshCw, User, Users, Check, UserPlus,
 } from 'lucide-react'
 import clsx from 'clsx'
+import * as XLSX from 'xlsx'
 import { supabase, Profile, BsySupervisor } from '@/lib/supabase'
 import { normalizeName } from '@/lib/sellout'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
@@ -219,6 +220,50 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
   const [assigning,     setAssigning]     = useState<string | null>(null)
 
   const isAdmin      = currentProfile.role === 'admin'
+
+  // ── Çetinler Merch hesapları (admin) ──
+  // Eksik hesapları oluşturur; yeni kullanıcı adı + şifreler yalnızca indirilen
+  // Excel dosyasına yazılır (hiçbir yerde saklanmaz).
+  const [hesapBusy, setHesapBusy] = useState(false)
+  const [hesapMsg,  setHesapMsg]  = useState<string | null>(null)
+  const merchHesaplari = async () => {
+    setHesapMsg(null)
+    setHesapBusy(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const headers = { Authorization: `Bearer ${session?.access_token ?? ''}` }
+      const pr = await fetch('/api/merch-hesaplari', { headers })
+      const plan = await pr.json()
+      if (!pr.ok) throw new Error(plan.error ?? 'Liste alınamadı')
+      const yeni = (plan.hesaplar as { mevcut: boolean }[]).filter(h => !h.mevcut).length
+      const mevcut = plan.hesaplar.length - yeni
+      if (yeni === 0) { setHesapMsg(`✓ Tüm Çetinler Merch hesapları zaten var (${mevcut})`); return }
+      if (!confirm(`${yeni} yeni Çetinler Merch hesabı oluşturulacak (${mevcut} hesap zaten var, dokunulmaz).\n\nKullanıcı adları ve şifreler bir Excel dosyası olarak indirilecek. Devam edilsin mi?`)) return
+
+      const res = await fetch('/api/merch-hesaplari', { method: 'POST', headers })
+      const out = await res.json()
+      if (!res.ok) throw new Error(out.error ?? 'Oluşturma hatası')
+      const olusan = out.olusan as { ad: string; email: string; sifre: string }[]
+      if (olusan.length > 0) {
+        const ws = XLSX.utils.aoa_to_sheet([
+          ['Ad Soyad', 'Kullanıcı Adı (e-posta)', 'Şifre'],
+          ...olusan.map(o => [o.ad, o.email, o.sifre]),
+        ])
+        ws['!cols'] = [{ wch: 28 }, { wch: 42 }, { wch: 14 }]
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Çetinler Merch')
+        XLSX.writeFile(wb, `Cetinler_Merch_Kullanicilari_${new Date().toISOString().slice(0, 10)}.xlsx`)
+      }
+      const hata = out.hata as { email: string; mesaj: string }[]
+      setHesapMsg(hata.length
+        ? `✗ ${olusan.length} oluşturuldu, ${hata.length} hata: ${hata[0].mesaj}`
+        : `✓ ${olusan.length} hesap oluşturuldu, Excel indirildi`)
+    } catch (e) {
+      setHesapMsg('✗ ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setHesapBusy(false)
+    }
+  }
   const isSup        = currentProfile.role === 'sup'
   const isAdminOrBsy = currentProfile.role === 'admin' || currentProfile.role === 'bsy'
 
@@ -465,6 +510,22 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
             <RefreshCw size={11} className={syncing ? 'animate-spin' : ''} />
             {syncing ? 'Güncelleniyor…' : 'Güncelle'}
           </button>
+        )}
+        {isAdmin && (
+          <button
+            onClick={merchHesaplari}
+            disabled={hesapBusy}
+            className="flex items-center gap-1 px-2.5 py-1 text-[11px] rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold disabled:opacity-50"
+          >
+            <UserPlus size={11} className={hesapBusy ? 'animate-pulse' : ''} />
+            {hesapBusy ? 'Hesaplar oluşturuluyor…' : 'Çetinler Merch Hesaplarını Oluştur'}
+          </button>
+        )}
+        {hesapMsg && (
+          <span className={clsx(
+            'text-[10px] px-2 py-0.5 rounded-full border',
+            hesapMsg.startsWith('✓') ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-red-700 bg-red-50 border-red-200'
+          )}>{hesapMsg}</span>
         )}
         {syncMsg && (
           <span className={clsx(
