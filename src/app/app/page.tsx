@@ -1995,6 +1995,8 @@ export default function AppPage() {
   const isSup = currentProfile?.role === 'sup'
   const isJr  = currentProfile?.role === 'jr'
   const isIk  = currentProfile?.role === 'ik'
+  // Çetinler Merch: yalnızca Sellout (Merch / Top 20 / Satışlar), yalnızca kendi verisi
+  const isMerch = currentProfile?.role === 'merch'
 
   // Süpervizör ve Jr. Süpervizör → sadece Sellout + Noktalarımız
   const isSupOrJr = currentProfile?.role === 'sup' || currentProfile?.role === 'jr'
@@ -2037,6 +2039,7 @@ if (currentProfile.role === 'bsy') {
 
     if (currentProfile.role === 'manager') setTab('dashboard')
     else if (currentProfile.role === 'ik') setTab('prim-odeme')
+    else if (currentProfile.role === 'merch') setTab('sellout')
     else if (hasCalendarAccess) setTab('month')
     else if (isSupOrJr) setTab('sellout')
     else if (isBsy) setTab('bsy')
@@ -2158,8 +2161,8 @@ if (currentProfile.role === 'bsy') {
         <div className="border-b bg-white sticky top-0 z-20">
           {/* Ana satır */}
           <div className="flex items-center gap-2 px-3 py-2">
-            {/* Mobil: hamburger + filtre adı - Manager görmesin */}
-            {!isManager && (
+            {/* Mobil: hamburger + filtre adı - Manager / Merch görmesin */}
+            {!isManager && !isMerch && (
               <>
                 <button
                   onClick={() => setShowPersonSheet(true)}
@@ -2265,7 +2268,7 @@ if (currentProfile.role === 'bsy') {
               </button>
               )}
               {/* Noktalarımız grubu */}
-              {!isIk && (
+              {!isIk && !isMerch && (
               <button
                 onClick={() => { if (!['noktalar','kullanicilar'].includes(tab)) setTab('noktalar') }}
                 className={clsx(
@@ -2702,7 +2705,7 @@ if (currentProfile.role === 'bsy') {
           currentProfile?.role === 'admin' ? 'grid-cols-9' :
           isBsy                            ? 'grid-cols-8'  :
           isSup                            ? 'grid-cols-5'  :
-          isIk                             ? 'grid-cols-1'  :
+          isIk || isMerch                  ? 'grid-cols-1'  :
                                              'grid-cols-4'
         )}>
           {([
@@ -2717,7 +2720,7 @@ if (currentProfile.role === 'bsy') {
             ...(isBsyOrAdmin ? [{ key: 'sellinout' as const, icon: BarChart2, label: 'S.In/Out'}] : []),
             ...(!isIk ? [{ key: 'sellout'  as const, icon: TrendingUp, label: 'Sellout' }] : []),
             ...(isBsyOrAdmin ? [{ key: 'analiz'   as const, icon: BarChart2, label: 'Analiz'  }] : []),
-            ...(!isIk ? [{ key: 'noktalar' as const, icon: Store, label: 'Noktalar' }] : []),
+            ...(!isIk && !isMerch ? [{ key: 'noktalar' as const, icon: Store, label: 'Noktalar' }] : []),
             ...((currentProfile?.role === 'admin' || isBsy || isSup || isIk || isJr)
               ? [{ key: 'adet-prim' as const, icon: Activity, label: 'Primler' }] : []),
           ] as const).map(({ key, icon: Icon, label }) => (

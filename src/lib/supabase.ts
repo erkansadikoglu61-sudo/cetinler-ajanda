@@ -19,7 +19,7 @@ export const supabase = new Proxy({} as SupabaseClient, {
   },
 })
 
-export type Role = 'admin' | 'bsy' | 'sup' | 'jr' | 'manager' | 'ik'
+export type Role = 'admin' | 'bsy' | 'sup' | 'jr' | 'manager' | 'ik' | 'merch'
 
 export interface Profile {
   id: string

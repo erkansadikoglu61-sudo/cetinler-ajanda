@@ -19,6 +19,7 @@ export const ROLE_LABELS: Record<string, string> = {
   bsy:   'Bölge Satış Yöneticisi',
   sup:   'Süpervizör',
   jr:    'Jr. Süpervizör',
+  merch: 'Çetinler Merch',
 }
 
 export const PERSON_COLORS = [

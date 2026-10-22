@@ -24,3 +24,6 @@ yarn-error.log*
 
 # Vercel
 .vercel
+
+# Çetinler Merch kullanıcı şifreleri (scripts/create-merch-users.ts çıktısı)
+cetinler-merch-kullanicilar*.csv

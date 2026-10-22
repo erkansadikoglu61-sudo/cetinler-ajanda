@@ -34,7 +34,7 @@ function tarihToIso(t: string): string {
 }
 
 // ─── Top-30 yardımcı tipler ───
-interface Top20Row { cariIsim: string; subeAdi: string; adet: number }
+interface Top20Row { cariIsim: string; subeAdi: string; adet: number; sira?: number }
 
 function calcTop20(
   periodRows: import('@/hooks/useSellout').SelloutRow[],
@@ -47,16 +47,17 @@ function calcTop20(
     ex.adet  += r.satilan_adet
     map.set(key, ex)
   })
-  return [...map.values()].sort((a, b) => b.adet - a.adet)
+  return [...map.values()].sort((a, b) => b.adet - a.adet).map((r, i) => ({ ...r, sira: i + 1 }))
 }
 
 function Top20Table({
-  title, subtitle, data, colorMap,
+  title, subtitle, data, colorMap, highlight,
 }: {
   title: string
   subtitle?: string
   data: Top20Row[]
   colorMap: Map<string, string>
+  highlight?: Set<string>   // 'cari||şube' — vurgulanacak satırlar (Merch kullanıcısının şubeleri)
 }) {
   if (data.length === 0) return (
     <div className="text-xs text-gray-400 text-center py-6">Bu dönemde veri yok.</div>
@@ -86,8 +87,11 @@ function Top20Table({
             {data.map((d, i) => {
               const color = colorMap.get(d.cariIsim) ?? '#6B7280'
               return (
-                <tr key={i} className="border-b border-gray-100 hover:bg-gray-50/60 transition-colors">
-                  <td className="px-2 py-1.5 text-center text-gray-400 font-medium text-[10px]">{i + 1}</td>
+                <tr key={i} className={clsx(
+                  'border-b border-gray-100 transition-colors',
+                  highlight?.has(`${d.cariIsim}||${d.subeAdi}`) ? 'bg-amber-100 font-semibold' : 'hover:bg-gray-50/60'
+                )}>
+                  <td className="px-2 py-1.5 text-center text-gray-400 font-medium text-[10px]">{d.sira ?? i + 1}</td>
                   <td className="px-3 py-1.5">
                     <div className="flex items-center gap-1.5">
                       <span
@@ -356,6 +360,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const [donem, setDonem]         = useState(currentDonem)
   const [subTab, setSubTab]       = useState<SubTab>(() =>
     currentProfile.role === 'bsy' ? 'top20'
+    : currentProfile.role === 'merch' ? 'merch'
     : currentProfile.role === 'jr' ? 'jr'
     : 'sup'
   )
@@ -378,6 +383,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const isSup   = currentProfile.role === 'sup'
   const isJr    = currentProfile.role === 'jr'
   const isBsy   = currentProfile.role === 'bsy'
+  // Çetinler Merch kullanıcısı: yalnızca Merch / Top 20 / Satışlar, yalnızca kendi verisi
+  const isMerch = currentProfile.role === 'merch'
 
   const {
     rows: allRows, loading: selloutLoading, fetchedAt, reload: reloadSellout,
@@ -443,6 +450,16 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   )
 
   // ── Top-30 şube sıralamaları ─────────────────────────────────
+  // Merch kullanıcısının şubeleri (dönem satışları + merch-detay ataması) — Top 20'de vurgulanır
+  const myMerchSubeKeys = useMemo(() => {
+    const keys = new Set<string>()
+    if (!isMerch) return keys
+    const me = currentProfile.full_name
+    periodRows.forEach(r => { if (namesMatch(r.merch_personel, me)) keys.add(`${r.cari_isim}||${r.sube_adi}`) })
+    merchDetayData.forEach(m => { if (m.merch_adi && namesMatch(m.merch_adi, me)) keys.add(`${m.cari_adi}||${m.sube_adi}`) })
+    return keys
+  }, [isMerch, currentProfile.full_name, periodRows, merchDetayData])
+
   const top20Ipl = useMemo(
     () => calcTop20(periodRows, r =>
       r.grup_aciklama?.toLowerCase().includes('ipl') ?? false
@@ -739,13 +756,14 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
   const filteredPeriodRows = useMemo(() => {
     return periodRows.filter(r => {
+      if (isMerch) return namesMatch(r.merch_personel, currentProfile.full_name)
       if (isBsy && bsyKod) {
         return r.bsy === bsyKod
       }
       const normApi = normalizeName(r.supervisor_adi || '')
       return allSupNames.some(n => normalizeName(n) === normApi)
     })
-  }, [periodRows, allSupNames, isBsy, bsyKod])
+  }, [periodRows, allSupNames, isBsy, bsyKod, isMerch, currentProfile.full_name])
 
   // ── Satışlar tablosu ek filtreleri ──
   const satislarRows = useMemo(() => {
@@ -1005,10 +1023,12 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   }, [isAdmin, isSup, isJr, currentProfile, allSupNames, jrsOf])
 
   const visibleMerch = useMemo(
-    () => uniqueMerch.filter(m =>
-      !m.supApiName || myVisibleSupNames.some(n => namesMatch(n, m.supApiName))
-    ),
-    [uniqueMerch, myVisibleSupNames]
+    () => isMerch
+      ? uniqueMerch.filter(m => namesMatch(m.name, currentProfile.full_name))
+      : uniqueMerch.filter(m =>
+          !m.supApiName || myVisibleSupNames.some(n => namesMatch(n, m.supApiName))
+        ),
+    [uniqueMerch, myVisibleSupNames, isMerch, currentProfile.full_name]
   )
 
   // ── Sup table data ───────────────────────────────────────────
@@ -1267,8 +1287,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   }, [ozelFiltered, donem])
 
   // ── Which sub-tabs are visible? ───────────────────────────────
-  const showSupTab  = isAdmin || isSup
-  const showJrTab   = isAdmin || isSup || isJr
+  const showSupTab  = (isAdmin || isSup) && !isMerch
+  const showJrTab   = (isAdmin || isSup || isJr) && !isMerch
   const showMerchTab = true
 
   // ── Render ───────────────────────────────────────────────────
@@ -1354,6 +1374,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             subTab === 'satislar' ? 'border-brand-700 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'
           )}
         >Satışlar</button>
+        {!isMerch && (
         <button
           onClick={() => setSubTab('satisgirmeyen')}
           className={clsx(
@@ -1361,6 +1382,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             subTab === 'satisgirmeyen' ? 'border-rose-500 text-rose-700' : 'border-transparent text-gray-500 hover:text-gray-800'
           )}
         >Şube Takibi</button>
+        )}
         {(isAdmin || isSup || isJr) && (
           <button
             onClick={() => setSubTab('ozel')}
@@ -1550,18 +1572,21 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                   subtitle="Kategori bazında tüm şubeler"
                   data={top20Ipl}
                   colorMap={globalCariColorMap}
+                  highlight={myMerchSubeKeys}
                 />
                 <Top20Table
                   title="2 · RMS9200 Stokları"
                   subtitle="RMS9200 ile başlayan stoklarda tüm şubeler"
                   data={top20Rms}
                   colorMap={globalCariColorMap}
+                  highlight={myMerchSubeKeys}
                 />
                 <Top20Table
                   title="3 · Süpürge Grubu"
                   subtitle="Kategori bazında tüm şubeler"
                   data={top20Supurge}
                   colorMap={globalCariColorMap}
+                  highlight={myMerchSubeKeys}
                 />
               </div>
             </div>
