@@ -635,13 +635,15 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
 
         {!loading && filtered.length > 0 && (
           <div className="divide-y divide-gray-100">
-            {filtered.map(person => {
+            {filtered.map((person, idx) => {
               const assignedJr = person.jr_profile_id
                 ? team.find(p => p.id === person.jr_profile_id)
                 : null
               return (
                 <button
-                  key={person.id}
+                  // Aynı merch birden çok şubede aynı MERCH_ID ile gelebilir → anahtar benzersiz olmalı,
+                  // yoksa React filtre değişince eski satırları ekranda bırakıyor
+                  key={`${person.id}|${person.cari_adi ?? ''}|${person.sube_adi ?? ''}|${idx}`}
                   onClick={() => isSup ? setSelectedPerson(person) : undefined}
                   className={clsx(
                     'w-full flex items-center gap-3 px-4 py-3 bg-white transition-colors text-left',
