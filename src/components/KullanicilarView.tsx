@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
-  Search, X, ChevronDown, RefreshCw, User, Users, Check, UserPlus,
+  Search, X, ChevronDown, RefreshCw, User, UserPlus,
 } from 'lucide-react'
 import clsx from 'clsx'
 import * as XLSX from 'xlsx'
@@ -21,7 +21,6 @@ interface FieldPerson {
   jr_adi:        string | null   // Excel'den gelen orijinal ad
   sup_adi:       string | null
   bsy_adi:       string | null
-  jr_profile_id: string | null
 }
 
 interface Props {
@@ -70,142 +69,6 @@ function grupBadge(grup: string | null) {
   return 'bg-gray-100 text-gray-600'
 }
 
-// ─── Kişi Detay / Atama Paneli ─────────────────────────────────────────────
-
-interface PersonDetailProps {
-  person:    FieldPerson
-  myJrs:     Profile[]
-  team:      Profile[]
-  assigning: string | null      // field person id being saved
-  onToggleJr: (personId: string, jrProfileId: string | null) => Promise<void>
-  onClose:   () => void
-}
-
-function PersonDetail({ person, myJrs, team, assigning, onToggleJr, onClose }: PersonDetailProps) {
-  const assignedJr = person.jr_profile_id
-    ? team.find(p => p.id === person.jr_profile_id)
-    : null
-  const busy = assigning === person.id
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40 p-0 md:p-4">
-      <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
-
-        {/* Başlık */}
-        <div className="flex items-start justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-              style={{ backgroundColor: '#6366f1' }}
-            >
-              {person.merch_adi.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-gray-900 leading-tight">{person.merch_adi}</h2>
-              <p className="text-[11px] text-gray-500 mt-0.5">
-                {person.cari_adi} — {person.sube_adi}
-              </p>
-              {person.merch_grubu && (
-                <span className={clsx('text-[9px] px-1.5 py-0.5 rounded-full font-medium', grupBadge(person.merch_grubu))}>
-                  {person.merch_grubu}
-                </span>
-              )}
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 flex-shrink-0">
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* İçerik */}
-        <div className="overflow-y-auto flex-1 p-4 space-y-3">
-
-          {/* Mevcut atama */}
-          <div className="rounded-xl border border-violet-200 bg-violet-50 p-3">
-            <div className="flex items-center gap-1.5 mb-1 text-xs font-semibold text-violet-700">
-              <Users size={13} />
-              Mevcut Jr. Süpervizör
-            </div>
-            {assignedJr ? (
-              <div className="flex items-center gap-2 mt-1.5">
-                <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
-                  style={{ backgroundColor: assignedJr.color }}
-                >
-                  {assignedJr.full_name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
-                </div>
-                <span className="text-xs font-medium text-violet-800">{assignedJr.full_name}</span>
-              </div>
-            ) : (
-              <p className="text-xs text-gray-400 mt-1">Atanmamış</p>
-            )}
-          </div>
-
-          {/* Jr. atama seçimi */}
-          {myJrs.length > 0 && (
-            <div className="rounded-xl border-2 border-dashed border-violet-200 bg-violet-50/30 p-3">
-              <div className="flex items-center gap-1.5 mb-2.5 text-xs font-semibold text-violet-700">
-                <Users size={13} />
-                Jr. Süpervizör Ata / Kaldır
-                {busy && <RefreshCw size={11} className="ml-1 animate-spin text-violet-400" />}
-              </div>
-              <div className="space-y-1.5">
-                {myJrs.map(jr => {
-                  const isAssigned = person.jr_profile_id === jr.id
-                  return (
-                    <button
-                      key={jr.id}
-                      disabled={busy}
-                      onClick={() => onToggleJr(person.id, isAssigned ? null : jr.id)}
-                      className={clsx(
-                        'group w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border',
-                        isAssigned
-                          ? 'bg-violet-100 text-violet-800 border-violet-300 hover:bg-red-50 hover:border-red-300 hover:text-red-700'
-                          : 'bg-white text-gray-600 border-gray-200 hover:bg-violet-50 hover:border-violet-300 hover:text-violet-700',
-                        busy && 'opacity-50 cursor-not-allowed'
-                      )}
-                    >
-                      <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0"
-                        style={{ backgroundColor: jr.color }}
-                      >
-                        {jr.full_name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
-                      </div>
-                      <span className="flex-1 text-left">{jr.full_name}</span>
-                      {isAssigned ? (
-                        <>
-                          <Check size={13} className="flex-shrink-0 group-hover:hidden text-violet-600" />
-                          <X     size={13} className="flex-shrink-0 hidden group-hover:block text-red-500" />
-                        </>
-                      ) : (
-                        <User size={13} className="flex-shrink-0 text-gray-300 group-hover:text-violet-500" />
-                      )}
-                    </button>
-                  )
-                })}
-
-                {/* Atamayı kaldır */}
-                {person.jr_profile_id && (
-                  <button
-                    disabled={busy}
-                    onClick={() => onToggleJr(person.id, null)}
-                    className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-red-500 border border-red-200 bg-red-50 hover:bg-red-100 transition-all mt-2 disabled:opacity-50"
-                  >
-                    <X size={12} />
-                    Jr. Süpervizörü Kaldır
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Ana Bileşen ────────────────────────────────────────────────────────────
-
 export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
   const [personnel,     setPersonnel]     = useState<FieldPerson[]>([])
   const [loading,       setLoading]       = useState(true)
@@ -216,8 +79,6 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
   const [filterSup,     setFilterSup]     = useState('')
   const [filterJr,      setFilterJr]      = useState('')
   const [filterCari,    setFilterCari]    = useState('')
-  const [selectedPerson, setSelectedPerson] = useState<FieldPerson | null>(null)
-  const [assigning,     setAssigning]     = useState<string | null>(null)
 
   const isAdmin      = currentProfile.role === 'admin'
 
@@ -264,7 +125,6 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
       setHesapBusy(false)
     }
   }
-  const isSup        = currentProfile.role === 'sup'
   const isAdminOrBsy = currentProfile.role === 'admin' || currentProfile.role === 'bsy'
 
   // ── Veri yükleme ──────────────────────────────────────────────────────────
@@ -286,7 +146,6 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
           jr_adi: m.jr_adi || null,
           sup_adi: m.sup_adi,
           bsy_adi: m.bsy_adi || m.bsy_kod,
-          jr_profile_id: null,
         }))
 
         setPersonnel(converted)
@@ -334,19 +193,11 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
     }
 
     if (currentProfile.role === 'jr') {
-      return personnel.filter(p => p.jr_profile_id === currentProfile.id)
+      return personnel.filter(p => p.jr_adi && normalizeName(p.jr_adi) === normalizeName(currentProfile.full_name))
     }
 
     return []
   }, [personnel, currentProfile, team, bsyLinks])
-
-  // ── Sup'ın Jr'ları ────────────────────────────────────────────────────────
-  const myJrs = useMemo(
-    () => isSup
-      ? team.filter(p => p.role === 'jr' && p.manager_id === currentProfile.id)
-      : [],
-    [isSup, currentProfile, team]
-  )
 
   // ── Filtre seçenekleri (cascade) ──────────────────────────────────────────
   const supOptions = useMemo(() => {
@@ -426,58 +277,6 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
     return res
   }, [visiblePersonnel, filterGrup, filterSup, filterJr, filterCari, search])
 
-  // ── Jr atama / kaldırma ───────────────────────────────────────────────────
-  // Her değişiklik jr_assignment_history'e loglanır (effective_month = bu ayın 1'i).
-  // Böylece önceki aylardaki atamalar değişmez — sadece bu ay ve sonrası etkilenir.
-  const handleToggleJr = useCallback(async (personId: string, jrProfileId: string | null) => {
-    setAssigning(personId)
-    try {
-      const person = personnel.find(p => p.id === personId)
-      if (!person) return
-
-      const oldJrId = person.jr_profile_id
-
-      // field_personnel tablosunu güncelle
-      const { error } = await supabase
-        .from('field_personnel')
-        .update({ jr_profile_id: jrProfileId })
-        .eq('id', personId)
-      if (error) {
-        console.error('Jr atama hatası:', error)
-        return
-      }
-
-      // Geçmiş logu — effective_month: bu ayın ilk günü
-      const now = new Date()
-      const effectiveMonth =
-        `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-      const { error: logErr } = await supabase
-        .from('jr_assignment_history')
-        .insert({
-          field_person_id:   personId,
-          merch_adi:         person.merch_adi,
-          sube_adi:          person.sube_adi,
-          cari_adi:          person.cari_adi,
-          old_jr_profile_id: oldJrId,
-          new_jr_profile_id: jrProfileId,
-          effective_month:   effectiveMonth,
-          changed_by:        currentProfile.id,
-        })
-      if (logErr) console.error('Geçmiş log hatası:', logErr)
-
-      // Lokal state güncelle
-      setPersonnel(prev =>
-        prev.map(p => p.id === personId ? { ...p, jr_profile_id: jrProfileId } : p)
-      )
-      setSelectedPerson(prev =>
-        prev?.id === personId ? { ...prev, jr_profile_id: jrProfileId } : prev
-      )
-    } catch (err) {
-      console.error('handleToggleJr beklenmedik hata:', err)
-    } finally {
-      setAssigning(null)
-    }
-  }, [personnel, currentProfile.id])
 
   const activeFilters = [filterGrup, filterSup, filterJr, filterCari].filter(Boolean).length
 
@@ -636,19 +435,12 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
         {!loading && filtered.length > 0 && (
           <div className="divide-y divide-gray-100">
             {filtered.map((person, idx) => {
-              const assignedJr = person.jr_profile_id
-                ? team.find(p => p.id === person.jr_profile_id)
-                : null
               return (
-                <button
+                <div
                   // Aynı merch birden çok şubede aynı MERCH_ID ile gelebilir → anahtar benzersiz olmalı,
                   // yoksa React filtre değişince eski satırları ekranda bırakıyor
                   key={`${person.id}|${person.cari_adi ?? ''}|${person.sube_adi ?? ''}|${idx}`}
-                  onClick={() => isSup ? setSelectedPerson(person) : undefined}
-                  className={clsx(
-                    'w-full flex items-center gap-3 px-4 py-3 bg-white transition-colors text-left',
-                    isSup ? 'hover:bg-blue-50/30 cursor-pointer' : 'cursor-default'
-                  )}
+                  className="w-full flex items-center gap-3 px-4 py-3 bg-white text-left"
                 >
                   {/* Avatar */}
                   <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0 text-indigo-700 font-bold text-xs">
@@ -668,35 +460,23 @@ export function KullanicilarView({ currentProfile, team, bsyLinks }: Props) {
                     <p className="text-[11px] text-gray-500 truncate">
                       {[person.cari_adi, person.sube_adi].filter(Boolean).join(' — ')}
                     </p>
-                    {assignedJr && (
-                      <p className="text-[10px] text-violet-600 font-medium mt-0.5">
-                        Jr: {assignedJr.full_name}
+                    {/* Süpervizör / Jr. Süpervizör — B2B (SUPERVIZOR / JR_SUPERVIZOR) tek kaynak;
+                        değişiklik B2B'de yapılır, tüm ekranlara oradan yansır */}
+                    {(person.sup_adi || person.jr_adi) && (
+                      <p className="text-[10px] font-medium mt-0.5">
+                        {person.sup_adi && <span className="text-gray-500">Süpervizör: {person.sup_adi.replace(/\s+SV$/i, '')}</span>}
+                        {person.sup_adi && person.jr_adi && <span className="text-gray-300"> · </span>}
+                        {person.jr_adi && <span className="text-violet-600">Jr: {person.jr_adi}</span>}
                       </p>
                     )}
                   </div>
-
-                  {/* Chevron — sadece sup */}
-                  {isSup && (
-                    <ChevronDown size={14} className="flex-shrink-0 text-gray-300 -rotate-90" />
-                  )}
-                </button>
+                </div>
               )
             })}
           </div>
         )}
       </div>
 
-      {/* Detay / Atama Paneli */}
-      {selectedPerson && isSup && (
-        <PersonDetail
-          person={selectedPerson}
-          myJrs={myJrs}
-          team={team}
-          assigning={assigning}
-          onToggleJr={handleToggleJr}
-          onClose={() => setSelectedPerson(null)}
-        />
-      )}
     </div>
   )
 }
