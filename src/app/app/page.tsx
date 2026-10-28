@@ -96,6 +96,8 @@ function TaskSheet({
   const [checkingIn, setCheckingIn] = useState(false)
   const [locationStatus, setLocationStatus] = useState<'idle' | 'no_location' | 'no_address' | 'done'>('idle')
   const [customerOptions, setCustomerOptions] = useState<string[]>([])
+  // Seçenekler cariye göre gruplu gösterilir (mobilde uzun cari adı şube adını kesiyordu)
+  const [customerGroups, setCustomerGroups] = useState<{ cari: string; subeler: { value: string; sube: string }[] }[]>([])
 
   const canEdit = isNew || currentProfile.role === 'admin' || task?.pid === currentProfile.id
   const canAddForOthers = currentProfile.role === 'admin' ||
@@ -139,7 +141,7 @@ function TaskSheet({
         const res = await fetch('/api/bsy-cari-sube')
         if (!res.ok) throw new Error('bsy-cari-sube API hatası')
         const json = await res.json()
-        const data: { cari_adi: string; sube_adi: string; bsy_adi: string; bsy_kod: string; sup_adi: string; jr_adi: string }[] = json.data ?? []
+        const data: { cari_adi: string; sube_adi: string; bsy_adi: string; bsy_kod: string; sup_adi: string; jr_adi: string; sups?: string[]; jrs?: string[] }[] = json.data ?? []
 
         const toOpt = (r: { cari_adi: string; sube_adi: string }) =>
           `${r.cari_adi?.trim() || ''} / ${r.sube_adi?.trim() || ''}`
@@ -161,7 +163,10 @@ function TaskSheet({
               .filter(Boolean)
           : []
 
-        const isVisible = (r: { bsy_adi: string; bsy_kod: string; sup_adi: string; jr_adi: string }) => {
+        const isVisible = (r: { bsy_adi: string; bsy_kod: string; sup_adi: string; jr_adi: string; sups?: string[]; jrs?: string[] }) => {
+          // Şubede birden çok süpervizör / Jr olabilir — hepsi dikkate alınır
+          const sups = r.sups ?? (r.sup_adi ? [r.sup_adi] : [])
+          const jrs  = r.jrs  ?? (r.jr_adi  ? [r.jr_adi]  : [])
           // Admin / Yönetici / İK → tümü
           if (role === 'admin' || role === 'manager' || role === 'ik') return true
 
@@ -174,29 +179,42 @@ function TaskSheet({
 
           // Süpervizör → kendi carileri + kendi Jr'larının carileri
           if (role === 'sup') {
-            return namesMatch(r.sup_adi, person.full_name) ||
-              (r.jr_adi ? myJrNames.some(n => namesMatch(n, r.jr_adi)) : false)
+            return sups.some(n => namesMatch(n, person.full_name)) ||
+              jrs.some(j => myJrNames.some(n => namesMatch(n, j)))
           }
 
           // Jr → yalnızca kendi carileri
           if (role === 'jr') {
-            return namesMatch(r.jr_adi, person.full_name)
+            return jrs.some(n => namesMatch(n, person.full_name))
           }
 
           return false
         }
 
         const set = new Set<string>()
+        const groups = new Map<string, Map<string, string>>()   // cari → (value → şube)
         for (const r of data) {
           if (!isVisible(r)) continue
           const opt = toOpt(r)
-          if (opt && opt !== ' / ') set.add(opt)
+          if (!opt || opt === ' / ') continue
+          set.add(opt)
+          const cari = r.cari_adi?.trim() || ''
+          if (!groups.has(cari)) groups.set(cari, new Map())
+          groups.get(cari)!.set(opt, r.sube_adi?.trim() || '')
         }
 
         setCustomerOptions([...set].sort((a, b) => a.localeCompare(b, 'tr')))
+        setCustomerGroups([...groups.entries()]
+          .sort((a, b) => a[0].localeCompare(b[0], 'tr'))
+          .map(([cari, m]) => ({
+            cari,
+            subeler: [...m.entries()].map(([value, sube]) => ({ value, sube }))
+              .sort((a, b) => a.sube.localeCompare(b.sube, 'tr')),
+          })))
       } catch (err) {
         console.error('Müşteri listesi yüklenemedi:', err)
         setCustomerOptions([])
+        setCustomerGroups([])
       }
     }
 
@@ -397,8 +415,13 @@ function TaskSheet({
               {customer && !customerOptions.includes(customer) && (
                 <option value="__mevcut__">{customer}</option>
               )}
-              {customerOptions.map((opt, i) => (
-                <option key={i} value={opt}>{opt}</option>
+              {/* Cariye göre gruplu: seçenekte önce şube adı görünür, cari grup başlığında */}
+              {customerGroups.map(g => (
+                <optgroup key={g.cari} label={g.cari}>
+                  {g.subeler.map(o => (
+                    <option key={o.value} value={o.value}>{o.sube ? `${o.sube} · ${g.cari}` : o.value}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
