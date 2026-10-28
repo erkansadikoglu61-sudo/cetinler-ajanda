@@ -104,6 +104,20 @@ export function namesMatch(a: string, b: string): boolean {
   return normalizeName(a) === normalizeName(b)
 }
 
+// ─── Görevden ayrılanlar ───────────────────────────────────────────
+// İsim → görevde olduğu son dönem ('YYYY-MM'). Sonraki dönemlerde Sellout
+// listelerinde (Süpervizör / Jr. tabloları, hedef girişi, Şube Takibi) gösterilmez;
+// geçmiş dönemlerde görünmeye devam eder.
+const AYRILANLAR: { ad: string; sonDonem: string }[] = [
+  { ad: 'Atilla YILMAZ', sonDonem: '2026-09' },   // 30.09.2026'da ayrıldı
+]
+
+/** Kişi verilen dönemde görevde mi? (ayrılanlar listesine göre) */
+export function donemdeAktif(ad: string, donem: string): boolean {
+  const a = AYRILANLAR.find(x => namesMatch(x.ad, ad))
+  return !a || donem <= a.sonDonem
+}
+
 // ─── Dönem bazlı özel kategori primi uygulaması ───────────────────
 // Listelenen dönemde normal hesaplanan kategori primi (aşağıdaki calcPrim
 // formülü), kategori gerçekleşme oranının düştüğü basamağın katıyla çarpılır.

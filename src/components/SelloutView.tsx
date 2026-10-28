@@ -10,7 +10,7 @@ import { useSelloutTargets, ProfileTarget, MerchTarget } from '@/hooks/useSellou
 import {
   SELLOUT_GROUPS, GRUP_NORMALIZE,
   PRIM_SUP, PRIM_JR, PRIM_MERCH,
-  calcPrim, namesMatch, normalizeName,
+  calcPrim, namesMatch, normalizeName, donemdeAktif,
   fmtCur, currentDonem, donemOptions, donemLabel,
 } from '@/lib/sellout'
 import { Profile } from '@/lib/supabase'
@@ -501,13 +501,14 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   }, [top20Ipl, top20Rms, top20Supurge])
 
   // ── Team slices ──────────────────────────────────────────────
+  // Görevden ayrılanlar (lib/sellout AYRILANLAR) ayrıldıkları dönemden sonra listelenmez
   const visibleSups = useMemo(
-    () => team.filter(p => p.role === 'sup' && visibleIds.includes(p.id)),
-    [team, visibleIds]
+    () => team.filter(p => p.role === 'sup' && visibleIds.includes(p.id) && donemdeAktif(p.full_name, donem)),
+    [team, visibleIds, donem]
   )
   const visibleJrs = useMemo(
-    () => team.filter(p => p.role === 'jr' && visibleIds.includes(p.id)),
-    [team, visibleIds]
+    () => team.filter(p => p.role === 'jr' && visibleIds.includes(p.id) && donemdeAktif(p.full_name, donem)),
+    [team, visibleIds, donem]
   )
   const jrsOf = useCallback(
     (supId: string) => visibleJrs.filter(j => j.manager_id === supId),
