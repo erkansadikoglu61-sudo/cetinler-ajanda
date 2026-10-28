@@ -101,6 +101,49 @@ const normKisi = (s: string) => (s ?? '').replace(/İ/g, 'I').toLowerCase()
   .replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/\s+/g, ' ').trim()
 const SUP_OVERRIDE_SETS = SUP_OVERRIDES.map(o => ({ ...o, set: new Set(o.merchler.map(normKisi)) }))
 
+// ── BSY dönem bazlı atama ────────────────────────────────────────────
+// Evkur: Atilla Yılmaz (MB9) 30.09.2026'da ayrıldı; 2026-10'dan itibaren BSY
+// Erkan Sadıkoğlu (MB10). B2B güncellemesi tutarsız (2026-10-27): satışlarda
+// Ağu/Eyl de MB10'a çevrildi, merch-detay'da BSY_ADI boş, cari-şube listesinde
+// kod+ad boş. Burada dönem bazlı tek doğruya çekilir:
+//   • Satış satırları (DONEM + BSY): DONEM'e göre ilgili dönemin BSY'si.
+//   • Cari-şube / merch-detay (BSY_KODU / BSY_ADI, dönemsiz = güncel atama):
+//     bugünün dönemine göre.
+// Yalnızca BSY'si bu kişilerden biri ya da boş olan satırlar değişir
+// (ör. Evkur'un MB1'e bağlı tek şubesine dokunulmaz).
+const BSY_DONEMLERI: { cariKod: string; cariAdPrefix: string; donemler: { from: string; to: string; kod: string; ad: string }[] }[] = [
+  {
+    cariKod: 'M34002900', cariAdPrefix: 'EVKUR',
+    donemler: [
+      { from: '0000-00', to: '2026-09', kod: 'MB9',  ad: 'Atilla Yılmaz' },
+      { from: '2026-10', to: '9999-99', kod: 'MB10', ad: 'Erkan Sadıkoğlu' },
+    ],
+  },
+]
+function bugununDonemi(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+function applyBsyOverride(row: MerchSatisRow): void {
+  const cariKod = (row['CARI_KOD'] ?? row['CARI_KODU'] ?? '').trim()
+  const cariAd  = (row['CARI_ISIM'] ?? row['CARI_ADI'] ?? '').trim().toLocaleUpperCase('tr')
+  for (const o of BSY_DONEMLERI) {
+    if (cariKod !== o.cariKod && !cariAd.startsWith(o.cariAdPrefix)) continue
+    const kodlar = new Set(['', ...o.donemler.map(d => d.kod)])
+    if ('BSY' in row && 'DONEM' in row) {
+      const d = o.donemler.find(x => row['DONEM'] >= x.from && row['DONEM'] <= x.to)
+      if (d && kodlar.has(row['BSY'].trim())) row['BSY'] = d.kod
+    } else if ('BSY_KODU' in row) {
+      const bugun = bugununDonemi()
+      const d = o.donemler.find(x => bugun >= x.from && bugun <= x.to)
+      if (d && kodlar.has(row['BSY_KODU'].trim())) {
+        row['BSY_KODU'] = d.kod
+        if ('BSY_ADI' in row) row['BSY_ADI'] = d.ad
+      }
+    }
+  }
+}
+
 /** Satış satırı (MERCH_PERSONEL + DONEM + SUPERVISOR_ADI) ise yeniden atamayı uygular. */
 function applySupervisorOverride(row: MerchSatisRow): void {
   if (!('SUPERVISOR_ADI' in row) || !('MERCH_PERSONEL' in row) || !('DONEM' in row)) return
@@ -154,6 +197,7 @@ export function parseHtmlTableByHeader(html: string): ParsedHtmlTable {
       row[headers[c]] = cells[c] ?? ''
     }
     applySupervisorOverride(row)
+    applyBsyOverride(row)
     rows.push(row)
   }
 
