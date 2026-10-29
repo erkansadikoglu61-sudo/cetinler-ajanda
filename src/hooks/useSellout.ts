@@ -13,6 +13,7 @@ export interface SelloutRow {
   grup_kodu:      string
   beklened_ciro:  number
   supervisor_adi: string
+  ana_supervisor_adi?: string   // Jr'a atanmadan önceki süpervizör (Sup toplamı)
   cari_kod:       string
   sube_kod:       string
   donem:          string

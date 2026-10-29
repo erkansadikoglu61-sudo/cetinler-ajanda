@@ -30,6 +30,7 @@ export interface NihaiPrimRow {
 export interface NPSelloutRow {
   merch_personel: string
   supervisor_adi: string
+  ana_supervisor_adi?: string   // Jr'a atanmadan önceki süpervizör (Sup toplamı)
   grup_aciklama:  string
   satilan_adet:   number
   merch_tipi:     string
@@ -63,11 +64,15 @@ export function computeSelloutPrimForMonth(params: {
   const getMerchHedef = (merchName: string, grup: string) =>
     merchTargets.find(t => t.merch_name === merchName && t.grup === grup)?.hedef ?? 0
 
-  const getGerc = (apiNames: string[], grup: string): number => {
+  // anaSup: süpervizör toplamında, Jr'a atanan satışlar B2B'deki asıl
+  // süpervizör adıyla da eşleşir (Jr profili başka süpervizöre bağlı olsa bile kaybolmaz)
+  const getGerc = (apiNames: string[], grup: string, anaSup?: string): number => {
     const norm = apiNames.map(normalizeName)
+    const ana = anaSup ? normalizeName(anaSup) : null
     return periodRows
       .filter(r =>
-        norm.includes(normalizeName(r.supervisor_adi)) &&
+        (norm.includes(normalizeName(r.supervisor_adi)) ||
+          (ana !== null && normalizeName(r.ana_supervisor_adi ?? '') === ana)) &&
         GRUP_NORMALIZE[r.grup_aciklama] === grup
       )
       .reduce((s, r) => s + r.satilan_adet, 0)
@@ -85,7 +90,7 @@ export function computeSelloutPrimForMonth(params: {
     let tPrim = 0
     for (const g of SELLOUT_GROUPS) {
       const h = getProfileHedef(sup.id, g)
-      const v = getGerc(apiNames, g)
+      const v = getGerc(apiNames, g, sup.full_name)
       tPrim += calcPrim(h, v, PRIM_SUP[g], donem)
     }
     out.push({ tip: 'Süpervizör', ad: sup.full_name, prim: tPrim, selfProfileId: sup.id })

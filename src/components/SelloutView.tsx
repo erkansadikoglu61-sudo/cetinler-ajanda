@@ -731,11 +731,15 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
   // ── Gerç aggregation ────────────────────────────────────────
   const getGerc = useCallback(
-    (supApiNames: string[], grup: string): number => {
+    // anaSup: süpervizör toplamında, /api/sellout'un Jr'a atadığı satışlar
+    // B2B'deki asıl süpervizör adıyla (ana_supervisor_adi) da eşleşir.
+    (supApiNames: string[], grup: string, anaSup?: string): number => {
+      const ana = anaSup ? normalizeName(anaSup) : null
       return periodRows
         .filter(r => {
           const normApi = normalizeName(r.supervisor_adi)
-          return supApiNames.some(n => normalizeName(n) === normApi)
+          return (supApiNames.some(n => normalizeName(n) === normApi) ||
+                  (ana !== null && normalizeName(r.ana_supervisor_adi ?? '') === ana))
               && GRUP_NORMALIZE[r.grup_aciklama] === grup
         })
         .reduce((s, r) => s + r.satilan_adet, 0)
@@ -1043,7 +1047,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       const apiNames = [sup.full_name, ...jrs.map(j => j.full_name)]
       const groups   = SELLOUT_GROUPS.map(g => {
         const h = getProfileHedef(sup.id, g)
-        const v = getGerc(apiNames, g)
+        const v = getGerc(apiNames, g, sup.full_name)
         const p = pct(h, v)
         const prim = calcPrim(h, v, PRIM_SUP[g], donem)
         return { g, h, v, p, prim }
