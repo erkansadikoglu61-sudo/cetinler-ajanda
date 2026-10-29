@@ -1877,6 +1877,21 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr className="bg-brand-50 font-semibold text-gray-800">
+                      <td className="border border-gray-200 px-2 py-1.5 text-center text-gray-500">Σ</td>
+                      {satisGirmeyenColumns.map((c, ci) => (
+                        <React.Fragment key={ci}>
+                          <td className="border border-gray-200 px-3 py-1.5 whitespace-nowrap">
+                            Toplam <span className="font-normal text-gray-500">({c.subeler.length} şube)</span>
+                          </td>
+                          <td className="border border-gray-200 px-2 py-1.5 text-right tabular-nums">
+                            {c.subeler.reduce((t, s) => t + s.adet, 0).toLocaleString('tr-TR')}
+                          </td>
+                        </React.Fragment>
+                      ))}
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             )}
