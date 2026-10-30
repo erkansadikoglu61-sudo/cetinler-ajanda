@@ -97,7 +97,7 @@ function TaskSheet({
   const [locationStatus, setLocationStatus] = useState<'idle' | 'no_location' | 'no_address' | 'done'>('idle')
   const [customerOptions, setCustomerOptions] = useState<string[]>([])
   // Seçenekler cariye göre gruplu gösterilir (mobilde uzun cari adı şube adını kesiyordu)
-  const [customerGroups, setCustomerGroups] = useState<{ cari: string; subeler: { value: string; sube: string }[] }[]>([])
+  const [customerGroups, setCustomerGroups] = useState<{ cari: string; kisa: string; subeler: { value: string; sube: string }[] }[]>([])
 
   const canEdit = isNew || currentProfile.role === 'admin' || task?.pid === currentProfile.id
   const canAddForOthers = currentProfile.role === 'admin' ||
@@ -204,10 +204,14 @@ function TaskSheet({
         }
 
         setCustomerOptions([...set].sort((a, b) => a.localeCompare(b, 'tr')))
+        // Kısa ad listede başka bir cariyle çakışırsa tam unvan kullanılır
+        const kisaSay = new Map<string, number>()
+        for (const cari of groups.keys()) kisaSay.set(kisaCariAdi(cari), (kisaSay.get(kisaCariAdi(cari)) ?? 0) + 1)
         setCustomerGroups([...groups.entries()]
           .sort((a, b) => a[0].localeCompare(b[0], 'tr'))
           .map(([cari, m]) => ({
             cari,
+            kisa: (kisaSay.get(kisaCariAdi(cari)) ?? 0) > 1 ? cari : kisaCariAdi(cari),
             subeler: [...m.entries()].map(([value, sube]) => ({ value, sube }))
               .sort((a, b) => a.sube.localeCompare(b.sube, 'tr')),
           })))
@@ -415,14 +419,12 @@ function TaskSheet({
               {customer && !customerOptions.includes(customer) && (
                 <option value="__mevcut__">{customer}</option>
               )}
-              {/* Cariye göre gruplu: seçenekte önce şube adı görünür, cari grup başlığında */}
-              {customerGroups.map(g => (
-                <optgroup key={g.cari} label={g.cari}>
-                  {g.subeler.map(o => (
-                    <option key={o.value} value={o.value}>{o.sube ? `${o.sube} · ${g.cari}` : o.value}</option>
-                  ))}
-                </optgroup>
-              ))}
+              {/* "Cari kısa adı – Şube": şirket unvanı ekleri atılır ki mobilde şube adı kesilmesin */}
+              {customerGroups.flatMap(g => g.subeler.map(o => (
+                <option key={o.value} value={o.value} title={o.value}>
+                  {o.sube ? `${g.kisa} – ${o.sube}` : o.value}
+                </option>
+              )))}
             </select>
           </div>
 
@@ -1989,9 +1991,23 @@ function StatsSheet({ team, visibleIds, initialYear, initialMonth, onClose }: {
 // ─────────────────────────────────────────────────────
 // ANA SAYFA
 // ─────────────────────────────────────────────────────
+// Görev penceresi cari listesi için kısa cari adı: unvan ekleri (TİC., LTD.,
+// ŞTİ., A.Ş., MAĞAZACILIK, ZÜCC. …) ve sonrası atılır, en fazla 3 kelime.
+// ör. "ÖZ ŞANAL ZÜCC. VE DTM SAN. VE TİC. A.Ş." → "ÖZ ŞANAL"
+const CARI_UNVAN_RE = /^(TİC|TIC|TİCARET|TICARET|SAN|SANAYİ|SANAYI|LTD|LİMİTED|LIMITED|ŞTİ|STI|A\.?Ş|AŞ|ANONİM|ANONIM|ŞİRKETİ|SIRKETI|MAĞAZACILIK|MAGAZACILIK|MAĞAZALARI|MAGAZALARI|ZÜCC|DTM|DAY|DAYANIKLI|TÜK|MOB|MOBİLYA|MOBILYA|HALI|GIDA|TEKS|TEKSTİL|İNŞ|INŞ|ALIŞVERİŞ|ALISVERIS|AVM|VE|-)/i
+function kisaCariAdi(cari: string): string {
+  const out: string[] = []
+  for (const w of cari.trim().split(/\s+/)) {
+    if (out.length > 0 && (CARI_UNVAN_RE.test(w) || w.includes('.'))) break
+    out.push(w.replace(/[.,]+$/, ''))
+    if (out.length === 3) break
+  }
+  return out.join(' ') || cari
+}
+
 export default function AppPage() {
   const router = useRouter()
-  const { profile: currentProfile, loading: authLoading, signOut } = useAuth()
+  const { profile: currentProfile, loading: authLoading, connectionError, retry: retryAuth, signOut } = useAuth()
   const { team, bsyLinks, loading: teamLoading, visibleIds, profileById } = useTeam(currentProfile)
 
   const now = new Date()
@@ -2051,10 +2067,11 @@ if (currentProfile.role === 'bsy') {
 
   // Auth redirect
   useEffect(() => {
-    if (!authLoading && !currentProfile) {
+    // Bağlantı hatasında giriş ekranına atma — oturum açık, "Tekrar dene" gösterilir
+    if (!authLoading && !currentProfile && !connectionError) {
       router.replace('/login')
     }
-  }, [authLoading, currentProfile, router])
+  }, [authLoading, currentProfile, connectionError, router])
 
   // Varsayılan sekme: manager için dashboard, takvim erişimi varsa month, sup/jr için sellout, bsy için bsy
   useEffect(() => {
@@ -2147,6 +2164,27 @@ if (currentProfile.role === 'bsy') {
   const handleCheckIn = async (taskId: string) => {
     if (!currentProfile) return { ok: false, hasLocation: false, hasAddress: false }
     return checkIn(taskId, currentProfile.id)
+  }
+
+  if (!authLoading && !currentProfile && connectionError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-brand-700 px-6 text-center text-white safe-top safe-bottom">
+        <p className="text-lg font-semibold">Sunucuya bağlanılamadı</p>
+        <p className="text-sm text-white/80">İnternet bağlantınızı kontrol edip tekrar deneyin.</p>
+        <button
+          onClick={() => retryAuth()}
+          className="min-h-[46px] rounded-xl bg-white px-6 py-3 font-semibold text-brand-700 btn-active"
+        >
+          Tekrar dene
+        </button>
+        <button
+          onClick={async () => { await signOut(); router.replace('/login') }}
+          className="text-sm text-white/70 underline"
+        >
+          Giriş ekranına dön
+        </button>
+      </div>
+    )
   }
 
   if (authLoading || teamLoading) {

@@ -10,13 +10,18 @@ export default function RootPage() {
   const router = useRouter()
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        router.replace('/app')
-      } else {
-        router.replace('/login')
-      }
-    })
+    // Zayıf mobil bağlantıda getSession (token yenileme) asılı kalabiliyor —
+    // 8 sn içinde dönmezse /app'e geç; orada bağlantı hatası ekranı / önbellek devreye girer.
+    let done = false
+    const fallback = setTimeout(() => { if (!done) { done = true; router.replace('/app') } }, 8000)
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (done) return
+        done = true
+        router.replace(session ? '/app' : '/login')
+      })
+      .catch(() => { if (!done) { done = true; router.replace('/login') } })
+      .finally(() => clearTimeout(fallback))
   }, [router])
 
   return (

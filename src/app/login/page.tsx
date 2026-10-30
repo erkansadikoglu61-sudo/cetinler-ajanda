@@ -68,12 +68,16 @@ export default function LoginPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">E-posta</label>
               <input
                 type="email"
-                autoComplete="email"
+                inputMode="email"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
-                placeholder="ornek@cetinler.com"
-                className="w-full border border-gray-300 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                placeholder="ornek@cetinlerltd.com.tr"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-base outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
               />
             </div>
 
@@ -83,16 +87,20 @@ export default function LoginPage() {
                 <input
                   type={showPass ? 'text' : 'password'}
                   autoComplete="current-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
                   placeholder="••••••••"
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 pr-12 outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 pr-12 text-base outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 p-1"
+                  aria-label={showPass ? 'Şifreyi gizle' : 'Şifreyi göster'}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 p-3"
                 >
                   {showPass ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
@@ -137,12 +145,16 @@ export default function LoginPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">E-posta</label>
               <input
                 type="email"
-                autoComplete="email"
+                inputMode="email"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
-                placeholder="ornek@cetinler.com"
-                className="w-full border border-gray-300 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                placeholder="ornek@cetinlerltd.com.tr"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-base outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
               />
             </div>
 

@@ -10,12 +10,20 @@ export function useTeam(currentProfile: Profile | null) {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [profilesRes, linksRes] = await Promise.all([
-      supabase.from('profiles').select('*').order('full_name'),
-      supabase.from('bsy_supervisors').select('*'),
-    ])
-    if (profilesRes.data) setTeam(profilesRes.data as Profile[])
-    if (linksRes.data) setBsyLinks(linksRes.data as BsySupervisor[])
+    // Zayıf mobil bağlantıda ilk istek düşebiliyor — 3 deneme (ekip listesi
+    // boş gelirse takvim/sekme görünürlükleri bozuluyordu)
+    for (let i = 0; i < 3; i++) {
+      if (i > 0) await new Promise(r => setTimeout(r, 1500 * i))
+      try {
+        const [profilesRes, linksRes] = await Promise.all([
+          supabase.from('profiles').select('*').order('full_name'),
+          supabase.from('bsy_supervisors').select('*'),
+        ])
+        if (profilesRes.data) setTeam(profilesRes.data as Profile[])
+        if (linksRes.data) setBsyLinks(linksRes.data as BsySupervisor[])
+        if (!profilesRes.error && !linksRes.error) break
+      } catch { /* ağ hatası → tekrar dene */ }
+    }
     setLoading(false)
   }, [])
 
