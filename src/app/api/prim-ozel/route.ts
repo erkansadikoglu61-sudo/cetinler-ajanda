@@ -1,3 +1,4 @@
+import { requireRole, ROLLER } from '@/lib/apiAuth'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -26,6 +27,8 @@ export async function GET(req: Request) {
 
 // POST — yeni satır ekle
 export async function POST(req: Request) {
+  const yetki = await requireRole(req, ROLLER.ADMIN)
+  if (yetki instanceof NextResponse) return yetki
   try {
     const body = await req.json()
     const { error, data } = await sb()
@@ -54,6 +57,8 @@ export async function POST(req: Request) {
 
 // PUT /api/prim-ozel?id=
 export async function PUT(req: Request) {
+  const yetki = await requireRole(req, ROLLER.ADMIN)
+  if (yetki instanceof NextResponse) return yetki
   const id = new URL(req.url).searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id gerekli' }, { status: 400 })
   try {
@@ -81,6 +86,8 @@ export async function PUT(req: Request) {
 
 // DELETE /api/prim-ozel?id=
 export async function DELETE(req: Request) {
+  const yetki = await requireRole(req, ROLLER.ADMIN)
+  if (yetki instanceof NextResponse) return yetki
   const id = new URL(req.url).searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id gerekli' }, { status: 400 })
   const { error } = await sb().from('prim_ozel').delete().eq('id', id)

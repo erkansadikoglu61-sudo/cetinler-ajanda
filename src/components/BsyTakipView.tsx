@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { authFetch } from '@/lib/authFetch'
 import { RefreshCw, ChevronDown, Settings2, X, Save, Upload, SlidersHorizontal, ImagePlus } from 'lucide-react'
 import clsx from 'clsx'
 import { useBsyCiro, BRAND_KEYS, BrandKey } from '@/hooks/useBsyCiro'
@@ -96,7 +97,7 @@ function useBsyParametreler() {
 
   const load = useCallback(async () => {
     try {
-      const res  = await fetch('/api/bsy-parametreler')
+      const res  = await authFetch('/api/bsy-parametreler')
       const json = await res.json()
       const map: Params = { ...DEFAULT_PARAMS }
       ;(json.rows ?? []).forEach((r: { key: string; value: number }) => { map[r.key] = r.value })
@@ -110,7 +111,7 @@ function useBsyParametreler() {
     setSaving(true)
     try {
       const rows = Object.entries(newParams).map(([key, value]) => ({ key, label: key, value }))
-      await fetch('/api/bsy-parametreler', {
+      await authFetch('/api/bsy-parametreler', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows }),
       })
@@ -902,7 +903,7 @@ export function BsyTakipView() {
     const file = e.target.files?.[0]; if (!file) return
     setUploading(true); setUploadMsg(null)
     try {
-      const presignRes = await fetch('/api/bsy-excel-presign', { method: 'POST' })
+      const presignRes = await authFetch('/api/bsy-excel-presign', { method: 'POST' })
       const presign    = await presignRes.json()
       if (!presignRes.ok) throw new Error(presign.error ?? 'Presign hatası')
       const uploadRes = await fetch(presign.signedUrl, {

@@ -1,3 +1,4 @@
+import { requireRole, ROLLER } from '@/lib/apiAuth'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { loadAdetPrimRates } from '@/lib/adetPrimRates'
@@ -74,6 +75,8 @@ export async function GET(req: Request) {
 // Body: { yil, ay, rows: [{stokKodu, kategori?, bayiMerch, kosulluDestek}] }
 // Upserts per-month overrides
 export async function PUT(req: Request) {
+  const yetki = await requireRole(req, ROLLER.ADMIN)
+  if (yetki instanceof NextResponse) return yetki
   try {
     const body = await req.json() as {
       yil:  number

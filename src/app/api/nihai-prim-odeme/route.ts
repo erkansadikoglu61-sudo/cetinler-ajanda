@@ -1,3 +1,4 @@
+import { requireRole, ROLLER } from '@/lib/apiAuth'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -40,6 +41,8 @@ interface OdemeInput {
 }
 
 export async function POST(req: Request) {
+  const yetki = await requireRole(req, ROLLER.ADMIN_IK)
+  if (yetki instanceof NextResponse) return yetki
   try {
     const body = await req.json()
     const updated_by: string | undefined = body.updated_by

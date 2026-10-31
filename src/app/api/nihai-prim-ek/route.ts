@@ -1,3 +1,4 @@
+import { requireRole, ROLLER } from '@/lib/apiAuth'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -34,6 +35,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const yetki = await requireRole(req, ROLLER.ADMIN_IK)
+  if (yetki instanceof NextResponse) return yetki
   try {
     const b = await req.json()
     const { yil, ay, kullanici_tipi, kullanici_adi, updated_by } = b

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { parseHtmlTableByHeader, num, fetchPhpHtml } from '@/lib/merchSatis'
 import { normalizeName } from '@/lib/sellout'
+import { requireRole, ROLLER } from '@/lib/apiAuth'
 
 export const maxDuration = 60
 
@@ -14,7 +15,8 @@ const MERCH_SATIS_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_sa
 //        Prim Ödeme'yi gören roller okuyabilir (admin/bsy/sup/ik); rol filtresi istemcide.
 // POST   { row: {id?, donem, kullanici_adi, grup, cari_adi, sube_adi, gorev, sube_adet, hakedis}, updated_by } → upsert
 // DELETE ?id=<uuid>&user=<profileId>                → sil
-// Yalnızca admin; profil rolü sunucuda doğrulanır.
+// Yalnızca admin; rol oturumdan (Authorization: Bearer) sunucuda doğrulanır.
+// (Önceden istemcinin gönderdiği user/updated_by id'sine güveniliyordu — taklit edilebilirdi.)
 
 function getSupabase() {
   return createClient(
@@ -23,16 +25,6 @@ function getSupabase() {
   )
 }
 
-type Sb = ReturnType<typeof getSupabase>
-
-async function roleOf(sb: Sb, userId: string | null | undefined): Promise<string | null> {
-  if (!userId) return null
-  const { data } = await sb.from('profiles').select('role').eq('id', userId).single()
-  return (data?.role as string) ?? null
-}
-async function isAdmin(sb: Sb, userId: string | null | undefined): Promise<boolean> {
-  return (await roleOf(sb, userId)) === 'admin'
-}
 const ODEME_ROLLERI = ['admin', 'bsy', 'sup', 'ik']
 
 const COLS = 'id, donem, kullanici_adi, grup, cari_adi, sube_adi, gorev, sube_adet, hakedis, updated_at'
@@ -41,12 +33,10 @@ export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams
   const donem = sp.get('donem') ?? ''
   if (!/^\d{4}-\d{2}$/.test(donem)) return NextResponse.json({ error: 'donem geçersiz' }, { status: 400 })
-  const sb = getSupabase()
   const odeme = sp.get('mode') === 'odeme'
-  const role = await roleOf(sb, sp.get('user'))
-  if (odeme ? !ODEME_ROLLERI.includes(role ?? '') : role !== 'admin') {
-    return NextResponse.json({ error: 'Bu işlem için yetkiniz yok' }, { status: 403 })
-  }
+  const yetki = await requireRole(req, odeme ? ODEME_ROLLERI : ROLLER.ADMIN)
+  if (yetki instanceof NextResponse) return yetki
+  const sb = getSupabase()
   const { data, error } = await sb.from('diger_prim').select(COLS).eq('donem', donem).order('created_at')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (odeme) return NextResponse.json({ rows: data ?? [] })
@@ -66,13 +56,14 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const yetki = await requireRole(req, ROLLER.ADMIN)
+  if (yetki instanceof NextResponse) return yetki
   try {
-    const { row, updated_by } = await req.json() as {
+    const { row } = await req.json() as {
       row: { id?: string; donem: string; kullanici_adi: string; grup: string; cari_adi: string; sube_adi: string; gorev: string; sube_adet: number; hakedis: number }
-      updated_by?: string
     }
+    const updated_by = yetki.id
     const sb = getSupabase()
-    if (!(await isAdmin(sb, updated_by))) return NextResponse.json({ error: 'Bu işlem için yetkiniz yok' }, { status: 403 })
     if (!/^\d{4}-\d{2}$/.test(row?.donem ?? '')) return NextResponse.json({ error: 'donem geçersiz' }, { status: 400 })
 
     const rec = {
@@ -101,8 +92,9 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const sp = new URL(req.url).searchParams
   const id = sp.get('id')
+  const yetki = await requireRole(req, ROLLER.ADMIN)
+  if (yetki instanceof NextResponse) return yetki
   const sb = getSupabase()
-  if (!(await isAdmin(sb, sp.get('user')))) return NextResponse.json({ error: 'Bu işlem için yetkiniz yok' }, { status: 403 })
   if (!id) return NextResponse.json({ error: 'id eksik' }, { status: 400 })
   const { error } = await sb.from('diger_prim').delete().eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

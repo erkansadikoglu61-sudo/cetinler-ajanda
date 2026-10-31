@@ -48,7 +48,7 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId, curren
       const [destekRes, selloutRes, primRes, targetsRes] = await Promise.all([
         fetch(`/api/destek-personel-prim?${params}`),
         fetch('/api/sellout'),
-        fetch(`/api/adet-prim?yil=${yil}&ay=${ay}`),
+        authFetch(`/api/adet-prim?yil=${yil}&ay=${ay}`),
         authFetch(`/api/sellout-targets?donem=${donem}`),
       ])
       const [destekData, selloutData, primData, targetsData] = await Promise.all([

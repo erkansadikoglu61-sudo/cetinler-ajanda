@@ -1,3 +1,4 @@
+import { requireRole, ROLLER } from '@/lib/apiAuth'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -36,6 +37,8 @@ export async function GET(req: Request) {
 
 // ─── POST: Yeni destek personeli ekle ─────────────────────────────
 export async function POST(req: Request) {
+  const yetki = await requireRole(req, ROLLER.MERCH_HARIC)
+  if (yetki instanceof NextResponse) return yetki
   try {
     const body = await req.json()
     let { sube_adi, cari_adi, merch_adi } = body
@@ -107,6 +110,8 @@ export async function POST(req: Request) {
 
 // ─── DELETE: Destek personeli sil ─────────────────────────────────
 export async function DELETE(req: Request) {
+  const yetki = await requireRole(req, ROLLER.MERCH_HARIC)
+  if (yetki instanceof NextResponse) return yetki
   try {
     const sp = new URL(req.url).searchParams
     const id = sp.get('id')

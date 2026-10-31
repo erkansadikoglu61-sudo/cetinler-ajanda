@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { authFetch } from '@/lib/authFetch'
 import { BrandKey, BsyKisiHedefRecord, BsyKisiExtraRecord } from '@/lib/bsy'
 
 export function useBsyKisiHedef(yil: number, ay: number) {
@@ -14,7 +15,7 @@ export function useBsyKisiHedef(yil: number, ay: number) {
     setLoading(true)
     setError(null)
     try {
-      const res  = await fetch(`/api/bsy-kisi-hedef?yil=${yil}&ay=${ay}`)
+      const res  = await authFetch(`/api/bsy-kisi-hedef?yil=${yil}&ay=${ay}`)
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'API hatası')
       setHedefRows(json.hedefRows ?? [])
@@ -55,7 +56,7 @@ export function useBsyKisiHedef(yil: number, ay: number) {
     setSaving(true)
     setError(null)
     try {
-      const res = await fetch('/api/bsy-kisi-hedef', {
+      const res = await authFetch('/api/bsy-kisi-hedef', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ yil, ay, hedefRows: newHedefRows, extraRows: newExtraRows }),

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { authFetch } from '@/lib/authFetch'
 import { RefreshCw, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
 import { BSY_KOD_TO_NAME } from '@/lib/bsy'
@@ -126,7 +127,7 @@ export function TahsilatPlanimView({
       if (isAdmin) {
         if (selectedBsy) {
           // Belirli bir BSY seçili - sadece onun verilerini çek
-          const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(selectedBsy)}`)
+          const res = await authFetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(selectedBsy)}`)
           const data = await res.json()
           allRows = (data.rows || []).map((r: TahsilatPlanimRow) => ({
             ...r,
@@ -135,7 +136,7 @@ export function TahsilatPlanimView({
         } else {
           // BSY seçili değil - TÜM BSY'lerin verilerini PARALEL çek (hızlı!)
           const promises = BSY_LISTESI.map(async (bsy) => {
-            const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(bsy)}`)
+            const res = await authFetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(bsy)}`)
             const data = await res.json()
             return (data.rows || []).map((r: TahsilatPlanimRow) => ({
               ...r,
@@ -154,7 +155,7 @@ export function TahsilatPlanimView({
           : [bsyAdi]
 
         for (const bsy of bsyAdlari) {
-          const res = await fetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(bsy)}`)
+          const res = await authFetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(bsy)}`)
           const data = await res.json()
           const rowsWithBsy = (data.rows || []).map((r: TahsilatPlanimRow) => ({
             ...r,
@@ -200,7 +201,7 @@ export function TahsilatPlanimView({
         [field]: field === 'tutar' ? (value as number | null) : (value as string)
       }
 
-      await fetch('/api/tahsilat-planim', {
+      await authFetch('/api/tahsilat-planim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

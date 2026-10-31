@@ -395,11 +395,11 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   useEffect(() => {
     if (!active) return
     const [yil, ay] = donem.split('-')
-    fetch(`/api/adet-prim?yil=${yil}&ay=${ay}`)
+    authFetch(`/api/adet-prim?yil=${yil}&ay=${ay}`)
       .then(r => r.json())
       .then(d => setAdetPrimData(d.rows || []))
       .catch(() => setAdetPrimData([]))
-    fetch(`/api/prim-ozel?yil=${yil}`)
+    authFetch(`/api/prim-ozel?yil=${yil}`)
       .then(r => r.json())
       .then(d => setOzelPrimData(d.rows || []))
       .catch(() => setOzelPrimData([]))
@@ -426,7 +426,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   // Destek personeli flag verilerini fetch et
   useEffect(() => {
     if (!active) return
-    fetch(`/api/merch-destek-flag?donem=${donem}`)
+    authFetch(`/api/merch-destek-flag?donem=${donem}`)
       .then(r => r.json())
       .then(d => {
         const dmap: Record<string, boolean> = {}
@@ -2107,7 +2107,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
           destekInitial={(key) => destekFlags[key] ?? false}
           gizleInitial={(key) => gizleFlags[key] ?? false}
           onSaveDestek={async (flags) => {
-            await fetch('/api/merch-destek-flag', {
+            await authFetch('/api/merch-destek-flag', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ donem, flags }),

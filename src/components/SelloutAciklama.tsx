@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { authFetch } from '@/lib/authFetch'
 import { Info, Edit2, Save, X, Plus } from 'lucide-react'
 
 // Sellout ▸ Süpervizör / Jr. Süpervizör / Merch sekmelerinde aylık açıklama notu.
@@ -22,7 +23,7 @@ export function SelloutAciklama({
     let iptal = false
     setEdit(false)
     setMetin('')
-    fetch(`/api/sellout-aciklama?donem=${donem}&sekme=${sekme}`)
+    authFetch(`/api/sellout-aciklama?donem=${donem}&sekme=${sekme}`)
       .then(r => r.json())
       .then(d => { if (!iptal) setMetin(d.metin ?? '') })
       .catch(() => { if (!iptal) setMetin('') })
@@ -32,7 +33,7 @@ export function SelloutAciklama({
   const kaydet = async () => {
     setSaving(true)
     try {
-      const res = await fetch('/api/sellout-aciklama', {
+      const res = await authFetch('/api/sellout-aciklama', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ donem, sekme, metin: taslak, updated_by: profileId }),

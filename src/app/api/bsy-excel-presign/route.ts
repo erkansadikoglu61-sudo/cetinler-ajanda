@@ -1,10 +1,13 @@
+import { requireRole, ROLLER } from '@/lib/apiAuth'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 const BUCKET   = 'bsy-excel'
 const OBJ_NAME = 'SAHA.xlsx'
 
-export async function POST() {
+export async function POST(req: Request) {
+  const yetki = await requireRole(req, ROLLER.ADMIN_BSY)
+  if (yetki instanceof NextResponse) return yetki
   try {
     const sb = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

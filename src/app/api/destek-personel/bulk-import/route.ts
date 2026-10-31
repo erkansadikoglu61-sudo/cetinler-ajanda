@@ -1,3 +1,4 @@
+import { requireRole, ROLLER } from '@/lib/apiAuth'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -104,7 +105,9 @@ const DESTEK_PERSONELLERI = [
   { cari: 'EVKUR ALIŞVERİŞ MERKEZLERİ TİC', sube: 'ESKİŞEHİR', merch: 'Emine Pelin Tosun' },
 ]
 
-export async function POST() {
+export async function POST(req: Request) {
+  const yetki = await requireRole(req, ROLLER.ADMIN)
+  if (yetki instanceof NextResponse) return yetki
   try {
     const sb = getAdmin()
 

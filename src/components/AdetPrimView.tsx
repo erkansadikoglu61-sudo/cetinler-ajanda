@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { authFetch } from '@/lib/authFetch'
 import { supabase } from '@/lib/supabase'
 import { createPortal } from 'react-dom'
 import { RefreshCw, Edit2, Save, X, ChevronDown, Plus, Trash2, FileDown } from 'lucide-react'
@@ -185,7 +186,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const r = await fetch(`/api/prim-ozel?yil=${yil}`)  // ay filtresi yok — tarih aralığı kısıtı satırda
+      const r = await authFetch(`/api/prim-ozel?yil=${yil}`)  // ay filtresi yok — tarih aralığı kısıtı satırda
       const d = await r.json()
       setRows((d.rows ?? []).map((x: Record<string,unknown>) => ({
         id: x.id, stokKodu: x.stok_kodu ?? null, grupKodu: x.grup_kodu ?? null,
@@ -230,7 +231,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
   async function addRow() {
     setSaving(true); setMsg(null)
     try {
-      const r = await fetch('/api/prim-ozel', {
+      const r = await authFetch('/api/prim-ozel', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newRow),
       })
@@ -251,7 +252,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
   async function saveEdit(id: string) {
     setSaving(true); setMsg(null)
     try {
-      const r = await fetch(`/api/prim-ozel?id=${id}`, {
+      const r = await authFetch(`/api/prim-ozel?id=${id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editBuf),
       })
@@ -267,7 +268,7 @@ function OzelPrimler({ yil, ay }: { yil: number; ay: number }) {
     if (!confirm('Bu özel primi silmek istiyor musunuz?')) return
     setSaving(true)
     try {
-      await fetch(`/api/prim-ozel?id=${id}`, { method: 'DELETE' })
+      await authFetch(`/api/prim-ozel?id=${id}`, { method: 'DELETE' })
       setRows(prev => prev.filter(x => x.id !== id))
       setMsg('✓ Silindi')
     } finally { setSaving(false) }
@@ -466,7 +467,7 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
     setLoading(true)
     setMsg(null)
     try {
-      const res  = await fetch(`/api/adet-prim?yil=${yil}&ay=${ay}`)
+      const res  = await authFetch(`/api/adet-prim?yil=${yil}&ay=${ay}`)
       const data = await res.json()
       setRows(data.rows ?? [])
     } finally {
@@ -519,7 +520,7 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
           kosulluDestek: r.kosulluDestek !== '' ? parseInt(r.kosulluDestek) || null : null,
         }))
       const allRows = [...draft, ...validNew]
-      const res = await fetch('/api/adet-prim', {
+      const res = await authFetch('/api/adet-prim', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ yil, ay, rows: allRows }),
@@ -924,9 +925,9 @@ export function PrimOdemeListesi({
       const donem = `${yil}-${String(ay).padStart(2, '0')}`
       const [bayiRes, destekRes, detayRes, digerRes] = await Promise.all([
         fetch(`/api/bayi-merch-prim?yil=${yil}&ay=${ay}`),
-        fetch(`/api/destek-hakedis?yil=${yil}&ay=${ay}`),
+        authFetch(`/api/destek-hakedis?yil=${yil}&ay=${ay}`),
         fetch('/api/merch-detay'),
-        fetch(`/api/diger-prim?donem=${donem}&user=${userId}&mode=odeme`),
+        authFetch(`/api/diger-prim?donem=${donem}&user=${userId}&mode=odeme`),
       ])
       const [bayiData, destekData, detayData] = await Promise.all([bayiRes.json(), destekRes.json(), detayRes.json()])
       // Diğer kayıtları yüklenemezse (ör. yetki) liste yine de gösterilir

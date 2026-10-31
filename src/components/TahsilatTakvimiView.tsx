@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { authFetch } from '@/lib/authFetch'
 import { RefreshCw, X } from 'lucide-react'
 
 const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
@@ -91,7 +92,7 @@ export function TahsilatTakvimiView({ isAdmin = false, bsyAdi = '' }: { isAdmin?
       // BSY kullanıcısı ise sadece kendi carilerini getir (admin/manager tümünü görür)
       const bsyQs = bsyAdi ? `?bsyAdi=${encodeURIComponent(bsyAdi)}` : ''
       const [planRes, gercRes] = await Promise.all([
-        fetch(`/api/tahsilat-planim${bsyQs}`),
+        authFetch(`/api/tahsilat-planim${bsyQs}`),
         fetch(`/api/tahsilat-gerceklesen${bsyQs}`),
       ])
       if (!planRes.ok) throw new Error('API hatası')

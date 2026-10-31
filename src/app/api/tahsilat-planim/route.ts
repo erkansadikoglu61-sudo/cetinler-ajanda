@@ -1,3 +1,4 @@
+import { requireRole, ROLLER } from '@/lib/apiAuth'
 import { NextResponse } from 'next/server'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -230,6 +231,8 @@ export async function GET(req: Request) {
 
 // POST: Kullanıcı seçimlerini kaydet
 export async function POST(req: Request) {
+  const yetki = await requireRole(req, ROLLER.MERCH_HARIC)
+  if (yetki instanceof NextResponse) return yetki
   try {
     const body = await req.json()
     const { bsyAdi, yil, ay, cariKod, tahsilatHaftasi, tutar, tahsilatTuru } = body

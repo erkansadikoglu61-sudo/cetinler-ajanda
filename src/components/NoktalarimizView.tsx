@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
+import { authFetch } from '@/lib/authFetch'
 import { Search, X, ChevronRight, RefreshCw, User, Users, ShoppingBag, Store, ChevronDown, Plus, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 import { Profile, BsySupervisor, supabase } from '@/lib/supabase'
@@ -191,7 +192,7 @@ function SubeDetail({ sube, onClose, currentProfile, onRefresh }: SubeDetailProp
 
   // Panel açıldığında DB'den güncel listeyi çek (prop stale olabilir)
   useEffect(() => {
-    fetch(`/api/destek-personel?sube_adi=${encodeURIComponent(sube.subeAdi)}&cari_adi=${encodeURIComponent(sube.cariIsim)}`)
+    authFetch(`/api/destek-personel?sube_adi=${encodeURIComponent(sube.subeAdi)}&cari_adi=${encodeURIComponent(sube.cariIsim)}`)
       .then(r => r.json())
       .then(d => {
         if (Array.isArray(d.data)) {
@@ -208,7 +209,7 @@ function SubeDetail({ sube, onClose, currentProfile, onRefresh }: SubeDetailProp
     setMsg('')
 
     try {
-      const res = await fetch('/api/destek-personel', {
+      const res = await authFetch('/api/destek-personel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -246,7 +247,7 @@ function SubeDetail({ sube, onClose, currentProfile, onRefresh }: SubeDetailProp
 
     try {
       // Önce ID'yi bul
-      const getRes = await fetch(`/api/destek-personel?sube_adi=${encodeURIComponent(sube.subeAdi)}&cari_adi=${encodeURIComponent(sube.cariIsim)}`)
+      const getRes = await authFetch(`/api/destek-personel?sube_adi=${encodeURIComponent(sube.subeAdi)}&cari_adi=${encodeURIComponent(sube.cariIsim)}`)
       const getData = await getRes.json()
 
       const record = getData.data?.find((d: { merch_adi: string }) => d.merch_adi === merchName)
@@ -256,7 +257,7 @@ function SubeDetail({ sube, onClose, currentProfile, onRefresh }: SubeDetailProp
         return
       }
 
-      const res = await fetch(`/api/destek-personel?id=${record.id}`, {
+      const res = await authFetch(`/api/destek-personel?id=${record.id}`, {
         method: 'DELETE',
       })
 
@@ -486,7 +487,7 @@ export function NoktalarimizView({ currentProfile, team, bsyLinks }: Props) {
     setImportMsg('')
 
     try {
-      const res = await fetch('/api/destek-personel/bulk-import', {
+      const res = await authFetch('/api/destek-personel/bulk-import', {
         method: 'POST',
       })
 

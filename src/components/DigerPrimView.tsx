@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { authFetch } from '@/lib/authFetch'
 import { RefreshCw, Save, X, ChevronDown, Plus, Trash2, Search } from 'lucide-react'
 import clsx from 'clsx'
 import { normalizeName } from '@/lib/sellout'
@@ -84,7 +85,7 @@ export function DigerPrimView({ userId }: { userId: string }) {
     setLoading(true)
     setError(null)
     try {
-      const res  = await fetch(`/api/diger-prim?donem=${donem}&user=${userId}`)
+      const res  = await authFetch(`/api/diger-prim?donem=${donem}&user=${userId}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Yükleme hatası')
       setSubeAdet(data.subeAdet ?? {})
@@ -135,7 +136,7 @@ export function DigerPrimView({ userId }: { userId: string }) {
     patch(r.key, { saving: true })
     setError(null)
     try {
-      const res = await fetch('/api/diger-prim', {
+      const res = await authFetch('/api/diger-prim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -159,7 +160,7 @@ export function DigerPrimView({ userId }: { userId: string }) {
   const deleteRow = async (r: DigerRow) => {
     if (r.id) {
       if (!confirm(`${r.kullanici_adi || 'Bu satır'} silinsin mi?`)) return
-      const res = await fetch(`/api/diger-prim?id=${r.id}&user=${userId}`, { method: 'DELETE' })
+      const res = await authFetch(`/api/diger-prim?id=${r.id}&user=${userId}`, { method: 'DELETE' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         setError(data.error ?? 'Silme hatası')

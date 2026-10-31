@@ -54,10 +54,10 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
       const [destekRes, selloutRes, primRes, targetsRes, hakedisRes, flagRes] = await Promise.all([
         fetch(`/api/destek-personel-prim?${params}`),
         fetch('/api/sellout'),
-        fetch(`/api/adet-prim?yil=${yil}&ay=${ay}`),
+        authFetch(`/api/adet-prim?yil=${yil}&ay=${ay}`),
         authFetch(`/api/sellout-targets?donem=${donem}`),
-        fetch(`/api/destek-hakedis?yil=${yil}&ay=${ay}`),
-        fetch(`/api/merch-destek-flag?donem=${donem}`),
+        authFetch(`/api/destek-hakedis?yil=${yil}&ay=${ay}`),
+        authFetch(`/api/merch-destek-flag?donem=${donem}`),
       ])
 
       const [destekData, selloutData, primData, targetsData, hakedisData, flagData] = await Promise.all([
@@ -212,7 +212,7 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
     const r = rows[idx]
     if (!r) return
     try {
-      const res = await fetch('/api/destek-hakedis', {
+      const res = await authFetch('/api/destek-hakedis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -82,8 +82,8 @@ export function NihaiPrimListesi({
         const aylar = Array.from({ length: 12 }, (_, i) => i + 1)
         const [bsyRes, odemeRes, ekRes, mdRes, ...targetRes] = await Promise.all([
           fetch(`/api/nihai-prim-bsy?yil=${yil}`).then(r => r.json()).catch(() => ({ rows: [] })),
-          fetch(`/api/nihai-prim-odeme?yil=${yil}`).then(r => r.json()).catch(() => ({ rows: [] })),
-          fetch(`/api/nihai-prim-ek?yil=${yil}`).then(r => r.json()).catch(() => ({ rows: [] })),
+          authFetch(`/api/nihai-prim-odeme?yil=${yil}`).then(r => r.json()).catch(() => ({ rows: [] })),
+          authFetch(`/api/nihai-prim-ek?yil=${yil}`).then(r => r.json()).catch(() => ({ rows: [] })),
           fetch('/api/merch-detay').then(r => r.json()).catch(() => ({ data: [] })),
           ...aylar.map(ay =>
             authFetch(`/api/sellout-targets?donem=${yil}-${mm(ay)}`).then(r => r.json()).catch(() => ({ profile_targets: [], merch_targets: [] }))
@@ -258,7 +258,7 @@ export function NihaiPrimListesi({
     try {
       // 1. Ek prim (değiştiyse)
       if (ekDegisti) {
-        const r1 = await fetch('/api/nihai-prim-ek', {
+        const r1 = await authFetch('/api/nihai-prim-ek', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -283,7 +283,7 @@ export function NihaiPrimListesi({
         setEdit(null)
         return
       }
-      const res = await fetch('/api/nihai-prim-odeme', {
+      const res = await authFetch('/api/nihai-prim-odeme', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -345,7 +345,7 @@ export function NihaiPrimListesi({
         const paid = !!bulkChecked[pKey(x.tip, x.ad)]
         return { yil, ay: bulkAy, kullanici_tipi: x.tip, kullanici_adi: x.ad, odendi: paid, odeme_tarihi: paid ? bulkTarih : null }
       })
-      const res = await fetch('/api/nihai-prim-odeme', {
+      const res = await authFetch('/api/nihai-prim-odeme', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items, updated_by: currentProfile.id }),
       })

@@ -1,3 +1,4 @@
+import { requireRole, ROLLER } from '@/lib/apiAuth'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -8,6 +9,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
+  const yetki = await requireRole(req, ROLLER.ADMIN_BSY)
+  if (yetki instanceof NextResponse) return yetki
   try {
     const formData = await req.formData()
     const file = formData.get('file') as File | null

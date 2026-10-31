@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { authFetch } from '@/lib/authFetch'
 import { RefreshCw, ChevronDown, Settings2, X, Save, Upload, SlidersHorizontal, ImagePlus } from 'lucide-react'
 // Save intentionally kept for HedefModal
 import clsx from 'clsx'
@@ -28,7 +29,7 @@ function useBsyParametreler() {
   const [saving,  setSaving]  = useState(false)
   const load = useCallback(async () => {
     try {
-      const res  = await fetch('/api/bsy-parametreler')
+      const res  = await authFetch('/api/bsy-parametreler')
       const json = await res.json()
       const map: Params = { ...DEFAULT_PARAMS }
       ;(json.rows ?? []).forEach((r: { key: string; value: number }) => { map[r.key] = r.value })
@@ -40,7 +41,7 @@ function useBsyParametreler() {
     setSaving(true)
     try {
       const rows = Object.entries(newParams).map(([key, value]) => ({ key, label: key, value }))
-      await fetch('/api/bsy-parametreler', {
+      await authFetch('/api/bsy-parametreler', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows }),
       })
@@ -170,7 +171,7 @@ function ParametrelerModal({ isAdmin, onClose }: { isAdmin: boolean; onClose: ()
 
   useEffect(() => {
     // API'den görseli al
-    fetch('/api/bsy-param-img')
+    authFetch('/api/bsy-param-img')
       .then(res => res.json())
       .then(data => {
         if (data.url) {
@@ -198,7 +199,7 @@ function ParametrelerModal({ isAdmin, onClose }: { isAdmin: boolean; onClose: ()
       const formData = new FormData()
       formData.append('file', file)
 
-      const res = await fetch('/api/bsy-param-img', {
+      const res = await authFetch('/api/bsy-param-img', {
         method: 'POST',
         body: formData
       })
@@ -796,7 +797,7 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
     setUploadMsg(null)
     try {
       // 1. Supabase'den imzalı yükleme URL'si al (Vercel üzerinden küçük istek)
-      const presignRes = await fetch('/api/bsy-excel-presign', { method: 'POST' })
+      const presignRes = await authFetch('/api/bsy-excel-presign', { method: 'POST' })
       const presign    = await presignRes.json()
       if (!presignRes.ok) throw new Error(presign.error ?? 'Presign hatası')
 

@@ -1,3 +1,4 @@
+import { requireRole, ROLLER } from '@/lib/apiAuth'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { BrandKey, BRAND_KEYS, BsyHedefRecord } from '@/lib/bsy'
@@ -45,6 +46,8 @@ export async function GET(req: Request) {
 // POST /api/bsy-hedef
 // Body: { yil, ay, records: { brand, hedefCiro, toplamPrim }[] }
 export async function POST(req: Request) {
+  const yetki = await requireRole(req, ROLLER.ADMIN_BSY)
+  if (yetki instanceof NextResponse) return yetki
   try {
     const body = await req.json()
     const { yil, ay, records } = body as {
