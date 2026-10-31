@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { authFetch } from '@/lib/authFetch'
 import { RefreshCw, X, Check, FileDown } from 'lucide-react'
 import clsx from 'clsx'
 import * as XLSX from 'xlsx'
@@ -85,7 +86,7 @@ export function NihaiPrimListesi({
           fetch(`/api/nihai-prim-ek?yil=${yil}`).then(r => r.json()).catch(() => ({ rows: [] })),
           fetch('/api/merch-detay').then(r => r.json()).catch(() => ({ data: [] })),
           ...aylar.map(ay =>
-            fetch(`/api/sellout-targets?donem=${yil}-${mm(ay)}`).then(r => r.json()).catch(() => ({ profile_targets: [], merch_targets: [] }))
+            authFetch(`/api/sellout-targets?donem=${yil}-${mm(ay)}`).then(r => r.json()).catch(() => ({ profile_targets: [], merch_targets: [] }))
           ),
         ])
         if (iptal) return

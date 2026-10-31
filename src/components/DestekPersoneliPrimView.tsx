@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { authFetch } from '@/lib/authFetch'
 import { RefreshCw, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
 import { GRUP_NORMALIZE } from '@/lib/sellout'
@@ -48,7 +49,7 @@ export function DestekPersoneliPrimView({ currentUserRole, currentUserId, curren
         fetch(`/api/destek-personel-prim?${params}`),
         fetch('/api/sellout'),
         fetch(`/api/adet-prim?yil=${yil}&ay=${ay}`),
-        fetch(`/api/sellout-targets?donem=${donem}`),
+        authFetch(`/api/sellout-targets?donem=${donem}`),
       ])
       const [destekData, selloutData, primData, targetsData] = await Promise.all([
         destekRes.json(), selloutRes.json(), primRes.json(), targetsRes.json(),

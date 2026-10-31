@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
+import { authFetch } from '@/lib/authFetch'
 import { RefreshCw, X, Save, Target, ChevronDown, FileDown } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import clsx from 'clsx'
@@ -407,7 +408,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   // Merch hedef verilerini fetch et
   useEffect(() => {
     if (!active) return
-    fetch(`/api/sellout-targets?donem=${donem}`)
+    authFetch(`/api/sellout-targets?donem=${donem}`)
       .then(r => r.json())
       .then(d => setMerchHedefData(d.merch_targets || []))
       .catch(() => setMerchHedefData([]))

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { authFetch } from '@/lib/authFetch'
 import { RefreshCw, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
 import { GRUP_NORMALIZE } from '@/lib/sellout'
@@ -54,7 +55,7 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
         fetch(`/api/destek-personel-prim?${params}`),
         fetch('/api/sellout'),
         fetch(`/api/adet-prim?yil=${yil}&ay=${ay}`),
-        fetch(`/api/sellout-targets?donem=${donem}`),
+        authFetch(`/api/sellout-targets?donem=${donem}`),
         fetch(`/api/destek-hakedis?yil=${yil}&ay=${ay}`),
         fetch(`/api/merch-destek-flag?donem=${donem}`),
       ])

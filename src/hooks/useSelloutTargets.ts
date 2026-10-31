@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { authFetch } from '@/lib/authFetch'
 
 export interface ProfileTarget {
   id?: string
@@ -31,7 +32,7 @@ export function useSelloutTargets(donem: string) {
     if (!donem) return
     setLoading(true)
     try {
-      const res  = await fetch(`/api/sellout-targets?donem=${donem}`)
+      const res  = await authFetch(`/api/sellout-targets?donem=${donem}`)
       const json = await res.json()
       setProfileTargets(json.profile_targets ?? [])
       setMerchTargets(json.merch_targets ?? [])
@@ -57,7 +58,7 @@ export function useSelloutTargets(donem: string) {
   const upsertProfileTargets = async (targets: ProfileTarget[]): Promise<boolean> => {
     setSaving(true)
     try {
-      const res = await fetch('/api/sellout-targets', {
+      const res = await authFetch('/api/sellout-targets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'profile', targets }),
@@ -70,7 +71,7 @@ export function useSelloutTargets(donem: string) {
   const upsertMerchTargets = async (targets: MerchTarget[]): Promise<boolean> => {
     setSaving(true)
     try {
-      const res = await fetch('/api/sellout-targets', {
+      const res = await authFetch('/api/sellout-targets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'merch', targets }),
