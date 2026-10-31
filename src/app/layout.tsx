@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import ApiAuthFetch from '@/components/ApiAuthFetch'
 
 export const metadata: Metadata = {
   title: 'Çetinler Saha Ajandası',
@@ -26,7 +27,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="tr">
-      <body className="antialiased bg-white text-gray-900">{children}</body>
+      <body className="antialiased bg-white text-gray-900"><ApiAuthFetch />{children}</body>
     </html>
   )
 }
