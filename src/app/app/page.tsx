@@ -1364,6 +1364,13 @@ function CompletedVisitsView({
     ? completedVisits.filter(t => (t.customer || '').toLowerCase().includes(cariFilter.toLowerCase()))
     : completedVisits
 
+  // Görünen (filtrelenmiş) ziyaretlerin ziyaret nedenine göre özeti — filtre değişince dinamik
+  const ozetSayilar = (() => {
+    const m = new Map<string, number>()
+    visibleVisits.forEach(t => m.set(t.type, (m.get(t.type) || 0) + 1))
+    return [...m.entries()].sort((a, b) => b[1] - a[1])
+  })()
+
   // ── Harita için: cari/şube → koordinat havuzu (tüm check-in'lerden) ──
   const customerCoords = useMemo(() => {
     const m = new Map<string, [number, number]>()
@@ -1531,6 +1538,23 @@ function CompletedVisitsView({
       <div className="flex-1 overflow-x-auto">
       <table className="w-full text-sm border-collapse">
         <thead className="bg-gray-50 sticky top-0">
+          <tr className="border-b bg-gray-100">
+            <th colSpan={5} className="text-left px-4 py-2">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
+                <span className="font-semibold text-gray-800">Özet:</span>
+                {ozetSayilar.length === 0 ? (
+                  <span className="text-gray-400">Kayıt yok</span>
+                ) : (
+                  <>
+                    {ozetSayilar.map(([tip, adet]) => (
+                      <span key={tip}>{tip}: <span className="font-semibold text-gray-800">{adet}</span></span>
+                    ))}
+                    <span className="ml-auto">Toplam: <span className="font-semibold text-gray-800">{visibleVisits.length}</span></span>
+                  </>
+                )}
+              </div>
+            </th>
+          </tr>
           <tr className="border-b">
             <th className="text-left px-4 py-3 font-medium text-gray-700">Ziyaret Edilen Cari / Şube</th>
             <th className="text-left px-4 py-3 font-medium text-gray-700">Ziyaret Tarihi</th>
