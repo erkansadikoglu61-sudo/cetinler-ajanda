@@ -87,7 +87,13 @@ function TaskSheet({
   const [date, setDate] = useState(task?.date ?? format(selectedDate, 'yyyy-MM-dd'))
   const [endDate, setEndDate] = useState(task?.date ?? format(selectedDate, 'yyyy-MM-dd'))
   const [time, setTime] = useState(task?.time?.substring(0, 5) ?? '09:00')
-  const [type, setType] = useState(task?.type ?? TASK_TYPES[0])
+  // Süpervizör (sup) ve Jr. Süpervizör (jr) rollerinde "Bayi Ziyareti" tipi gizlenir.
+  // Mevcut bir kayıt zaten "Bayi Ziyareti" ise, veriyi bozmamak için o değer korunur.
+  const isSupOrJr = currentProfile.role === 'sup' || currentProfile.role === 'jr'
+  const availableTypes = isSupOrJr
+    ? TASK_TYPES.filter(t => t !== 'Bayi Ziyareti' || t === task?.type)
+    : TASK_TYPES
+  const [type, setType] = useState(task?.type ?? availableTypes[0])
   const [customer, setCustomer] = useState(task?.customer ?? '')
   const [description, setDescription] = useState(task?.description ?? '')
   const [noteText, setNoteText] = useState('')
@@ -394,7 +400,7 @@ function TaskSheet({
               disabled={!canEdit}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-500"
             >
-              {TASK_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              {availableTypes.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
 
