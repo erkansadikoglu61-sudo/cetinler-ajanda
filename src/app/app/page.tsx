@@ -1549,7 +1549,7 @@ function CompletedVisitsView({
                     {ozetSayilar.map(([tip, adet]) => (
                       <span key={tip}>{tip}: <span className="font-semibold text-gray-800">{adet}</span></span>
                     ))}
-                    <span className="ml-auto">Toplam: <span className="font-semibold text-gray-800">{visibleVisits.length}</span></span>
+                    <span className="pl-4 border-l border-gray-300 font-semibold text-gray-900">Toplam: {visibleVisits.length}</span>
                   </>
                 )}
               </div>
