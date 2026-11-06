@@ -831,6 +831,7 @@ const ODEME_ISTISNALARI: { cari: string; allow?: string[]; deny?: string[]; yil?
   { cari: 'kolay home', deny: ['Fazilet Aydın'], from: '2026-08' }, // Ağu 2026 ve sonrası → ödenmez
   { cari: 'kolay home', allow: ['Gülser Çevik', 'Fazilet Aydın', 'Büşra Çalcalı'] }, // yalnızca bu üçü ödenir
   { cari: 'çınarlar dtm', yil: 2026, aylar: [6, 7, 8] },            // Haz/Tem/Ağu 2026 → ödenmez
+  { cari: 'evdiz', from: '2026-09' },                               // Eylül 2026 ve sonrası → ödenmez
 ]
 
 // IBAN'ı standart formata çevir: TR + 24 hane = 26 karakter, 4'erli gruplar
@@ -1057,7 +1058,7 @@ export function PrimOdemeListesi({
     return opts.sort((a, b) => a.localeCompare(b, 'tr'))
   }, [allRows])
 
-  const filtered = allRows.filter(r => {
+  const filteredRaw = allRows.filter(r => {
     if (bsyKodFilter !== null && r.bsyKod !== bsyKodFilter) return false
     if (supervisorFilter !== null) {
       const match = supervisorFilter.some(sf => normSupName(sf) === normSupName(r.supAdi))
@@ -1068,6 +1069,24 @@ export function PrimOdemeListesi({
     if (cariFilter && !r.cariAdi.toLowerCase().includes(cariFilter.toLowerCase())) return false
     return true
   })
+
+  // Aynı kişiyi (Merch + Cari + Şube) tek satırda birleştir, hakedişleri topla.
+  // Kaynak veride aynı kişi farklı süpervizör/isim yazımıyla birden çok hakediş
+  // satırı üretebiliyor (TEKRAR). Ödeme tek satır olmalı → burada birleştirilir.
+  const filtered = (() => {
+    const map = new Map<string, PrimOdemeRow>()
+    for (const r of filteredRaw) {
+      const k = `${normOdeme(r.merchAdi)}||${normOdeme(r.cariAdi)}||${normOdeme(r.subeAdi)}`
+      const ex = map.get(k)
+      if (ex) {
+        ex.hakedis += r.hakedis
+        ex.manuel = Boolean(ex.manuel && r.manuel)  // yalnızca hepsi manuel ise manuel
+      } else {
+        map.set(k, { ...r })
+      }
+    }
+    return [...map.values()]
+  })()
 
   const toplamPrim = filtered.reduce((s, r) => s + r.hakedis, 0)
   const toplamOdenecek = filtered.reduce((s, r) => s + hesaplaOdenecek(r, yil, ay), 0)
