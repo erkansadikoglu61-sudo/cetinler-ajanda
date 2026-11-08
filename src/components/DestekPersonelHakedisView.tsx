@@ -152,6 +152,7 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
       // hesaplandığından, o ay o şubede satış giren Çetinler Merch (en çok adet)
       // esas alınır; o ay satış yoksa güncel atama kullanılır.
       const shortCari = (c: string) => nk(c).split(' ').slice(0, 2).join(' ')
+      const donemMerchKod   = new Map<string, Map<string, number>>()   // şube kodu (en güvenilir)
       const donemMerchFull  = new Map<string, Map<string, number>>()
       const donemMerchShort = new Map<string, Map<string, number>>()
       if (donem >= DONEM_MERCH_BASLANGIC) {
@@ -165,13 +166,16 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
           const merch = ((r.merch_personel as string) || '').trim()
           if (!merch) continue
           const adet = (r.satilan_adet as number) || 0
+          const kod  = ((r.sube_kod as string) || '').trim()
+          if (kod) ekle(donemMerchKod, kod, merch, adet)
           ekle(donemMerchFull,  `${nk(r.sube_adi as string)}||${nk(r.cari_isim as string)}`, merch, adet)
           ekle(donemMerchShort, `${nk(r.sube_adi as string)}||${shortCari(r.cari_isim as string)}`, merch, adet)
         }
       }
       const enCokSatan = (m?: Map<string, number>) =>
         m ? [...m.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '' : ''
-      const donemMerchOf = (cari: string, sube: string) =>
+      const donemMerchOf = (kod: string, cari: string, sube: string) =>
+        (kod ? enCokSatan(donemMerchKod.get(kod.trim())) : '') ||
         enCokSatan(donemMerchFull.get(`${nk(sube)}||${nk(cari)}`)) ||
         enCokSatan(donemMerchShort.get(`${nk(sube)}||${shortCari(cari)}`))
 
@@ -179,12 +183,12 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
       // Dedup key: cari_adi + sube_adi + cetinler_merch + merch_adi (kullanıcı isteği)
       const seen = new Set<string>()
       const built: HakedisRow[] = []
-      const destekRows: Array<{ merch_adi: string; sube_adi: string; cari_adi: string; cetinler_merch: string; sup_adi: string; parent_sup_adi: string }> =
+      const destekRows: Array<{ merch_adi: string; sube_adi: string; sube_kod?: string; cari_adi: string; cetinler_merch: string; sup_adi: string; parent_sup_adi: string }> =
         destekData.rows ?? []
 
       for (const dp of destekRows) {
         const apiMerch = dp.cetinler_merch === '-' ? '' : (dp.cetinler_merch || '')
-        const effMerch = donemMerchOf(dp.cari_adi, dp.sube_adi) || apiMerch
+        const effMerch = donemMerchOf(dp.sube_kod || '', dp.cari_adi, dp.sube_adi) || apiMerch
         const mk = effMerch.toLowerCase()
 
         // Merch Hedefleri'nde "Destek Personeli var mı?" = true olmayanları filtrele

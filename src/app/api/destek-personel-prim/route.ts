@@ -13,6 +13,7 @@ function getAdmin() {
 interface DestekPersonelRow {
   merch_adi:           string
   sube_adi:            string
+  sube_kod:            string   // B2B SUBE_KODU (eşleşen kayıttan; yoksa '')
   cari_adi:            string
   cetinler_merch:      string
   sup_adi:             string   // Jr. Sup varsa Jr. adı, yoksa doğrudan Sup adı
@@ -62,6 +63,7 @@ export async function GET(req: Request) {
 
     type PhpEntry = {
       cari_adi: string; sube_adi: string; merch: string; bsy: string; sup: string; jr: string
+      kod:    string
       hasKod: boolean  // SUBE_KODU dolu (kodsuz satırlar B2B'de eski/bozuk kayıt olabiliyor)
       aktif:  boolean  // süpervizör bugün görevde (lib/sellout AYRILANLAR)
     }
@@ -108,6 +110,7 @@ export async function GET(req: Request) {
         bsy,
         sup:      supAdiPHP,
         jr:       jrAdi,
+        kod:      subeKodu,
         hasKod:   !!subeKodu,
         aktif:    !supAdiPHP || donemdeAktif(supAdiPHP, bugun),
       }
@@ -158,6 +161,7 @@ export async function GET(req: Request) {
       rows.push({
         merch_adi:           dp.merch_adi,
         sube_adi:            displaySube,
+        sube_kod:            php?.kod ?? '',
         cari_adi:            displayCari,
         cetinler_merch:      cetinlerMerch || '-',
         sup_adi:             displaySup,
