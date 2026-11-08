@@ -78,6 +78,7 @@ const EK_KATEGORI: Record<string, string> = {
 /** Belirli ay için nihai oranlar: Excel (veya defaults) + adet_prim_override. */
 export async function loadAdetPrimRates(sb: SupabaseClient, yil: number, ay: number): Promise<Record<string, AdetPrimRow>> {
   const primData = await loadBaseRates(sb)
+  const excelStoklari = new Set(Object.keys(primData))
   try {
     // kategori kolonu: elle eklenen (Excel'de olmayan) stokların kategorisi.
     // Kolon henüz yoksa (migration çalışmadıysa) eski sorguya düşülür.
@@ -105,6 +106,40 @@ export async function loadAdetPrimRates(sb: SupabaseClient, yil: number, ay: num
   } catch (e) {
     console.error('DB override fetch error:', e)
   }
+
+  // Elle eklenen (Excel'de olmayan) stoklar eklendikleri aydan SONRAKİ aylarda
+  // da geçerli: bu ay kaydı yoksa en son önceki ayın kaydı kullanılır. Sonraki
+  // bir ayda düzenlenirse o ay ve sonrası yeni değeri alır. Excel'deki stokların
+  // aylık override davranışı değişmez (yalnız kendi ayında geçerli).
+  try {
+    const hedef = yil * 12 + ay
+    const haric = [...excelStoklari, ...Object.keys(primData)]
+    const inList = `(${[...new Set(haric)].map(k => `"${k.replace(/"/g, '')}"`).join(',')})`
+    const sorgu = (kolonlar: string) => {
+      let q = sb.from('adet_prim_override').select(kolonlar).lte('yil', yil)
+      if (haric.length) q = q.not('stok_kodu', 'in', inList)
+      return q.order('yil', { ascending: false }).order('ay', { ascending: false })
+    }
+    let prev = await sorgu('stok_kodu, bayi_merch, kosullu_destek, kategori, yil, ay')
+    if (prev.error) prev = await sorgu('stok_kodu, bayi_merch, kosullu_destek, yil, ay')
+    const onceki = (prev.data ?? []) as unknown as {
+      stok_kodu: string; bayi_merch: number | null; kosullu_destek: number | null; kategori?: string | null; yil: number; ay: number
+    }[]
+    onceki.sort((a, b) => (b.yil * 12 + b.ay) - (a.yil * 12 + a.ay))   // en yeni ay önce
+    for (const row of onceki) {
+      if (row.yil * 12 + row.ay >= hedef) continue   // yalnızca önceki aylar
+      if (primData[row.stok_kodu]) continue           // en yeni ay zaten alındı
+      primData[row.stok_kodu] = {
+        stokKodu:      row.stok_kodu,
+        kategori:      row.kategori || null,
+        bayiMerch:     row.bayi_merch,
+        kosulluDestek: row.kosullu_destek,
+      }
+    }
+  } catch (e) {
+    console.error('Önceki ay override devri hatası:', e)
+  }
+
   for (const r of Object.values(primData)) {
     if (!r.kategori && EK_KATEGORI[r.stokKodu]) r.kategori = EK_KATEGORI[r.stokKodu]
   }

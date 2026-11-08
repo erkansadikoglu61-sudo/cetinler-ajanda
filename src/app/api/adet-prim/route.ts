@@ -70,7 +70,13 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ rows: Object.values(primData) })
+    // Sıralama: önce Kategori (grup), sonra Stok Kodu — alfabetik; kategorisiz en sonda
+    const rows = Object.values(primData).sort((a, b) => {
+      if (!a.kategori !== !b.kategori) return a.kategori ? -1 : 1
+      return (a.kategori ?? '').localeCompare(b.kategori ?? '', 'tr') ||
+        a.stokKodu.localeCompare(b.stokKodu, 'tr')
+    })
+    return NextResponse.json({ rows })
   } catch (e) {
     console.error('Adet prim API error:', e)
     return NextResponse.json({ error: String(e) }, { status: 500 })
