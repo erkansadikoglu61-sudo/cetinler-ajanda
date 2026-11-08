@@ -25,9 +25,27 @@ async function loadBaseRates(sb: SupabaseClient): Promise<Record<string, AdetPri
       console.error('Adet Primleri sheet not found. Available sheets:', wb.SheetNames)
       return fallback()
     }
+    const ws = wb.Sheets['Adet Primleri']
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const jsonData: any[][] = XLSX.utils.sheet_to_json(wb.Sheets['Adet Primleri'], { header: 1, defval: '' })
+    const jsonData: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
     if (jsonData.length < 2) return fallback()
+
+    // Birleştirilmiş hücreler (ör. Kategori / Marka sütunu grup boyunca tek
+    // hücre): değer yalnızca ilk satırda okunur, diğerleri boş kalır. Birleşik
+    // aralığın değerini kapsadığı tüm satırlara dağıt.
+    const aralik = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : { s: { r: 0, c: 0 } }
+    for (const m of ws['!merges'] ?? []) {
+      const ust = ws[XLSX.utils.encode_cell(m.s)]
+      const deger = ust?.v ?? ''
+      for (let r = m.s.r; r <= m.e.r; r++) {
+        const satir = jsonData[r - aralik.s.r]
+        if (!satir) continue
+        for (let c = m.s.c; c <= m.e.c; c++) {
+          const ci = c - aralik.s.c
+          if (satir[ci] === '' || satir[ci] == null) satir[ci] = deger
+        }
+      }
+    }
 
     // Başlık satırını bul (ilk 5 satırda tara)
     let headerRowIdx = 0
@@ -55,10 +73,11 @@ async function loadBaseRates(sb: SupabaseClient): Promise<Record<string, AdetPri
       if (!row || row.length === 0) continue
       const stokKodu = cols['stokKodu'] >= 0 ? String(row[cols['stokKodu']] ?? '').trim() : ''
       const kategori = cols['kategori'] >= 0 ? String(row[cols['kategori']] ?? '').trim() : ''
+      const marka    = cols['marka'] >= 0 ? String(row[cols['marka']] ?? '').trim() : ''
       const bayiMerch = cols['bayiMerch'] >= 0 ? parseFloat(String(row[cols['bayiMerch']] ?? '0')) || null : null
       const kosulluDestek = cols['kosulluDestek'] >= 0 ? parseFloat(String(row[cols['kosulluDestek']] ?? '0')) || null : null
       if (stokKodu && stokKodu.toLowerCase() !== 'stok kodu' && stokKodu.toLowerCase() !== 'stok_kodu') {
-        primData[stokKodu] = { stokKodu, kategori: kategori || null, bayiMerch, kosulluDestek }
+        primData[stokKodu] = { stokKodu, kategori: kategori || null, bayiMerch, kosulluDestek, marka: marka || null }
       }
     }
     return primData
@@ -101,6 +120,7 @@ export async function loadAdetPrimRates(sb: SupabaseClient, yil: number, ay: num
         kategori:      row.kategori || primData[row.stok_kodu]?.kategori || null,
         bayiMerch:     row.bayi_merch,
         kosulluDestek: row.kosullu_destek,
+        marka:         primData[row.stok_kodu]?.marka ?? null,
       }
     }
   } catch (e) {
