@@ -47,3 +47,6 @@ export async function GET() {
     grupStokMap:  grupStokMapSorted,
   })
 }
+
+// PHP raporu yavaş/büyük: kalıcı cache + arka plan yenileme için süre
+export const maxDuration = 300

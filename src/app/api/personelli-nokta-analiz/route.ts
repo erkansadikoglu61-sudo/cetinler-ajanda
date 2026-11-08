@@ -220,3 +220,6 @@ export async function GET(req: Request) {
     carilar,
   })
 }
+
+// PHP raporu yavaş/büyük: kalıcı cache + arka plan yenileme için süre
+export const maxDuration = 300

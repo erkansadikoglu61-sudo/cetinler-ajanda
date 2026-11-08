@@ -6,51 +6,168 @@
 //   const adet = num(rows[0]['SATILAN_ADET'])
 //   const merchTipi = rows[0]['MERCH_TIPI']
 
-// ── PHP HTML paylaşımlı bellek cache'i ───────────────────────────────
-// export_merch_satis.php ~28MB ve çekmesi ~10sn sürüyor. Next'in fetch
-// cache'i 2MB üstünü tutmadığı için her istek yeniden çekiyor, bu da
-// Vercel fonksiyon timeout'una yaklaşıp ara sıra 504 → boş sellout'a yol
-// açıyordu. Aynı URL'yi çeken tüm route'lar bu modül-seviyesi cache'i
-// paylaşır; sıcak instance'ta TTL boyunca tek çekim yeter.
-const HTML_TTL_MS = 10 * 60 * 1000 // 10 dk
+import { gzipSync, gunzipSync } from 'zlib'
+import { createHash } from 'crypto'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { after } from 'next/server'
+
+// ── PHP HTML paylaşımlı cache (bellek + Supabase Storage) ────────────
+// export_merch_satis.php tüm geçmişi tek seferde döndürüyor (~40MB, büyüyor)
+// ve b2b sunucusu yavaş; her sunucu fonksiyonu bunu ayrı ayrı çekince hem
+// Vercel süre limitine takılıyor (sayfada "Unexpected token 'A'…" hatası)
+// hem de PHP sunucusu daha da yavaşlıyordu. Çözüm:
+//   1. Bellek cache'i (sıcak instance, 10 dk) — eskisi gibi.
+//   2. Kalıcı cache: Supabase Storage'da gzip'li kopya (tüm instance'lar ortak).
+//      Taze (STORE_FRESH_MS) ise PHP'ye hiç gidilmez.
+//   3. Eskiyse: eski veri HEMEN döner, PHP arka planda (after) tazelenir.
+//      PHP çökse/zaman aşımına düşse bile sayfa son başarılı veriyle çalışır.
+// Kalıcı cache yalnızca sorgu parametresiz (büyük, ortak) rapor URL'lerinde.
+const HTML_TTL_MS = 10 * 60 * 1000            // bellek: 10 dk
+const STORE_FRESH_MS = 30 * 60 * 1000         // Storage kopyası bu süre "taze"
+const STORE_LOCK_MS = 5 * 60 * 1000           // aynı anda tek arka plan yenilemesi
+const PHP_TIMEOUT_MS = 240 * 1000             // route maxDuration (300) altında kalsın
+const STORE_BUCKET = 'bsy-excel'
+
 const htmlCache = new Map<string, { at: number; html: string }>()
 const htmlInflight = new Map<string, Promise<string>>()
+const refreshing = new Set<string>()
+
+let _sb: SupabaseClient | null | undefined
+function storeClient(): SupabaseClient | null {
+  if (_sb !== undefined) return _sb
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  _sb = url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }) : null
+  return _sb
+}
+
+function storePath(url: string, ext: string): string {
+  return `php-cache/${createHash('sha1').update(url).digest('hex').slice(0, 24)}.${ext}`
+}
+
+async function storeRead(url: string): Promise<{ at: number; html: string } | null> {
+  const sb = storeClient()
+  if (!sb) return null
+  try {
+    const { data, error } = await sb.storage.from(STORE_BUCKET).download(storePath(url, 'gz'))
+    if (error || !data) return null
+    const raw = gunzipSync(Buffer.from(await data.arrayBuffer())).toString('utf-8')
+    const nl = raw.indexOf('\n')
+    const at = Number(raw.slice(0, nl))
+    if (nl < 0 || !Number.isFinite(at)) return null
+    return { at, html: raw.slice(nl + 1) }
+  } catch {
+    return null
+  }
+}
+
+async function storeWrite(url: string, html: string, at: number): Promise<void> {
+  const sb = storeClient()
+  if (!sb) return
+  try {
+    const body = gzipSync(Buffer.from(`${at}\n${html}`, 'utf-8'))
+    const { error } = await sb.storage.from(STORE_BUCKET).upload(storePath(url, 'gz'), body, {
+      upsert: true, contentType: 'application/gzip', cacheControl: '0',
+    })
+    if (error) console.error('PHP cache yazılamadı:', url, error.message)
+  } catch (e) {
+    console.error('PHP cache yazılamadı:', url, e)
+  }
+}
+
+// Instance'lar arası kaba kilit: son 5 dk içinde başka biri yenilemeye başladıysa atla.
+async function storeTryLock(url: string): Promise<boolean> {
+  const sb = storeClient()
+  if (!sb) return true
+  const path = storePath(url, 'lock')
+  try {
+    const { data } = await sb.storage.from(STORE_BUCKET).download(path)
+    if (data) {
+      const t = Number(await data.text())
+      if (Number.isFinite(t) && Date.now() - t < STORE_LOCK_MS) return false
+    }
+    await sb.storage.from(STORE_BUCKET).upload(path, String(Date.now()), {
+      upsert: true, contentType: 'text/plain', cacheControl: '0',
+    })
+  } catch { /* kilit alınamasa da yenilemeye devam */ }
+  return true
+}
+
+// PHP hata sayfası / boş gövde ile iyi kopyanın üzerine yazmamak için.
+function looksValid(html: string): boolean {
+  return html.length > 1000 && /<tr[\s>]/i.test(html)
+}
+
+async function fetchFromPhp(url: string, headers?: Record<string, string>): Promise<string> {
+  // no-store: Next'in fetch enstrümantasyonunu atla (büyük gövdede sorunlu)
+  const res = await fetch(url, {
+    cache: 'no-store',
+    redirect: 'follow',
+    headers,
+    signal: AbortSignal.timeout(PHP_TIMEOUT_MS),
+  })
+  if (!res.ok) throw new Error(`PHP API ${res.status}`)
+  // arrayBuffer + tek seferde decode: atomik, doğru UTF-8
+  return new TextDecoder('utf-8').decode(await res.arrayBuffer())
+}
+
+// Yanıt gönderildikten sonra çalıştır (Vercel after); istek bağlamı yoksa arka planda.
+function runAfter(fn: () => Promise<void>): void {
+  try { after(fn) } catch { void fn() }
+}
+
+function scheduleRefresh(url: string, headers?: Record<string, string>): void {
+  if (refreshing.has(url)) return
+  refreshing.add(url)
+  runAfter(async () => {
+    try {
+      if (!(await storeTryLock(url))) return
+      const html = await fetchFromPhp(url, headers)
+      if (!looksValid(html)) return
+      const at = Date.now()
+      htmlCache.set(url, { at, html })
+      await storeWrite(url, html, at)
+    } catch (e) {
+      console.error('PHP arka plan yenilemesi başarısız:', url, e)
+    } finally {
+      refreshing.delete(url)
+    }
+  })
+}
 
 /**
- * PHP export'unu çekip gövdeyi tam UTF-8 çözer ve URL bazında cache'ler.
- * @param revalidateMs Cache TTL (ms). 0 → cache'i atla (taze çek).
+ * PHP export'unu çeker (tam UTF-8) ve bellek + Storage'da cache'ler.
+ * @param revalidateMs Bellek cache TTL (ms). 0 → tüm cache'leri atla (taze çek).
  */
 export async function fetchPhpHtml(
   url: string,
   opts?: { headers?: Record<string, string>; revalidateMs?: number },
 ): Promise<string> {
   const ttl = opts?.revalidateMs ?? HTML_TTL_MS
-  if (ttl > 0) {
-    const hit = htmlCache.get(url)
-    if (hit && Date.now() - hit.at < ttl) return hit.html
-    const pending = htmlInflight.get(url)
-    if (pending) return pending // eşzamanlı istekler tek çekimi paylaşsın
-  }
+  if (ttl <= 0) return fetchFromPhp(url, opts?.headers)
 
+  const hit = htmlCache.get(url)
+  if (hit && Date.now() - hit.at < ttl) return hit.html
+  const pending = htmlInflight.get(url)
+  if (pending) return pending // eşzamanlı istekler tek çekimi paylaşsın
+
+  const persist = !url.includes('?')
   const run = (async () => {
-    // no-store: Next'in fetch enstrümantasyonunu atla (büyük gövdede sorunlu)
-    const res = await fetch(url, {
-      cache: 'no-store',
-      redirect: 'follow',
-      headers: opts?.headers,
-    })
-    if (!res.ok) throw new Error(`PHP API ${res.status}`)
-    // arrayBuffer + tek seferde decode: atomik, doğru UTF-8
-    const html = new TextDecoder('utf-8').decode(await res.arrayBuffer())
-    if (ttl > 0) htmlCache.set(url, { at: Date.now(), html })
+    const stored = persist ? await storeRead(url) : null
+    if (stored) {
+      if (Date.now() - stored.at >= STORE_FRESH_MS) scheduleRefresh(url, opts?.headers)
+      htmlCache.set(url, { at: Date.now(), html: stored.html })
+      return stored.html
+    }
+    const html = await fetchFromPhp(url, opts?.headers)
+    const at = Date.now()
+    htmlCache.set(url, { at, html })
+    if (persist && looksValid(html)) runAfter(() => storeWrite(url, html, at))
     return html
   })()
 
-  if (ttl > 0) {
-    htmlInflight.set(url, run)
-    try { return await run } finally { htmlInflight.delete(url) }
-  }
-  return run
+  htmlInflight.set(url, run)
+  try { return await run } finally { htmlInflight.delete(url) }
 }
 
 /**

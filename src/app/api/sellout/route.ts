@@ -4,7 +4,7 @@ import { normalizeName } from '@/lib/sellout'
 
 // 28MB PHP fetch + 62k satır parse soğuk çağrıda ~10sn sürüyor; varsayılan
 // timeout'a takılıp 504 (→ boş sellout) üretmemesi için süreyi uzatıyoruz.
-export const maxDuration = 60
+export const maxDuration = 300
 
 const SOURCE_URL =
   'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'

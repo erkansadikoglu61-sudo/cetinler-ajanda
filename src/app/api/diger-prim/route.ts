@@ -4,7 +4,7 @@ import { parseHtmlTableByHeader, num, fetchPhpHtml } from '@/lib/merchSatis'
 import { normalizeName } from '@/lib/sellout'
 import { requireRole, ROLLER } from '@/lib/apiAuth'
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 const MERCH_SATIS_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
 
