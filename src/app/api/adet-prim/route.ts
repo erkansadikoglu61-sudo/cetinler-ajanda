@@ -1,5 +1,6 @@
 import { requireRole, ROLLER } from '@/lib/apiAuth'
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
+import { fetchPhpHtml } from '@/lib/merchSatis'
 import { createClient } from '@supabase/supabase-js'
 import { loadAdetPrimRates } from '@/lib/adetPrimRates'
 
@@ -29,12 +30,17 @@ export async function GET(req: Request) {
     if (phpUrl) {
       try {
         const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
-        const response = await fetch(`${phpUrl}?${params}`, {
-          next: { revalidate: 900 }, // 15 dakika cache
-        })
+        // Ortak PHP cache katmanı (bellek + Storage). Kategori yalnızca Excel'de
+        // eksik olanları tamamlar → PHP 15 sn'de gelmezse beklemeden devam et;
+        // çekim arka planda (after) sürer ve cache'i bir sonraki açılış için doldurur.
+        const phpPromise = fetchPhpHtml(`${phpUrl}?${params}`)
+        after(() => phpPromise.then(() => {}, () => {}))
+        const htmlText = await Promise.race([
+          phpPromise,
+          new Promise<null>(resolve => setTimeout(() => resolve(null), 15_000)),
+        ])
 
-        if (response.ok) {
-          const htmlText = await response.text()
+        if (htmlText) {
           const kategoriMap = new Map<string, string>()
           const trMatches = htmlText.match(/<tr>[\s\S]*?<\/tr>/gi) || []
 
@@ -111,3 +117,6 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
+
+// PHP raporu yavaş/büyük: kalıcı cache + arka plan yenileme için süre
+export const maxDuration = 300

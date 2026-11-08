@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { parseHtmlTableByHeader, num, fetchPhpHtml } from '@/lib/merchSatis'
 
 // Aynı 28MB PHP kaynağını 2 kez çekip parse ediyor; timeout headroom'u.
-export const maxDuration = 60
+export const maxDuration = 300
 
 export interface DashboardSelloutMetrics {
   // Yıllık (aylikAdet eklendi)

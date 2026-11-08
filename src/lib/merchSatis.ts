@@ -21,7 +21,7 @@ import { after } from 'next/server'
 //      Taze (STORE_FRESH_MS) ise PHP'ye hiç gidilmez.
 //   3. Eskiyse: eski veri HEMEN döner, PHP arka planda (after) tazelenir.
 //      PHP çökse/zaman aşımına düşse bile sayfa son başarılı veriyle çalışır.
-// Kalıcı cache yalnızca sorgu parametresiz (büyük, ortak) rapor URL'lerinde.
+// Kalıcı cache tüm rapor URL'lerinde (parametreler yalnızca yil/ay → sınırlı anahtar).
 const HTML_TTL_MS = 10 * 60 * 1000            // bellek: 10 dk
 const STORE_FRESH_MS = 30 * 60 * 1000         // Storage kopyası bu süre "taze"
 const STORE_LOCK_MS = 5 * 60 * 1000           // aynı anda tek arka plan yenilemesi
@@ -151,7 +151,7 @@ export async function fetchPhpHtml(
   const pending = htmlInflight.get(url)
   if (pending) return pending // eşzamanlı istekler tek çekimi paylaşsın
 
-  const persist = !url.includes('?')
+  const persist = true
   const run = (async () => {
     const stored = persist ? await storeRead(url) : null
     if (stored) {
