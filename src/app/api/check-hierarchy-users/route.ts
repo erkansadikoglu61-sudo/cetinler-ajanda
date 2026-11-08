@@ -3,10 +3,9 @@ import { createClient } from '@supabase/supabase-js'
 import * as fs from 'fs'
 import * as XLSX from 'xlsx'
 import { parseHtmlTableByHeader, fetchPhpHtml } from '@/lib/merchSatis'
+import { downloadBsyExcel } from '@/lib/bsyExcel'
 
 const EXCEL_PATH = '/Users/erkansadikoglu/Desktop/Saha Ajandası/cetinler-ajanda/SAHA.xlsx'
-const BUCKET = 'bsy-excel'
-const OBJ_NAME = 'SAHA.xlsx'
 
 async function getExcelBuffer(): Promise<Buffer | null> {
   if (fs.existsSync(EXCEL_PATH)) {
@@ -17,7 +16,7 @@ async function getExcelBuffer(): Promise<Buffer | null> {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
-    const { data, error } = await sb.storage.from(BUCKET).download(OBJ_NAME)
+    const { data, error } = await downloadBsyExcel(sb)
     if (error || !data) return null
     return Buffer.from(await data.arrayBuffer())
   } catch {

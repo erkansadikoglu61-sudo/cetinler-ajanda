@@ -9,12 +9,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as XLSX from 'xlsx'
 import { ADET_PRIM_DEFAULTS, type AdetPrimRow } from '@/lib/adet-prim-defaults'
+import { downloadBsyExcel } from '@/lib/bsyExcel'
 
 /** Excel'den oranları okur; Excel yoksa/okunamazsa ADET_PRIM_DEFAULTS'a düşer. */
 async function loadBaseRates(sb: SupabaseClient): Promise<Record<string, AdetPrimRow>> {
   const fallback = () => Object.fromEntries(ADET_PRIM_DEFAULTS.map(r => [r.stokKodu, { ...r }]))
   try {
-    const { data: excelData, error } = await sb.storage.from('bsy-excel').download('SAHA.xlsx')
+    const { data: excelData, error } = await downloadBsyExcel(sb)
     if (error || !excelData) {
       console.error('Excel download error:', error)
       return fallback()

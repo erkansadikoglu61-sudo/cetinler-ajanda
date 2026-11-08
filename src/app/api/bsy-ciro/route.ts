@@ -4,6 +4,11 @@ import * as path from 'path'
 import * as XLSX from 'xlsx'
 import { createClient } from '@supabase/supabase-js'
 import { GRUP_TO_BRAND, BSY_KOD_TO_NAME, BsyCiroRow, BsyCiroResponse } from '@/lib/bsy'
+import { downloadBsyExcel } from '@/lib/bsyExcel'
+
+// 27MB SAHA.xlsx indirilip 102k satırlık Data sayfası parse ediliyor → ağır route.
+export const dynamic     = 'force-dynamic'
+export const maxDuration = 60
 
 // Excel dosyası yolu — lokal geliştirme için
 const EXCEL_PATH =
@@ -13,8 +18,6 @@ const EXCEL_PATH =
     'Desktop/SAHA.xlsx'
   )
 
-const BUCKET   = 'bsy-excel'
-const OBJ_NAME = 'SAHA.xlsx'
 
 function getSupabase() {
   return createClient(
@@ -32,7 +35,7 @@ async function getExcelBuffer(): Promise<Buffer | null> {
   // 2. Supabase Storage'dan indir (production)
   try {
     const sb = getSupabase()
-    const { data, error } = await sb.storage.from(BUCKET).download(OBJ_NAME)
+    const { data, error } = await downloadBsyExcel(sb)
     if (error || !data) return null
     const arrayBuf = await data.arrayBuffer()
     return Buffer.from(arrayBuf)
