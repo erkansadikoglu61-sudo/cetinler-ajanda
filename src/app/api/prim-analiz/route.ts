@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { buildOzelCarpan } from '@/lib/ozelUygulama'
 import { parseHtmlTableByHeader, num, fetchPhpHtml, tarihToIso } from '@/lib/merchSatis'
 
-export const maxDuration = 30
+export const maxDuration = 60
 
 const MERCH_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
 
