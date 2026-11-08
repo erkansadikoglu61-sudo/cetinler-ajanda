@@ -67,10 +67,13 @@ export async function GET(req: Request) {
       if (!r.kategori && g?.aciklama) r.kategori = GRUP_NORMALIZE[g.aciklama] ?? g.aciklama
     }
 
-    // Sıralama: önce grup kodu (RELUX → EKEA → diğerleri), sonra Stok Kodu — alfabetik
+    // Sıralama: grup kodu (RELUX → EKEA → diğerleri) → Kategori → Stok Kodu — alfabetik;
+    // grup içinde kategorisiz satırlar en sonda
     const rows = Object.values(primData).sort((a, b) =>
       grupSira(a.grupKodu) - grupSira(b.grupKodu) ||
       (a.grupKodu ?? '').localeCompare(b.grupKodu ?? '', 'tr') ||
+      (Number(!a.kategori) - Number(!b.kategori)) ||
+      (a.kategori ?? '').localeCompare(b.kategori ?? '', 'tr') ||
       a.stokKodu.localeCompare(b.stokKodu, 'tr'))
     return NextResponse.json({ rows })
   } catch (e) {
