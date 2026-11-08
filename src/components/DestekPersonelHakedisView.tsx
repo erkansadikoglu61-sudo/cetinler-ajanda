@@ -6,6 +6,7 @@ import { RefreshCw, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
 import { GRUP_NORMALIZE } from '@/lib/sellout'
 import { SayfaParametreleri } from '@/components/SayfaParametreleri'
+import { DEVIR_DONEMI, isDevirMerch } from '@/lib/supDevir'
 
 const MONTHS_TR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
 
@@ -145,7 +146,10 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
         // Merch Hedefleri'nde "Destek Personeli var mı?" = true olmayanları filtrele
         // Admin/Manager/BSY rolleri için flag kontrolü uygulanmaz — tüm satırları göster
         const applyFlagFilter = currentUserRole === 'sup' || currentUserRole === 'jr'
-        if (applyFlagFilter && destekFlagMap.size > 0 && mk && !destekFlagMap.get(mk)) continue
+        // Devir (Eylül 2026): Atilla ekibinin bayrağı işaretlenmedi; bu satırları
+        // şubenin güncel süpervizörü görüp hakediş dağıtsın (bkz. lib/supDevir).
+        const devirIstisnasi = donem === DEVIR_DONEMI && isDevirMerch(dp.cetinler_merch || '')
+        if (applyFlagFilter && !devirIstisnasi && destekFlagMap.size > 0 && mk && !destekFlagMap.get(mk)) continue
 
         // Cari + Şube + Çetinler Merch + Destek Personeli aynıysa tek satır
         const dedup = `${nk(dp.cari_adi)}||${nk(dp.sube_adi)}||${mk}||${nk(dp.merch_adi)}`

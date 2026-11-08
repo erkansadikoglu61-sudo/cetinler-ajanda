@@ -19,6 +19,7 @@ import { BSY_NAME_TO_KOD } from '@/lib/bsy'
 import { SayfaParametreleri } from '@/components/SayfaParametreleri'
 import { SelloutAciklama } from '@/components/SelloutAciklama'
 import { getOzelGruplar, ozelSubeAdetleri, buildOzelCarpan } from '@/lib/ozelUygulama'
+import { DEVIR_DONEMI, isDevirSup } from '@/lib/supDevir'
 
 type SubTab = 'sup' | 'jr' | 'merch' | 'top20' | 'satislar' | 'satisgirmeyen' | 'ozel'
 
@@ -771,9 +772,33 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     })
   }, [periodRows, allSupNames, isBsy, bsyKod, isMerch, currentProfile.full_name])
 
+  // ── Devir (Eylül 2026, bkz. lib/supDevir) ──
+  // Şubesi artık bu süpervizöre/Jr'a ait olan, Atilla Yılmaz'a yazılmış satışlar
+  // Satışlar'da BİLGİ AMAÇLI gösterilir. Satış Atilla'da kalır: hedef/gerçekleşme/
+  // prim hesapları değişmez ve Satışlar toplamlarına katılmaz.
+  const devirRows = useMemo(() => {
+    if (donem !== DEVIR_DONEMI || isAdmin || isBsy || isMerch) return []
+    const myNames = new Set(allSupNames.map(normalizeName).filter(Boolean))
+    const mySubeler = new Set<string>()
+    merchDetayData.forEach(m => {
+      const sk = (m.sube_kod || '').trim()
+      if (!sk) return
+      if (myNames.has(normalizeName(m.sup_adi || '')) || myNames.has(normalizeName(m.jr_adi || ''))) mySubeler.add(sk)
+    })
+    if (mySubeler.size === 0) return []
+    const zatenVar = new Set(filteredPeriodRows)
+    return periodRows.filter(r =>
+      !zatenVar.has(r) && isDevirSup(r.supervisor_adi || '') && mySubeler.has((r.sube_kod || '').trim()))
+  }, [donem, isAdmin, isBsy, isMerch, allSupNames, merchDetayData, periodRows, filteredPeriodRows])
+  const devirSet = useMemo(() => new Set(devirRows), [devirRows])
+  const satislarBaseRows = useMemo(
+    () => (devirRows.length ? [...filteredPeriodRows, ...devirRows] : filteredPeriodRows),
+    [filteredPeriodRows, devirRows],
+  )
+
   // ── Satışlar tablosu ek filtreleri ──
   const satislarRows = useMemo(() => {
-    return filteredPeriodRows.filter(r => {
+    return satislarBaseRows.filter(r => {
       if (satMerchTipi && r.merch_tipi !== satMerchTipi) return false
       if (satMerch && r.merch_personel !== satMerch) return false
       if (satCari) {
@@ -782,7 +807,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       }
       return true
     })
-  }, [filteredPeriodRows, satMerchTipi, satMerch, satCari])
+  }, [satislarBaseRows, satMerchTipi, satMerch, satCari])
 
   // ── Adet prim lookup ──
   const adetPrimMap = useMemo(() => {
@@ -959,6 +984,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const satislarTotals = useMemo(() => {
     let toplamAdet = 0, bayiHakedis = 0, destekHakedis = 0, cetinlerPrim = 0
     for (const r of satislarRows) {
+      if (devirSet.has(r)) continue // devir: satış Atilla'da, toplama katılmaz
       const adet = r.satilan_adet || 0
       toplamAdet += adet
       const stk = r.stok_kodu || '', grp = (r.grup_kodu || '').toUpperCase()
@@ -974,7 +1000,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       }
     }
     return { toplamAdet, bayiHakedis, destekHakedis, cetinlerPrim }
-  }, [satislarRows, getEffectiveBayiMerch, getEffectiveKosulluDestek, destekFlags, merchKategoriPerformans])
+  }, [satislarRows, devirSet, getEffectiveBayiMerch, getEffectiveKosulluDestek, destekFlags, merchKategoriPerformans])
 
   // Filtre: MERCH_TIPI === 'Çetinler Merch' olan satırlardan unique kişi listesi
   // Sadece seçili dönemde satışı olan kişiler (toplam satış > 0)
@@ -1607,9 +1633,9 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
           <div className="p-2">
             {/* Filtreler */}
             {(() => {
-              const tipiOptions = [...new Set(filteredPeriodRows.map(r => r.merch_tipi).filter(Boolean))].sort()
-              const merchOptions = [...new Set(filteredPeriodRows.map(r => r.merch_personel).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'))
-              const cariOptions  = [...new Set(filteredPeriodRows.map(r => r.sube_adi ? `${r.cari_isim} – ${r.sube_adi}` : r.cari_isim).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'))
+              const tipiOptions = [...new Set(satislarBaseRows.map(r => r.merch_tipi).filter(Boolean))].sort()
+              const merchOptions = [...new Set(satislarBaseRows.map(r => r.merch_personel).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'))
+              const cariOptions  = [...new Set(satislarBaseRows.map(r => r.sube_adi ? `${r.cari_isim} – ${r.sube_adi}` : r.cari_isim).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'))
               return (
                 <div className="flex flex-wrap items-center gap-2 mb-3">
                   <select value={satMerchTipi} onChange={e => setSatMerchTipi(e.target.value)}
@@ -1735,7 +1761,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                           key={idx}
                           className={clsx(
                             'border-b border-gray-100 last:border-0',
-                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                            devirSet.has(row) ? 'bg-amber-50/70' : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
                           )}
                         >
                           <td className="px-3 py-2 font-medium text-gray-800">{row.merch_personel || '—'}</td>
@@ -1747,7 +1773,17 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                           <td className="px-3 py-2 text-right tabular-nums font-semibold text-gray-900">
                             {satisAdedi.toLocaleString('tr-TR')}
                           </td>
-                          <td className="px-3 py-2 text-gray-700">{row.supervisor_adi || '—'}</td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {row.supervisor_adi || '—'}
+                            {devirSet.has(row) && (
+                              <div
+                                className="text-[9px] font-medium text-amber-700"
+                                title="Eylül satışı Atilla Yılmaz'a yazılır; şube artık sizde olduğu için bilgi amaçlı gösteriliyor. Toplamlara dahil değildir."
+                              >
+                                Devir · toplama dahil değil
+                              </div>
+                            )}
+                          </td>
                           <td className="px-3 py-2">
                             <span className={clsx(
                               'inline-block px-2 py-0.5 rounded-full text-[10px] font-medium',

@@ -10,6 +10,7 @@ import { gzipSync, gunzipSync } from 'zlib'
 import { createHash } from 'crypto'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { after } from 'next/server'
+import { SUP_OVERRIDES } from './supDevir'
 
 // ── PHP HTML paylaşımlı cache (bellek + Supabase Storage) ────────────
 // export_merch_satis.php tüm geçmişi tek seferde döndürüyor (~40MB, büyüyor)
@@ -197,22 +198,9 @@ export function decodeHtml(s: string): string {
 export type MerchSatisRow = Record<string, string>
 
 // ── Süpervizör yeniden atama (satış verisi) ──────────────────────────
-// Atilla Yılmaz'ın ekibi: aşağıdaki personelin 2026-01..2026-09 arası TÜM
-// satışları (merch tipi ne olursa olsun) Atilla Yılmaz'a yazılır; satış diğer
-// süpervizörden düşer (her satış tek kez sayılır). 2026-10 ve sonrası satış
-// verisindeki yetkilendirme (SUPERVISOR_ADI) aynen kullanılır.
+// Liste ve dönemler lib/supDevir'de (istemci tarafı da kullanır).
 // Tüm satış tüketicileri (sellout, prim, analiz…) parseHtmlTableByHeader'dan
 // geçtiği için tek noktada uygulanır.
-const SUP_OVERRIDES: { sup: string; from: string; to: string; merchler: string[] }[] = [
-  {
-    sup: 'Atilla Yılmaz SV', from: '2026-01', to: '2026-09',
-    merchler: [
-      'Dilan Yıkılmaz', 'Betül Keser', 'Aslı Gökmen', 'Hafize Gökçe', 'Hanife Yüksel',
-      'Şerife Karaahmetoğlu', 'Beyhan Bülbül Özlü', 'Neslihan Bulut', 'Ceren Ela Koçbay',
-      'Emine Şen', 'Özen Özdil', 'Güldem Tunçöz', 'Pınar Avcı',
-    ],
-  },
-]
 const normKisi = (s: string) => (s ?? '').replace(/İ/g, 'I').toLowerCase()
   .replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ş/g, 's').replace(/ç/g, 'c')
   .replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/\s+/g, ' ').trim()
