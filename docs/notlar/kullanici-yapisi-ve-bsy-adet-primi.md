@@ -50,14 +50,24 @@ Hepsinin sistemde kaydı var.
   (tablo + hesaplama).
 - BSY gerçekleşmesi: BSY'nin carilerine bağlı **tüm şubelerin** satış adedi.
 - **Hedef kategori bazlı** (Sup/Jr/Çetinler Merch'teki grup hedefleri gibi).
-- **Prim tutarları:** şablon kurulurken her kategoriye **şimdilik 3.000 ₺**.
-  Gerçek tutarlar canlıya alırken kullanıcı tarafından verilecek.
+- **Kategori ana prim tutarları (BSY):**
+  | Kategori | Ana prim |
+  |---|---|
+  | IPL Grubu | 28.000 ₺ |
+  | Üflemeli Grubu | 20.000 ₺ |
+  | Düzleştirici&Maşa Grubu | 15.000 ₺ |
+  | Erkek Bakım Grubu | 10.000 ₺ |
+  | Epilatör&Baskül(&Mutfak) | 8.500 ₺ |
+  (Önceki "her kategoriye 3.000 ₺" yer tutucusunun yerine bunlar kullanılacak;
+  tutarlar parametrik, sonradan değiştirilebilir.)
 - **2027'de ciro primi tamamen kalkacak**; prim yönetimi tamamen adete bağlı olacak.
-- **Basamaklar:** Sup/Jr ile aynı mantık (gerçekleşmeye göre prim), **ama alt barem var**:
-  bir kategoride gerçekleşme alt baremin altındaysa o kategoriden **prim yok**.
-  - Ciro priminde alt barem %80'di (kategoriyi %80 yakalayamayan BSY'ye ödeme yok).
-  - Adet priminde önerilen alt barem **%50** (ör. IPL grubuna 30.000 ₺ tanımlıysa %30
-    gerçekleşmede ödeme yapılmaz). Barem **parametrik** tutulacak, kullanıcı değiştirebilsin.
+- **Kategori prim formülü (BSY, tüm kategorilerde aynı baremler):**
+  - Gerçekleşme **< %50** → **0 ₺**
+  - **%50 – %80** arası → **(ana prim / 2) × gerçekleşme oranı**
+    (ör. ana prim 30.000 ₺, %60 gerçekleşme → 15.000 × 0,60 = **9.000 ₺**)
+  - **≥ %80** → **ana primin tamamı** (ör. 30.000 ₺)
+  - Ciro priminde alt barem %80'di; adette %50 alt barem + yarım prim bandı.
+  - %50 ve %80 eşikleri **parametrik** tutulacak.
 - Önce eksikler kontrol edilecek, sonra canlıya alınacak.
 
 ## 4b. Yeni: Kişisel prim ana ekranı ("Hesabım" — bankacılık uygulaması tarzı)
@@ -115,8 +125,9 @@ Hepsinin sistemde kaydı var.
   **2027 Ocak'ta** gerçek prim olarak devreye alınır (Jr'larla birlikte).
 
 ## 7. Açık sorular (konuşulacak)
-- %50 alt baremin üstünde Sup/Jr'daki gibi oranlı mı (gerçekleşme × prim), basamaklı mı?
-- Alt barem tüm kategorilerde aynı mı, kategori bazında ayrı mı?
+- **Süpürge Grubu** ve **Mutfak ve Diğer Gruplar** BSY prim listesinde yok: bu
+  kategorilerden BSY'ye prim yok mu, yoksa tutar sonra mı verilecek?
+- %100 üstü gerçekleşmede ek prim var mı (yoksa tavan ana prim mi)?
 
 ## Ek notlar (kullanıcıdan gelenler)
 - 2026-11-09: Sup/Jr görünürlüğü B2B şube atamasından; BSY Kasım–Aralık paralel adet
@@ -131,3 +142,6 @@ Hepsinin sistemde kaydı var.
 - 2026-11-09: BSY kategori priminde alt barem (öneri %50, parametrik; cirodaki %80'in
   karşılığı). v2 hazır olunca beklemeden geçiş; BSY adet primi 2 ay simülasyon,
   2027 Ocak'ta canlı.
+- 2026-11-09: BSY formülü: <%50 → 0; %50–80 → (ana prim/2) × gerçekleşme; ≥%80 → ana
+  prim. Ana primler: IPL 28.000, Üflemeli 20.000, Düzleştirici&Maşa 15.000, Erkek Bakım
+  10.000, Epilatör&Baskül 8.500 ₺. Baremler tüm kategorilerde aynı.
