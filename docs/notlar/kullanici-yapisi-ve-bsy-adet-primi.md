@@ -92,6 +92,22 @@ Hepsinin sistemde kaydı var.
 - Ödendi/bekliyor bilgisinin kaynağı: mevcut Nihai Prim Listesi "Ödendi" kayıtları
   (nihai-prim-odeme) ve Prim Ödeme Listesi — v2'de tek kaynakta birleştirilecek.
 
+## 4c. Ajanda / Takvim optimizasyonu (v2 kapsamında)
+- Prim tarafıyla **birlikte** ajanda/takvim de optimize edilecek: en hızlı ve en sade hali.
+- BSY, Sup ve Jr'lardan haftalık/aylık program girmeleri isteniyor.
+- **Sorun:** Görev modalında bazı cariler/şubeler çıkmıyor → kullanıcı gideceği yeri
+  seçemiyor; "Diğer" diye ya da elle garip isimle kaydediyor (Eylül/Ekim'de eksik
+  ziyaretleri SQL ile elle eklemek zorunda kaldık).
+- **Öneri — "Şubelerim" ekranı:** Her kullanıcı (özellikle Sup/Jr, ayrıca BSY) kendisine
+  ve alt kullanıcılarına bağlı **tüm şubeleri cari adlarıyla** bir yerde görsün.
+  - Eksik/yanlış şube varsa **takvime gelmeden önce** "Eksik şube talep et / bildir"
+    ile admine (veya üstüne) iletebilsin.
+  - Modal ile **aynı kaynak** kullanılsın: "Şubelerim"de gördüğü her şube modalda da
+    seçilebilsin (tek doğruluk kaynağı: B2B şube ataması + hiyerarşi).
+  - "Hesabım" ekranındaki şube bilgisiyle tutarlı olsun (hatalı bilgi bildirimi ortak).
+- Modal: şube araması hızlı ve önbellekli; ağır B2B raporu her açılışta çekilmesin.
+- "Diğer"/elle isim girişi en aza indirilsin (gerekirse yalnızca talep akışıyla).
+
 ## 5. Bilgisayara geçince ilk yapılacaklar
 - Mevcut yapının envanteri: kim, hangi şubeyi, hangi kaynaktan görüyor
   (B2B merch-detay, `field_personnel`, `profiles`, `bsy_supervisors`, ERP/BSY kodları).
@@ -150,3 +166,5 @@ Hepsinin sistemde kaydı var.
   10.000, Epilatör&Baskül 8.500 ₺. Baremler tüm kategorilerde aynı.
 - 2026-11-09: Süpürge ve Mutfak&Diğer 2027'de yok → BSY yapısında yer almaz, prim yok.
   %100 üstü tavan = ana prim; ay bazlı ekstra uygulama ayrı parametreyle tanımlanacak.
+- 2026-11-09: Ajanda/takvim de v2'de optimize edilecek; Sup/Jr/BSY için "Şubelerim"
+  ekranı (bağlı tüm şubeler + cari), eksik şube talebi, modal ile aynı kaynak.
