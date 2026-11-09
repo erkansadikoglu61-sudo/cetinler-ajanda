@@ -55,6 +55,23 @@ Hepsinin sistemde kaydı var.
 - **2027'de ciro primi tamamen kalkacak**; prim yönetimi tamamen adete bağlı olacak.
 - Önce eksikler kontrol edilecek, sonra canlıya alınacak.
 
+## 4b. Yeni: Kişisel prim ana ekranı ("Hesabım" — bankacılık uygulaması tarzı)
+- **Tüm kullanıcılar** (BSY, Sup, Jr, Çetinler Merch, Bayi Merch, Destek Personeli,
+  şube müdürleri) uygulamayı açınca kendi **öz dashboard'unu** görür.
+- Tasarım: bankacılık uygulamalarının açılış ekranı gibi **net ve şık**.
+- **Üst kart (kimlik):** ad soyad, **IBAN**, **cari**, **şube(ler)**, (rol, bağlı Sup/Jr).
+  Amaç: yanlış bilgi görülürse kullanıcı hemen fark edip bildirir
+  (ör. şubesi yanlış kayıtlı → Jr/Sup'una bildirip şube değişikliği yaptırır).
+  → "Hatalı bilgi bildir" aksiyonu düşünülecek (bağlı Jr/Sup'a bildirim).
+- **Bakiye kartı:** **mevcut ayın** anlık hakedişi ("kasa bakiyesi" / "hesabındaki para").
+- **Geçmiş tablo:** son **3 ay** kazanılan primler + ödeme durumu, ör.:
+  - 3 ay önce → **Ödendi** (ödeme tarihiyle)
+  - 2 ay önce → **Ödendi**
+  - geçen ay → **Bekliyor**
+  - bu ay → **Hakediş devam ediyor** (anlık tutar)
+- Ödendi/bekliyor bilgisinin kaynağı: mevcut Nihai Prim Listesi "Ödendi" kayıtları
+  (nihai-prim-odeme) ve Prim Ödeme Listesi — v2'de tek kaynakta birleştirilecek.
+
 ## 5. Bilgisayara geçince ilk yapılacaklar
 - Mevcut yapının envanteri: kim, hangi şubeyi, hangi kaynaktan görüyor
   (B2B merch-detay, `field_personnel`, `profiles`, `bsy_supervisors`, ERP/BSY kodları).
@@ -100,3 +117,5 @@ Hepsinin sistemde kaydı var.
 - 2026-11-09: BSY adet hedefi kategori bazlı, prim şimdilik kategori başına 3.000 ₺;
   bir cari tek BSY (ERP plasiyeri); 2027'de ciro primi tamamen kalkacak; tüm çalışma
   "Çetinler Ajanda v2" olarak, performans odaklı yeniden yapılandırma.
+- 2026-11-09: Herkes için bankacılık tarzı kişisel prim ana ekranı (IBAN, cari, şube,
+  bu ayın bakiyesi, son 3 ay ödendi/bekliyor tablosu, hatalı bilgi bildirimi).
