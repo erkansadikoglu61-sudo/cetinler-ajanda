@@ -83,3 +83,6 @@ export async function GET() {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
+
+// PHP raporu yavaş/büyük: kalıcı cache + arka plan yenileme için süre
+export const maxDuration = 300

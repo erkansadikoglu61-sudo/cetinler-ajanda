@@ -9,12 +9,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as XLSX from 'xlsx'
 import { ADET_PRIM_DEFAULTS, type AdetPrimRow } from '@/lib/adet-prim-defaults'
+import { downloadBsyExcel } from '@/lib/bsyExcel'
 
 /** Excel'den oranları okur; Excel yoksa/okunamazsa ADET_PRIM_DEFAULTS'a düşer. */
 async function loadBaseRates(sb: SupabaseClient): Promise<Record<string, AdetPrimRow>> {
   const fallback = () => Object.fromEntries(ADET_PRIM_DEFAULTS.map(r => [r.stokKodu, { ...r }]))
   try {
-    const { data: excelData, error } = await sb.storage.from('bsy-excel').download('SAHA.xlsx')
+    const { data: excelData, error } = await downloadBsyExcel(sb)
     if (error || !excelData) {
       console.error('Excel download error:', error)
       return fallback()
@@ -24,9 +25,27 @@ async function loadBaseRates(sb: SupabaseClient): Promise<Record<string, AdetPri
       console.error('Adet Primleri sheet not found. Available sheets:', wb.SheetNames)
       return fallback()
     }
+    const ws = wb.Sheets['Adet Primleri']
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const jsonData: any[][] = XLSX.utils.sheet_to_json(wb.Sheets['Adet Primleri'], { header: 1, defval: '' })
+    const jsonData: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
     if (jsonData.length < 2) return fallback()
+
+    // Birleştirilmiş hücreler (ör. Kategori / Marka sütunu grup boyunca tek
+    // hücre): değer yalnızca ilk satırda okunur, diğerleri boş kalır. Birleşik
+    // aralığın değerini kapsadığı tüm satırlara dağıt.
+    const aralik = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : { s: { r: 0, c: 0 } }
+    for (const m of ws['!merges'] ?? []) {
+      const ust = ws[XLSX.utils.encode_cell(m.s)]
+      const deger = ust?.v ?? ''
+      for (let r = m.s.r; r <= m.e.r; r++) {
+        const satir = jsonData[r - aralik.s.r]
+        if (!satir) continue
+        for (let c = m.s.c; c <= m.e.c; c++) {
+          const ci = c - aralik.s.c
+          if (satir[ci] === '' || satir[ci] == null) satir[ci] = deger
+        }
+      }
+    }
 
     // Başlık satırını bul (ilk 5 satırda tara)
     let headerRowIdx = 0
@@ -54,10 +73,11 @@ async function loadBaseRates(sb: SupabaseClient): Promise<Record<string, AdetPri
       if (!row || row.length === 0) continue
       const stokKodu = cols['stokKodu'] >= 0 ? String(row[cols['stokKodu']] ?? '').trim() : ''
       const kategori = cols['kategori'] >= 0 ? String(row[cols['kategori']] ?? '').trim() : ''
+      const marka    = cols['marka'] >= 0 ? String(row[cols['marka']] ?? '').trim() : ''
       const bayiMerch = cols['bayiMerch'] >= 0 ? parseFloat(String(row[cols['bayiMerch']] ?? '0')) || null : null
       const kosulluDestek = cols['kosulluDestek'] >= 0 ? parseFloat(String(row[cols['kosulluDestek']] ?? '0')) || null : null
       if (stokKodu && stokKodu.toLowerCase() !== 'stok kodu' && stokKodu.toLowerCase() !== 'stok_kodu') {
-        primData[stokKodu] = { stokKodu, kategori: kategori || null, bayiMerch, kosulluDestek }
+        primData[stokKodu] = { stokKodu, kategori: kategori || null, bayiMerch, kosulluDestek, marka: marka || null }
       }
     }
     return primData
@@ -77,6 +97,7 @@ const EK_KATEGORI: Record<string, string> = {
 /** Belirli ay için nihai oranlar: Excel (veya defaults) + adet_prim_override. */
 export async function loadAdetPrimRates(sb: SupabaseClient, yil: number, ay: number): Promise<Record<string, AdetPrimRow>> {
   const primData = await loadBaseRates(sb)
+  const excelStoklari = new Set(Object.keys(primData))
   try {
     // kategori kolonu: elle eklenen (Excel'de olmayan) stokların kategorisi.
     // Kolon henüz yoksa (migration çalışmadıysa) eski sorguya düşülür.
@@ -99,11 +120,46 @@ export async function loadAdetPrimRates(sb: SupabaseClient, yil: number, ay: num
         kategori:      row.kategori || primData[row.stok_kodu]?.kategori || null,
         bayiMerch:     row.bayi_merch,
         kosulluDestek: row.kosullu_destek,
+        marka:         primData[row.stok_kodu]?.marka ?? null,
       }
     }
   } catch (e) {
     console.error('DB override fetch error:', e)
   }
+
+  // Elle eklenen (Excel'de olmayan) stoklar eklendikleri aydan SONRAKİ aylarda
+  // da geçerli: bu ay kaydı yoksa en son önceki ayın kaydı kullanılır. Sonraki
+  // bir ayda düzenlenirse o ay ve sonrası yeni değeri alır. Excel'deki stokların
+  // aylık override davranışı değişmez (yalnız kendi ayında geçerli).
+  try {
+    const hedef = yil * 12 + ay
+    const haric = [...excelStoklari, ...Object.keys(primData)]
+    const inList = `(${[...new Set(haric)].map(k => `"${k.replace(/"/g, '')}"`).join(',')})`
+    const sorgu = (kolonlar: string) => {
+      let q = sb.from('adet_prim_override').select(kolonlar).lte('yil', yil)
+      if (haric.length) q = q.not('stok_kodu', 'in', inList)
+      return q.order('yil', { ascending: false }).order('ay', { ascending: false })
+    }
+    let prev = await sorgu('stok_kodu, bayi_merch, kosullu_destek, kategori, yil, ay')
+    if (prev.error) prev = await sorgu('stok_kodu, bayi_merch, kosullu_destek, yil, ay')
+    const onceki = (prev.data ?? []) as unknown as {
+      stok_kodu: string; bayi_merch: number | null; kosullu_destek: number | null; kategori?: string | null; yil: number; ay: number
+    }[]
+    onceki.sort((a, b) => (b.yil * 12 + b.ay) - (a.yil * 12 + a.ay))   // en yeni ay önce
+    for (const row of onceki) {
+      if (row.yil * 12 + row.ay >= hedef) continue   // yalnızca önceki aylar
+      if (primData[row.stok_kodu]) continue           // en yeni ay zaten alındı
+      primData[row.stok_kodu] = {
+        stokKodu:      row.stok_kodu,
+        kategori:      row.kategori || null,
+        bayiMerch:     row.bayi_merch,
+        kosulluDestek: row.kosullu_destek,
+      }
+    }
+  } catch (e) {
+    console.error('Önceki ay override devri hatası:', e)
+  }
+
   for (const r of Object.values(primData)) {
     if (!r.kategori && EK_KATEGORI[r.stokKodu]) r.kategori = EK_KATEGORI[r.stokKodu]
   }

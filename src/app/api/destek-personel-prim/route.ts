@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { parseHtmlTableByHeader, fetchPhpHtml } from '@/lib/merchSatis'
+import { donemdeAktif } from '@/lib/sellout'
 
 function getAdmin() {
   return createClient(
@@ -12,6 +13,7 @@ function getAdmin() {
 interface DestekPersonelRow {
   merch_adi:           string
   sube_adi:            string
+  sube_kod:            string   // B2B SUBE_KODU (eşleşen kayıttan; yoksa '')
   cari_adi:            string
   cetinler_merch:      string
   sup_adi:             string   // Jr. Sup varsa Jr. adı, yoksa doğrudan Sup adı
@@ -59,7 +61,25 @@ export async function GET(req: Request) {
       return normalize(cari).split(' ').slice(0, 2).join(' ')
     }
 
-    type PhpEntry = { cari_adi: string; sube_adi: string; merch: string; bsy: string; sup: string; jr: string }
+    type PhpEntry = {
+      cari_adi: string; sube_adi: string; merch: string; bsy: string; sup: string; jr: string
+      kod:    string
+      hasKod: boolean  // SUBE_KODU dolu (kodsuz satırlar B2B'de eski/bozuk kayıt olabiliyor)
+      aktif:  boolean  // süpervizör bugün görevde (lib/sellout AYRILANLAR)
+    }
+
+    // Aynı şube adına birden fazla B2B satırı düşebiliyor (ör. EVKUR ADANA:
+    // Hafize Gökçe / Songül + şube kodu boş eski "Tuğberk UZYILDIRIM / Atilla"
+    // satırı). Önceden SON Çetinler Merch satırı seçiliyordu → destek satırı
+    // yanlış merch'e ve ayrılmış süpervizöre bağlanıp yeni süpervizöre
+    // görünmüyordu. Öncelik: Çetinler Merch > şube kodu dolu > süpervizör
+    // görevde. Eşitlikte eski davranış: merch satırında son, diğerinde ilk.
+    const bugun = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` })()
+    const rank = (e: PhpEntry) => (e.merch ? 4 : 0) + (e.hasKod ? 2 : 0) + (e.aktif ? 1 : 0)
+    function put(map: Map<string, PhpEntry>, key: string, e: PhpEntry) {
+      const cur = map.get(key)
+      if (!cur || rank(e) > rank(cur) || (rank(e) === rank(cur) && !!e.merch)) map.set(key, e)
+    }
 
     // İki paralel harita:
     //   fullMap:  normalize(sube)||normalize(cari)         — tam eşleşme
@@ -76,6 +96,7 @@ export async function GET(req: Request) {
       const jrAdi     = r['JR_SUPERVIZOR'] ?? ''
       const merchAdi  = r['MERCH_ADI'] ?? ''
       const merchTipi = r['MERCH_TIPI'] ?? ''
+      const subeKodu  = (r['SUBE_KODU'] ?? '').trim()
 
       if (!subeAdi || !cariAdi) continue
 
@@ -89,11 +110,13 @@ export async function GET(req: Request) {
         bsy,
         sup:      supAdiPHP,
         jr:       jrAdi,
+        kod:      subeKodu,
+        hasKod:   !!subeKodu,
+        aktif:    !supAdiPHP || donemdeAktif(supAdiPHP, bugun),
       }
 
-      // Haritaya ekle — Çetinler Merch girdisi varsa tercih et (önce yazılan korunur)
-      if (!fullMap.has(fullKey) || entry.merch)  fullMap.set(fullKey, entry)
-      if (!shortMap.has(shortKey) || entry.merch) shortMap.set(shortKey, entry)
+      put(fullMap, fullKey, entry)
+      put(shortMap, shortKey, entry)
     }
 
     // Verilen subeKey için PHP girdisini döndür (tam key → kısa key fallback)
@@ -138,6 +161,7 @@ export async function GET(req: Request) {
       rows.push({
         merch_adi:           dp.merch_adi,
         sube_adi:            displaySube,
+        sube_kod:            php?.kod ?? '',
         cari_adi:            displayCari,
         cetinler_merch:      cetinlerMerch || '-',
         sup_adi:             displaySup,
@@ -170,3 +194,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
+
+// PHP raporu yavaş/büyük: kalıcı cache + arka plan yenileme için süre
+export const maxDuration = 300

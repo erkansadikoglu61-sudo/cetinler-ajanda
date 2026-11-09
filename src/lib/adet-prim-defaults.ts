@@ -3,6 +3,8 @@ export interface AdetPrimRow {
   kategori:     string | null
   bayiMerch:    number | null
   kosulluDestek: number | null
+  marka?:       string | null   // SAHA.xlsx "Marka" (Relux / Electrolux)
+  grupKodu?:    string          // B2B ürün grup kodu (RELUX / EKEA …) — /api/adet-prim doldurur
 }
 
 export const ADET_PRIM_DEFAULTS: AdetPrimRow[] = [

@@ -9,7 +9,7 @@ import { merchHesapPlani, merchHesaplariOlustur } from '@/lib/merchHesap'
 // Yetki: Authorization: Bearer <oturum access_token> — kullanıcının rolü
 // sunucuda 'admin' olarak doğrulanır.
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 function getAdminClient() {
   return createClient(

@@ -6,6 +6,11 @@ import { RefreshCw, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
 import { GRUP_NORMALIZE } from '@/lib/sellout'
 import { SayfaParametreleri } from '@/components/SayfaParametreleri'
+import { DEVIR_DONEMI, isDevirMerch } from '@/lib/supDevir'
+
+// Bu dönemden itibaren şubenin Çetinler Merch'ü o ayın satışından belirlenir
+// (önceki aylar ödenmiş; görünümleri değişmesin).
+const DONEM_MERCH_BASLANGIC = '2026-09'
 
 const MONTHS_TR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
 
@@ -15,6 +20,7 @@ interface HakedisRow {
   sup_adi:                string
   parent_sup_adi:         string   // Jr. Sup'ın üstündeki Sup adı (yoksa '')
   cetinler_merch:         string
+  kayit_cetinler:         string   // hakediş kaydının anahtarındaki Çetinler Merch (çift kayıt olmasın)
   cetinler_merch_hakedis: number
   merch_adi:              string   // Destek Personeli
   hakedis:                number   // F kolonu
@@ -125,42 +131,91 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
         .replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c').replace(/\s+/g, ' ')
       const fullMap  = new Map<string, number>()
       const merchMap = new Map<string, number>()
+      // 3. csmMap: cari||sube||destek (Çetinler Merch'ten bağımsız) → kayıt.
+      //    Satırın Çetinler Merch'ü değişse de (bkz. dönem merch'ü) önceki kayıt
+      //    bulunur ve AYNI anahtarla güncellenir → çift ödeme kaydı oluşmaz.
+      const csmMap   = new Map<string, { hakedis: number; cetinler: string }>()
       for (const h of (hakedisData.rows ?? [])) {
         const fk = `${nk(h.cari_adi)}||${nk(h.sube_adi)}||${nk(h.cetinler_merch)}||${nk(h.merch_adi)}`
         fullMap.set(fk, h.hakedis ?? 0)
         const mk2 = nk(h.merch_adi)
         if (!merchMap.has(mk2)) merchMap.set(mk2, h.hakedis ?? 0)
+        const ck = `${nk(h.cari_adi)}||${nk(h.sube_adi)}||${mk2}`
+        if (!csmMap.has(ck)) csmMap.set(ck, { hakedis: h.hakedis ?? 0, cetinler: h.cetinler_merch ?? '' })
       }
+
+      // ── Dönemin gerçek Çetinler Merch'ü (2026-09'dan itibaren) ──
+      // Şubenin Çetinler Merch'ü B2B'de güncel atamadan geliyor; ay içinde/ay
+      // sonrası merch değiştiyse (ör. TAŞPINAR PURSAKLAR: Eylül'de Burcu Evren,
+      // şimdi Gültaze Tezcan) geçmiş ay yanlış merch'le ve "–" primle
+      // görünüyordu. Destek primi o ayın merch'ünün kategori gerçekleşmesiyle
+      // hesaplandığından, o ay o şubede satış giren Çetinler Merch (en çok adet)
+      // esas alınır; o ay satış yoksa güncel atama kullanılır.
+      const shortCari = (c: string) => nk(c).split(' ').slice(0, 2).join(' ')
+      const donemMerchKod   = new Map<string, Map<string, number>>()   // şube kodu (en güvenilir)
+      const donemMerchFull  = new Map<string, Map<string, number>>()
+      const donemMerchShort = new Map<string, Map<string, number>>()
+      if (donem >= DONEM_MERCH_BASLANGIC) {
+        const ekle = (m: Map<string, Map<string, number>>, k: string, merch: string, adet: number) => {
+          if (!m.has(k)) m.set(k, new Map())
+          const mm = m.get(k)!
+          mm.set(merch, (mm.get(merch) ?? 0) + adet)
+        }
+        for (const r of (selloutData.rows ?? [])) {
+          if ((r.donem as string) !== donem || (r.merch_tipi as string) !== 'Çetinler Merch') continue
+          const merch = ((r.merch_personel as string) || '').trim()
+          if (!merch) continue
+          const adet = (r.satilan_adet as number) || 0
+          const kod  = ((r.sube_kod as string) || '').trim()
+          if (kod) ekle(donemMerchKod, kod, merch, adet)
+          ekle(donemMerchFull,  `${nk(r.sube_adi as string)}||${nk(r.cari_isim as string)}`, merch, adet)
+          ekle(donemMerchShort, `${nk(r.sube_adi as string)}||${shortCari(r.cari_isim as string)}`, merch, adet)
+        }
+      }
+      const enCokSatan = (m?: Map<string, number>) =>
+        m ? [...m.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '' : ''
+      const donemMerchOf = (kod: string, cari: string, sube: string) =>
+        (kod ? enCokSatan(donemMerchKod.get(kod.trim())) : '') ||
+        enCokSatan(donemMerchFull.get(`${nk(sube)}||${nk(cari)}`)) ||
+        enCokSatan(donemMerchShort.get(`${nk(sube)}||${shortCari(cari)}`))
 
       // Satırları oluştur
       // Dedup key: cari_adi + sube_adi + cetinler_merch + merch_adi (kullanıcı isteği)
       const seen = new Set<string>()
       const built: HakedisRow[] = []
-      const destekRows: Array<{ merch_adi: string; sube_adi: string; cari_adi: string; cetinler_merch: string; sup_adi: string; parent_sup_adi: string }> =
+      const destekRows: Array<{ merch_adi: string; sube_adi: string; sube_kod?: string; cari_adi: string; cetinler_merch: string; sup_adi: string; parent_sup_adi: string }> =
         destekData.rows ?? []
 
       for (const dp of destekRows) {
-        const mk = (dp.cetinler_merch === '-' ? '' : dp.cetinler_merch || '').toLowerCase()
+        const apiMerch = dp.cetinler_merch === '-' ? '' : (dp.cetinler_merch || '')
+        const effMerch = donemMerchOf(dp.sube_kod || '', dp.cari_adi, dp.sube_adi) || apiMerch
+        const mk = effMerch.toLowerCase()
 
         // Merch Hedefleri'nde "Destek Personeli var mı?" = true olmayanları filtrele
         // Admin/Manager/BSY rolleri için flag kontrolü uygulanmaz — tüm satırları göster
         const applyFlagFilter = currentUserRole === 'sup' || currentUserRole === 'jr'
-        if (applyFlagFilter && destekFlagMap.size > 0 && mk && !destekFlagMap.get(mk)) continue
+        // Devir (Eylül 2026): Atilla ekibinin bayrağı işaretlenmedi; bu satırları
+        // şubenin güncel süpervizörü görüp hakediş dağıtsın (bkz. lib/supDevir).
+        const devirIstisnasi = donem === DEVIR_DONEMI && isDevirMerch(effMerch)
+        if (applyFlagFilter && !devirIstisnasi && destekFlagMap.size > 0 && mk && !destekFlagMap.get(mk)) continue
 
         // Cari + Şube + Çetinler Merch + Destek Personeli aynıysa tek satır
         const dedup = `${nk(dp.cari_adi)}||${nk(dp.sube_adi)}||${mk}||${nk(dp.merch_adi)}`
         if (seen.has(dedup)) continue
         seen.add(dedup)
 
-        const fk  = dedup
-        // Önce tam eşleşme, yoksa sadece merch_adi ile fallback
-        const savedHakedis = fullMap.get(fk) ?? merchMap.get(nk(dp.merch_adi)) ?? 0
+        // Önce tam eşleşme, sonra cari+şube+destek, en son sadece merch_adi
+        const fk  = `${nk(dp.cari_adi)}||${nk(dp.sube_adi)}||${nk(effMerch)}||${nk(dp.merch_adi)}`
+        const csm = csmMap.get(`${nk(dp.cari_adi)}||${nk(dp.sube_adi)}||${nk(dp.merch_adi)}`)
+        const savedHakedis = fullMap.get(fk) ?? csm?.hakedis ?? merchMap.get(nk(dp.merch_adi)) ?? 0
+        const displayMerch = effMerch || dp.cetinler_merch
         built.push({
           cari_adi:               dp.cari_adi,
           sube_adi:               dp.sube_adi,
           sup_adi:                dp.sup_adi || (currentUserRole === 'sup' ? currentUserName : ''),
           parent_sup_adi:         dp.parent_sup_adi || '',
-          cetinler_merch:         dp.cetinler_merch,
+          cetinler_merch:         displayMerch,
+          kayit_cetinler:         csm?.cetinler || displayMerch,
           cetinler_merch_hakedis: satisMap.get(mk) ?? 0,
           merch_adi:              dp.merch_adi,
           hakedis:                savedHakedis,
@@ -220,7 +275,7 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
           ay,
           cari_adi:       r.cari_adi,
           sube_adi:       r.sube_adi,
-          cetinler_merch: r.cetinler_merch,
+          cetinler_merch: r.kayit_cetinler,
           merch_adi:      r.merch_adi,
           hakedis,
           sup_adi:        r.sup_adi || currentUserName,

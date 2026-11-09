@@ -3,13 +3,12 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as XLSX from 'xlsx'
 import { createClient } from '@supabase/supabase-js'
+import { downloadBsyExcel } from '@/lib/bsyExcel'
 
 const EXCEL_PATH =
   process.env.BSY_EXCEL_PATH ??
   path.join(process.env.HOME ?? '/Users/erkansadikoglu', 'Desktop/SAHA.xlsx')
 
-const BUCKET = 'bsy-excel'
-const OBJ_NAME = 'SAHA.xlsx'
 
 async function getExcelBuffer(): Promise<Buffer | null> {
   if (fs.existsSync(EXCEL_PATH)) {
@@ -22,7 +21,7 @@ async function getExcelBuffer(): Promise<Buffer | null> {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
-    const { data, error } = await sb.storage.from(BUCKET).download(OBJ_NAME)
+    const { data, error } = await downloadBsyExcel(sb)
     if (error || !data) {
       console.error('❌ Excel indirme hatası:', error)
       return null

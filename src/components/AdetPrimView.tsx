@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { authFetch } from '@/lib/authFetch'
 import { supabase } from '@/lib/supabase'
 import { createPortal } from 'react-dom'
-import { RefreshCw, Edit2, Save, X, ChevronDown, Plus, Trash2, FileDown } from 'lucide-react'
+import { RefreshCw, Edit2, Save, X, ChevronDown, Plus, Trash2, FileDown, FileSpreadsheet } from 'lucide-react'
 import clsx from 'clsx'
 
 import * as XLSX from 'xlsx'
@@ -539,6 +539,19 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
   }
 
   const displayRows = editing ? draft : rows
+
+  // Excel dışa aktarım (yalnızca admin): ekrandaki tabloyla aynı satırlar
+  function exportExcel() {
+    const wsData = [
+      ['#', 'Stok Kodu', 'Kategori', 'Bayi Merch (₺/adet)', 'Koşullu Destek Personeli (₺/adet)'],
+      ...displayRows.map((r, i) => [i + 1, r.stokKodu, r.kategori ?? '', r.bayiMerch ?? '', r.kosulluDestek ?? '']),
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(wsData)
+    ws['!cols'] = [{ wch: 5 }, { wch: 16 }, { wch: 30 }, { wch: 20 }, { wch: 32 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Adet Prim Tablosu')
+    XLSX.writeFile(wb, `Adet_Prim_Tablosu_${yil}_${String(ay).padStart(2, '0')}.xlsx`)
+  }
   // Kategori seçenekleri: kayıtlı satırlardaki kategoriler (düzenleme sırasında sabit kalsın diye rows'tan)
   const kategoriOptions = [...new Set(rows.map(r => r.kategori).filter(Boolean) as string[])]
     .sort((a, b) => a.localeCompare(b, 'tr'))
@@ -583,6 +596,16 @@ export function AdetPrimTablosu({ isAdmin = false }: { isAdmin?: boolean }) {
             >
               <FileDown size={12} /> PDF
             </button>
+            {isAdmin && (
+              <button
+                onClick={exportExcel}
+                disabled={loading || displayRows.length === 0}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold shadow-sm disabled:opacity-50"
+                title="Excel olarak indir"
+              >
+                <FileSpreadsheet size={12} /> Excel
+              </button>
+            )}
           </>
         )}
 

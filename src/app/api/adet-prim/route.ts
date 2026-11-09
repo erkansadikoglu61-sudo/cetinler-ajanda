@@ -1,5 +1,7 @@
 import { requireRole, ROLLER } from '@/lib/apiAuth'
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
+import { fetchPhpHtml, parseHtmlTableByHeader } from '@/lib/merchSatis'
+import { GRUP_NORMALIZE } from '@/lib/sellout'
 import { createClient } from '@supabase/supabase-js'
 import { loadAdetPrimRates } from '@/lib/adetPrimRates'
 
@@ -8,6 +10,36 @@ function getSupabase() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
+}
+
+// ── Stok → grup kodu / kategori (B2B satış raporu) ──────────────────
+const MERCH_SATIS_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_satis.php'
+const GRUP_SIRASI = ['RELUX', 'EKEA']
+function grupSira(g?: string): number {
+  const i = GRUP_SIRASI.indexOf((g ?? '').toUpperCase())
+  return i >= 0 ? i : (g ? GRUP_SIRASI.length : GRUP_SIRASI.length + 1)  // bilinmeyen en sonda
+}
+function markaToGrup(marka?: string | null): string {
+  const m = (marka ?? '').toLocaleLowerCase('tr')
+  if (m.includes('relux')) return 'RELUX'
+  if (m.includes('electrolux') || m.includes('ekea')) return 'EKEA'
+  return ''
+}
+let stokGrupCache: { at: number; map: Map<string, { grupKodu: string; aciklama: string }> } | null = null
+async function stokGrupHaritasi(): Promise<Map<string, { grupKodu: string; aciklama: string }> | null> {
+  if (stokGrupCache && Date.now() - stokGrupCache.at < 10 * 60 * 1000) return stokGrupCache.map
+  const p = fetchPhpHtml(MERCH_SATIS_URL).then(html => {
+    const map = new Map<string, { grupKodu: string; aciklama: string }>()
+    for (const r of parseHtmlTableByHeader(html).rows) {
+      const stok = (r['STOK_KODU'] ?? '').trim().toUpperCase()
+      if (!stok || map.has(stok)) continue
+      map.set(stok, { grupKodu: (r['GRUP_KODU'] ?? '').trim().toUpperCase(), aciklama: (r['GRUP_ACIKLAMA'] ?? '').trim() })
+    }
+    stokGrupCache = { at: Date.now(), map }
+    return map
+  })
+  after(() => p.then(() => {}, () => {}))
+  return Promise.race([p, new Promise<null>(res => setTimeout(() => res(null), 15_000))]).catch(() => null)
 }
 
 // GET /api/adet-prim?yil=2026&ay=5
@@ -24,47 +56,26 @@ export async function GET(req: Request) {
     // Ortak fonksiyon — Prim Ödeme (bayi-merch-prim) ve prim-analiz de aynısını kullanır.
     const primData = await loadAdetPrimRates(sb, yil, ay)
 
-    // 4. Fetch kategoriler from PHP API (eğer Excel'de yoksa)
-    const phpUrl = process.env.PHP_API_URL
-    if (phpUrl) {
-      try {
-        const params = new URLSearchParams({ yil: String(yil), ay: String(ay) })
-        const response = await fetch(`${phpUrl}?${params}`, {
-          next: { revalidate: 900 }, // 15 dakika cache
-        })
-
-        if (response.ok) {
-          const htmlText = await response.text()
-          const kategoriMap = new Map<string, string>()
-          const trMatches = htmlText.match(/<tr>[\s\S]*?<\/tr>/gi) || []
-
-          for (let i = 1; i < trMatches.length; i++) {
-            const tr = trMatches[i]
-            const tdMatches = tr.match(/<td>([\s\S]*?)<\/td>/gi) || []
-
-            if (tdMatches.length >= 6) {
-              const stokKodu = tdMatches[4]?.replace(/<\/?td>/gi, '').trim()
-              const grupAciklama = tdMatches[5]?.replace(/<\/?td>/gi, '').trim()
-
-              if (stokKodu && grupAciklama && !kategoriMap.has(stokKodu)) {
-                kategoriMap.set(stokKodu, grupAciklama)
-              }
-            }
-          }
-
-          // Kategori bilgisini merge et (sadece Excel'de yoksa)
-          for (const [stokKodu, kategori] of kategoriMap) {
-            if (primData[stokKodu] && !primData[stokKodu].kategori) {
-              primData[stokKodu].kategori = kategori
-            }
-          }
-        }
-      } catch (e) {
-        console.error('PHP kategori fetch error:', e)
-      }
+    // 4. Grup kodu (RELUX / EKEA …) ve eksik kategori: B2B satış raporundan
+    //    stok bazında (STOK_KODU → GRUP_KODU / GRUP_ACIKLAMA). Rapor ortak
+    //    cache'te; 15 sn'de gelmezse Excel "Marka" sütununa düşülür.
+    const stokGrup = await stokGrupHaritasi()
+    for (const r of Object.values(primData)) {
+      const g = stokGrup?.get(r.stokKodu.trim().toUpperCase())
+      const raporGrup = g?.grupKodu ?? ''
+      r.grupKodu = (GRUP_SIRASI.includes(raporGrup) ? raporGrup : '') || markaToGrup(r.marka) || raporGrup
+      if (!r.kategori && g?.aciklama) r.kategori = GRUP_NORMALIZE[g.aciklama] ?? g.aciklama
     }
 
-    return NextResponse.json({ rows: Object.values(primData) })
+    // Sıralama: grup kodu (RELUX → EKEA → diğerleri) → Kategori → Stok Kodu — alfabetik;
+    // grup içinde kategorisiz satırlar en sonda
+    const rows = Object.values(primData).sort((a, b) =>
+      grupSira(a.grupKodu) - grupSira(b.grupKodu) ||
+      (a.grupKodu ?? '').localeCompare(b.grupKodu ?? '', 'tr') ||
+      (Number(!a.kategori) - Number(!b.kategori)) ||
+      (a.kategori ?? '').localeCompare(b.kategori ?? '', 'tr') ||
+      a.stokKodu.localeCompare(b.stokKodu, 'tr'))
+    return NextResponse.json({ rows })
   } catch (e) {
     console.error('Adet prim API error:', e)
     return NextResponse.json({ error: String(e) }, { status: 500 })
@@ -111,3 +122,6 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
+
+// PHP raporu yavaş/büyük: kalıcı cache + arka plan yenileme için süre
+export const maxDuration = 300
