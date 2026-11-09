@@ -60,12 +60,17 @@ Hepsinin sistemde kaydı var.
   | Epilatör&Baskül(&Mutfak) | 8.500 ₺ |
   (Önceki "her kategoriye 3.000 ₺" yer tutucusunun yerine bunlar kullanılacak;
   tutarlar parametrik, sonradan değiştirilebilir.)
+- **Süpürge Grubu** ve **Mutfak ve Diğer Gruplar** 2027'de olmayacak → BSY adet
+  yapısında bu kategoriler **yer almaz, prim hesaplanmaz** (Kasım–Aralık simülasyonu
+  dahil). Yapı 2027 kategori setine göre kurulacak.
 - **2027'de ciro primi tamamen kalkacak**; prim yönetimi tamamen adete bağlı olacak.
 - **Kategori prim formülü (BSY, tüm kategorilerde aynı baremler):**
   - Gerçekleşme **< %50** → **0 ₺**
   - **%50 – %80** arası → **(ana prim / 2) × gerçekleşme oranı**
     (ör. ana prim 30.000 ₺, %60 gerçekleşme → 15.000 × 0,60 = **9.000 ₺**)
-  - **≥ %80** → **ana primin tamamı** (ör. 30.000 ₺)
+  - **≥ %80** → **ana primin tamamı** (ör. 30.000 ₺); **%100 üstünde de tavan ana prim**.
+    Ay bazlı ekstra uygulama (ör. %100 üstü ek prim) yapılırsa ayrı bir **parametreyle**
+    tanımlanacak (mevcut OZEL_KATEGORI_PRIM benzeri dönem bazlı kural).
   - Ciro priminde alt barem %80'di; adette %50 alt barem + yarım prim bandı.
   - %50 ve %80 eşikleri **parametrik** tutulacak.
 - Önce eksikler kontrol edilecek, sonra canlıya alınacak.
@@ -125,9 +130,7 @@ Hepsinin sistemde kaydı var.
   **2027 Ocak'ta** gerçek prim olarak devreye alınır (Jr'larla birlikte).
 
 ## 7. Açık sorular (konuşulacak)
-- **Süpürge Grubu** ve **Mutfak ve Diğer Gruplar** BSY prim listesinde yok: bu
-  kategorilerden BSY'ye prim yok mu, yoksa tutar sonra mı verilecek?
-- %100 üstü gerçekleşmede ek prim var mı (yoksa tavan ana prim mi)?
+- _(şimdilik yok — yeni notlar geldikçe eklenecek)_
 
 ## Ek notlar (kullanıcıdan gelenler)
 - 2026-11-09: Sup/Jr görünürlüğü B2B şube atamasından; BSY Kasım–Aralık paralel adet
@@ -145,3 +148,5 @@ Hepsinin sistemde kaydı var.
 - 2026-11-09: BSY formülü: <%50 → 0; %50–80 → (ana prim/2) × gerçekleşme; ≥%80 → ana
   prim. Ana primler: IPL 28.000, Üflemeli 20.000, Düzleştirici&Maşa 15.000, Erkek Bakım
   10.000, Epilatör&Baskül 8.500 ₺. Baremler tüm kategorilerde aynı.
+- 2026-11-09: Süpürge ve Mutfak&Diğer 2027'de yok → BSY yapısında yer almaz, prim yok.
+  %100 üstü tavan = ana prim; ay bazlı ekstra uygulama ayrı parametreyle tanımlanacak.
