@@ -53,6 +53,11 @@ Hepsinin sistemde kaydı var.
 - **Prim tutarları:** şablon kurulurken her kategoriye **şimdilik 3.000 ₺**.
   Gerçek tutarlar canlıya alırken kullanıcı tarafından verilecek.
 - **2027'de ciro primi tamamen kalkacak**; prim yönetimi tamamen adete bağlı olacak.
+- **Basamaklar:** Sup/Jr ile aynı mantık (gerçekleşmeye göre prim), **ama alt barem var**:
+  bir kategoride gerçekleşme alt baremin altındaysa o kategoriden **prim yok**.
+  - Ciro priminde alt barem %80'di (kategoriyi %80 yakalayamayan BSY'ye ödeme yok).
+  - Adet priminde önerilen alt barem **%50** (ör. IPL grubuna 30.000 ₺ tanımlıysa %30
+    gerçekleşmede ödeme yapılmaz). Barem **parametrik** tutulacak, kullanıcı değiştirebilsin.
 - Önce eksikler kontrol edilecek, sonra canlıya alınacak.
 
 ## 4b. Yeni: Kişisel prim ana ekranı ("Hesabım" — bankacılık uygulaması tarzı)
@@ -104,10 +109,14 @@ Hepsinin sistemde kaydı var.
   `PRIM_EXCLUDED_BSYS`.
 - B2B'de test/eski kayıtlar (ör. şube kodu boş satırlar) eşleşmeleri bozabiliyor.
 
+## 6b. v2 geçiş planı
+- v2 kısa sürede hazır ve çalışır hale gelirse **beklemeden v2'ye geçilir**.
+- İstisna: **BSY adet primi** Kasım–Aralık 2026 boyunca yalnızca **simüle** edilir;
+  **2027 Ocak'ta** gerçek prim olarak devreye alınır (Jr'larla birlikte).
+
 ## 7. Açık sorular (konuşulacak)
-- BSY kategori primi basamakları (gerçekleşme %'ye göre tam/oranlı) Sup'takiyle aynı
-  mantıkta mı olacak?
-- v2 geçiş planı: hangi modüller önce, veri taşıma, v1 ile paralel çalışma süresi.
+- %50 alt baremin üstünde Sup/Jr'daki gibi oranlı mı (gerçekleşme × prim), basamaklı mı?
+- Alt barem tüm kategorilerde aynı mı, kategori bazında ayrı mı?
 
 ## Ek notlar (kullanıcıdan gelenler)
 - 2026-11-09: Sup/Jr görünürlüğü B2B şube atamasından; BSY Kasım–Aralık paralel adet
@@ -119,3 +128,6 @@ Hepsinin sistemde kaydı var.
   "Çetinler Ajanda v2" olarak, performans odaklı yeniden yapılandırma.
 - 2026-11-09: Herkes için bankacılık tarzı kişisel prim ana ekranı (IBAN, cari, şube,
   bu ayın bakiyesi, son 3 ay ödendi/bekliyor tablosu, hatalı bilgi bildirimi).
+- 2026-11-09: BSY kategori priminde alt barem (öneri %50, parametrik; cirodaki %80'in
+  karşılığı). v2 hazır olunca beklemeden geçiş; BSY adet primi 2 ay simülasyon,
+  2027 Ocak'ta canlı.
