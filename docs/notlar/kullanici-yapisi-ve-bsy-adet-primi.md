@@ -1,4 +1,12 @@
-# Kullanıcı yapısı optimizasyonu + BSY adet primi (2027) — çalışma notları
+# Çetinler Ajanda v2 — kullanıcı yapısı optimizasyonu + BSY adet primi (2027) — çalışma notları
+
+## 0. Vizyon: Çetinler Ajanda **v2**
+- Bu çalışma bir yama değil, **v2** olarak düşünülecek. v1 parça parça, üst üste
+  geliştirildiği için ağır çalışıyor.
+- Hedef: optimizasyonları baştan yapılmış, **hızlı**, tutarlı ve sade bir yapı.
+- Canlı (v1) çalışmaya devam ederken v2 **yan yana** hazırlanacak; kontrol edilip
+  uygun bir şekilde geçiş yapılacak.
+- v2'de ciro tabanlı prim yok; **tamamen adet tabanlı** prim yönetimi.
 
 > Durum: **Henüz uygulanmadı.** Kullanıcı bilgisayara geçince birlikte başlanacak.
 > Canlıya dokunmadan ayrı (paralel) hazırlanacak, kontrol sonrası canlıya alınacak.
@@ -41,6 +49,10 @@ Hepsinin sistemde kaydı var.
   **adet hedefi girişi** + **adet gerçekleşme takibi** + prim hesabı, ayrı bir başlık
   (tablo + hesaplama).
 - BSY gerçekleşmesi: BSY'nin carilerine bağlı **tüm şubelerin** satış adedi.
+- **Hedef kategori bazlı** (Sup/Jr/Çetinler Merch'teki grup hedefleri gibi).
+- **Prim tutarları:** şablon kurulurken her kategoriye **şimdilik 3.000 ₺**.
+  Gerçek tutarlar canlıya alırken kullanıcı tarafından verilecek.
+- **2027'de ciro primi tamamen kalkacak**; prim yönetimi tamamen adete bağlı olacak.
 - Önce eksikler kontrol edilecek, sonra canlıya alınacak.
 
 ## 5. Bilgisayara geçince ilk yapılacaklar
@@ -57,6 +69,8 @@ Hepsinin sistemde kaydı var.
   süpervizörü-jr'ı değişirse — aynı kural) Satış/sipariş kaydı **oluştuğu andaki**
   yetkiliyle kalır. Değişiklikler pratikte **ay başında** yapıldığı için önceki ayın
   kayıtları eski kişide kalır; yani etki **ay bazında** yansır.
+- **Bir cari her zaman tek BSY'ye bağlıdır.** BSY = carinin plasiyeri; ERP → B2B →
+  ajanda akışıyla gelir. ERP'de plasiyer değişince B2B ve ajandada da değişir.
 - **Şube müdürleri (8. seviye):**
   - Hiyerarşide şubenin yetkilisi olan **Jr. Süpervizör / Süpervizör'ün altında**.
   - Bir nevi **destek personeli** gibi şubeye bağlı.
@@ -74,13 +88,15 @@ Hepsinin sistemde kaydı var.
 - B2B'de test/eski kayıtlar (ör. şube kodu boş satırlar) eşleşmeleri bozabiliyor.
 
 ## 7. Açık sorular (konuşulacak)
-- BSY adet hedefi: kategori bazlı mı (Sup/Jr/Çetinler Merch gibi grup hedefleri)?
-  Prim oranları/basamakları Sup'takiyle aynı mantıkta mı, tutarlar ne olacak?
-- Bir cari aynı anda birden fazla BSY'ye bağlı olabilir mi?
-- Ciro primi 2027'de tamamen mi kalkacak, yoksa adet primiyle birlikte mi sürecek?
+- BSY kategori primi basamakları (gerçekleşme %'ye göre tam/oranlı) Sup'takiyle aynı
+  mantıkta mı olacak?
+- v2 geçiş planı: hangi modüller önce, veri taşıma, v1 ile paralel çalışma süresi.
 
 ## Ek notlar (kullanıcıdan gelenler)
 - 2026-11-09: Sup/Jr görünürlüğü B2B şube atamasından; BSY Kasım–Aralık paralel adet
   hedefi (simülasyon), 2027 Ocak canlı; atama değişikliğinde kayıt oluştuğu andaki
   yetkilide kalır (ay bazında); şube müdürleri şubenin Jr/Sup'u altında, manuel prim
   alt başlığı.
+- 2026-11-09: BSY adet hedefi kategori bazlı, prim şimdilik kategori başına 3.000 ₺;
+  bir cari tek BSY (ERP plasiyeri); 2027'de ciro primi tamamen kalkacak; tüm çalışma
+  "Çetinler Ajanda v2" olarak, performans odaklı yeniden yapılandırma.
