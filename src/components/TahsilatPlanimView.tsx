@@ -11,6 +11,43 @@ const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
 
 const BSY_LISTESI = Object.values(BSY_KOD_TO_NAME).sort()
 
+// /api/tahsilat-planim, Burak Kılıç (IB1) için Okan Oğuz'un (IB2) carilerini de
+// döndürür (Burak görebilsin diye). Birden fazla BSY birlikte çekildiğinde
+// (admin "Tümü", Burak'ın kendi ekranı) aynı cari iki kez geliyordu.
+// Cari kodu bazında teke düşürülür; asıl sahibinin (ör. Okan) satırı tutulur.
+// Kopyada girilmiş plan varsa ve sahibin satırında yoksa plan taşınır (kaybolmaz).
+function tekillestir(gruplar: { bsy: string; rows: TahsilatPlanimRow[] }[]): TahsilatPlanimRow[] {
+  const toplayici = (BSY_KOD_TO_NAME['IB1'] ?? '').toLocaleLowerCase('tr')
+  const isToplayici = (b: string) => b.toLocaleLowerCase('tr') === toplayici
+  const planVar = (r: TahsilatPlanimRow) => !!(r.tahsilatHaftasi || r.tutar || r.tahsilatTuru)
+
+  const sahip = new Map<string, TahsilatPlanimRow>()   // cariKod → asıl sahibinin satırı
+  for (const g of gruplar) {
+    if (isToplayici(g.bsy)) continue
+    for (const r of g.rows) if (!sahip.has(r.cariKod)) sahip.set(r.cariKod, r)
+  }
+
+  const out: TahsilatPlanimRow[] = []
+  const seen = new Set<string>()
+  for (const g of gruplar) {
+    for (const r of g.rows) {
+      if (seen.has(r.cariKod)) continue
+      const s = sahip.get(r.cariKod)
+      if (isToplayici(g.bsy) && s && s !== r) {
+        if (!planVar(s) && planVar(r)) {
+          s.tahsilatHaftasi = r.tahsilatHaftasi
+          s.tutar = r.tutar
+          s.tahsilatTuru = r.tahsilatTuru
+        }
+        continue   // sahibinin grubunda yer alacak
+      }
+      seen.add(r.cariKod)
+      out.push(r)
+    }
+  }
+  return out
+}
+
 function fmtCur(n: number) {
   return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
@@ -146,7 +183,7 @@ export function TahsilatPlanimView({
           })
 
           const results = await Promise.all(promises)
-          allRows = results.flat()
+          allRows = tekillestir(results.map((rows, i) => ({ bsy: BSY_LISTESI[i], rows })))
         }
       } else {
         // BSY kullanıcısı için
@@ -154,6 +191,7 @@ export function TahsilatPlanimView({
           ? [bsyAdi, 'Okan Oğuz']
           : [bsyAdi]
 
+        const gruplar: { bsy: string; rows: TahsilatPlanimRow[] }[] = []
         for (const bsy of bsyAdlari) {
           const res = await authFetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(bsy)}`)
           const data = await res.json()
@@ -161,8 +199,9 @@ export function TahsilatPlanimView({
             ...r,
             _bsyAdi: bsy
           }))
-          allRows.push(...rowsWithBsy)
+          gruplar.push({ bsy, rows: rowsWithBsy })
         }
+        allRows = tekillestir(gruplar)
       }
 
       setRows(allRows)
