@@ -48,3 +48,25 @@ export function isDevirMerch(merch: string): boolean {
 export function isDevirSup(supApiName: string): boolean {
   return devirSupSet.has(normalizeName(supApiName))
 }
+
+// ── Jr. Süpervizör devirleri ─────────────────────────────────────────
+// Satışın Jr'ı 2026-09'dan beri B2B'nin GÜNCEL atamasından okunuyor
+// (api/sellout). B2B'de şubeler yeni Jr'a geçince eski Jr'ın geçmiş ay
+// satışları da yeni Jr'a kayıyordu → yeni Jr'ın hedef/primi bozuluyor, eski
+// Jr'ın geçmişi boşalıyordu. ilkDonem'den ÖNCEKİ dönemlerde satış eski Jr'da
+// kalır. Yeni Jr eski Jr'ın geçmiş verilerini (Takvim, Sellout) GÖRÜR ama
+// bunlar kendi hedef/primine katılmaz (ayrı satırda, eski Jr adına).
+export const JR_DEVIRLERI: { eski: string; yeni: string; ilkDonem: string }[] = [
+  { eski: 'Merve İnci', yeni: 'Burçin Acar', ilkDonem: '2026-11' },  // Merve son ay: Ekim 2026
+]
+
+/** Satış dönemine göre Jr adı: yeni Jr'ın başlangıcından önceki dönemde eski Jr. */
+export function donemJrAdi(jr: string, donem: string): string {
+  const d = JR_DEVIRLERI.find(x => normalizeName(x.yeni) === normalizeName(jr) && donem < x.ilkDonem)
+  return d ? d.eski : jr
+}
+
+/** Kişinin devraldığı (öncülü olan) Jr adları — geçmiş verilerini görebilsin diye. */
+export function devraldiklari(ad: string): string[] {
+  return JR_DEVIRLERI.filter(x => normalizeName(x.yeni) === normalizeName(ad)).map(x => x.eski)
+}

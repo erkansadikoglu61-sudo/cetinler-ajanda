@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, Profile, BsySupervisor } from '@/lib/supabase'
+import { devraldiklari } from '@/lib/supDevir'
+import { namesMatch } from '@/lib/sellout'
 
 export function useTeam(currentProfile: Profile | null) {
   const [team, setTeam] = useState<Profile[]>([])
@@ -49,6 +51,12 @@ export function useTeam(currentProfile: Profile | null) {
         .filter(p => p.manager_id === currentProfile.id)
         .map(p => p.id)
       return [currentProfile.id, ...jrs]
+    }
+    if (currentProfile.role === 'jr') {
+      // Jr devri: öncül Jr'ın (ör. Merve İnci → Burçin Acar) geçmiş kayıtlarını da görsün
+      const oncul = devraldiklari(currentProfile.full_name)
+      const onculIds = team.filter(p => oncul.some(a => namesMatch(a, p.full_name))).map(p => p.id)
+      return [currentProfile.id, ...onculIds]
     }
     return [currentProfile.id]
   }, [currentProfile, team, bsyLinks])

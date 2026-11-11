@@ -22,7 +22,7 @@ import { SelloutView } from '@/components/SelloutView'
 import { BsyView } from '@/components/BsyView'
 import { TahsilatPlanimView } from '@/components/TahsilatPlanimView'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
-import { namesMatch, normalizeName } from '@/lib/sellout'
+import { namesMatch, normalizeName, donemdeAktif } from '@/lib/sellout'
 import { GenelRaporlarView } from '@/components/GenelRaporlarView'
 import { KpiView } from '@/components/KpiView'
 import { NoktalarimizView } from '@/components/NoktalarimizView'
@@ -1756,6 +1756,7 @@ const VISIT_TARGETS: Record<string, number> = {
   'Duygu Duman':      60,
   'Tuğba Ayata':      60,
   'Merve İnci':       60,
+  'Burçin Acar':      60,
   'Atilla YILMAZ':    40,
   'Burak Alagöz':     60,
   'Gülcan Bayer':     60,
@@ -1870,7 +1871,8 @@ function StatsSheet({ team, visibleIds, initialYear, initialMonth, onClose }: {
           {/* Hedef Ziyaret Noktası Tablosu */}
           {(() => {
             const targetRows = team
-              .filter(p => VISIT_TARGETS[p.full_name] !== undefined && visibleIds.includes(p.id) && (p.role === 'sup' || p.role === 'jr'))
+              .filter(p => VISIT_TARGETS[p.full_name] !== undefined && visibleIds.includes(p.id) && (p.role === 'sup' || p.role === 'jr')
+                && donemdeAktif(p.full_name, `${statYear}-${String(statMonth + 1).padStart(2, '0')}`))
               .map(p => ({
                 profile: p,
                 target: VISIT_TARGETS[p.full_name],

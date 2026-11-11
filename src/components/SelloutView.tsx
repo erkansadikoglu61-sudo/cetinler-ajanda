@@ -19,7 +19,7 @@ import { BSY_NAME_TO_KOD } from '@/lib/bsy'
 import { SayfaParametreleri } from '@/components/SayfaParametreleri'
 import { SelloutAciklama } from '@/components/SelloutAciklama'
 import { getOzelGruplar, ozelSubeAdetleri, buildOzelCarpan } from '@/lib/ozelUygulama'
-import { DEVIR_DONEMI, isDevirSup } from '@/lib/supDevir'
+import { DEVIR_DONEMI, isDevirSup, devraldiklari } from '@/lib/supDevir'
 
 type SubTab = 'sup' | 'jr' | 'merch' | 'top20' | 'satislar' | 'satisgirmeyen' | 'ozel'
 
@@ -1053,7 +1053,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       const myJrs = jrsOf(currentProfile.id).map(j => j.full_name)
       return [currentProfile.full_name, ...myJrs]
     }
-    if (isJr) return [currentProfile.full_name]
+    if (isJr) return [currentProfile.full_name, ...devraldiklari(currentProfile.full_name)]
     return []
   }, [isAdmin, isSup, isJr, currentProfile, allSupNames, jrsOf])
 
@@ -1103,7 +1103,10 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
   // ── Jr table data ────────────────────────────────────────────
   const jrRows = useMemo(() => {
-    const jrs = (isAdmin || isSup) ? visibleJrs : visibleJrs.filter(j => j.id === currentProfile.id)
+    // Jr: kendisi + öncülü (Jr devri; öncül yalnızca görevde olduğu aylarda görünür)
+    const oncul = isJr ? devraldiklari(currentProfile.full_name) : []
+    const jrs = (isAdmin || isSup) ? visibleJrs
+      : visibleJrs.filter(j => j.id === currentProfile.id || oncul.some(a => namesMatch(a, j.full_name)))
     return jrs.map(jr => {
       const sup = team.find(p => p.id === jr.manager_id)
       const groups = SELLOUT_GROUPS.map(g => {
