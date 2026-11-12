@@ -972,7 +972,7 @@ export function PrimOdemeListesi({
       // kaydı TC'si 11111111111, asıl destek kaydı başka şubede). Önceden ADA göre
       // İLK kayıt alındığı için yanlış IBAN/TC geliyordu. Artık satırın cari+şube'si
       // ve tipiyle en iyi eşleşen kayıt seçilir; eşitlikte geçerli IBAN/TC'li olan.
-      type Aday = { ad: string; iban: string; tc: string; grubu: string; cari: string; sube: string }
+      type Aday = { id: string; ad: string; iban: string; tc: string; grubu: string; cari: string; sube: string }
       const adaylar = new Map<string, Aday[]>()   // normalize(ad) → B2B kayıtları
       for (const d of (detayData.data ?? [])) {
         const id = ((d.merch_id as string) || '').trim()
@@ -981,7 +981,7 @@ export function PrimOdemeListesi({
         if (!k) continue
         if (!adaylar.has(k)) adaylar.set(k, [])
         adaylar.get(k)!.push({
-          ad: d.merch_adi as string, iban: (d.iban as string) || '', tc: (d.merch_tc as string) || '',
+          id, ad: d.merch_adi as string, iban: (d.iban as string) || '', tc: (d.merch_tc as string) || '',
           grubu: (d.merch_grubu as string) || '', cari: (d.cari_adi as string) || '', sube: (d.sube_adi as string) || '',
         })
       }
@@ -998,7 +998,19 @@ export function PrimOdemeListesi({
           (ibanGecerli(a.iban) ? 1 : 0) + (tcGecerliMi(a.tc) ? 1 : 0)
         let best = list[0]
         for (const a of list) if (skor(a) > skor(best)) best = a
-        return { ad: best.ad, iban: best.iban, tc: best.tc }
+        // IBAN: seçilen kayıtta yoksa kişinin B2B'deki başka kaydından al —
+        // önce aynı MERCH_ID'li kayıtlar, sonra aynı isimli kayıtlarda TEK farklı
+        // geçerli IBAN varsa o (aynı isimde farklı kişilere yanlış IBAN yazılmasın).
+        let iban = best.iban
+        if (!ibanGecerli(iban)) {
+          const ayniId = list.find(a => a.id === best.id && ibanGecerli(a.iban))
+          if (ayniId) iban = ayniId.iban
+          else {
+            const farkli = [...new Set(list.filter(a => ibanGecerli(a.iban)).map(a => formatIban(a.iban).text))]
+            if (farkli.length === 1) iban = farkli[0]
+          }
+        }
+        return { ad: best.ad, iban, tc: best.tc }
       }
 
       const combined: PrimOdemeRow[] = []
