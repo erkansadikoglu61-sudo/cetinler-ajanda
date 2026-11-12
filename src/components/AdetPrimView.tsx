@@ -942,6 +942,8 @@ export function PrimOdemeListesi({
     return rawName.replace(/\s+sv\s*$/i, '').trim()
   }
 
+  // "Yenile" butonu: B2B merch detayını cache'siz çek (yeni girilen IBAN/TC hemen gelsin)
+  const tazeRef = useRef(false)
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -950,10 +952,11 @@ export function PrimOdemeListesi({
       const [bayiRes, destekRes, detayRes, digerRes] = await Promise.all([
         fetch(`/api/bayi-merch-prim?yil=${yil}&ay=${ay}`),
         authFetch(`/api/destek-hakedis?yil=${yil}&ay=${ay}`),
-        fetch('/api/merch-detay'),
+        fetch(`/api/merch-detay${tazeRef.current ? '?yenile=1' : ''}`),
         authFetch(`/api/diger-prim?donem=${donem}&user=${userId}&mode=odeme`),
       ])
       const [bayiData, destekData, detayData] = await Promise.all([bayiRes.json(), destekRes.json(), detayRes.json()])
+      tazeRef.current = false
       // Diğer kayıtları yüklenemezse (ör. yetki) liste yine de gösterilir
       const digerData = digerRes.ok ? await digerRes.json() : { rows: [] }
       if (!bayiRes.ok) throw new Error(bayiData.error ?? 'Bayi Merch yükleme hatası')
@@ -1239,8 +1242,8 @@ export function PrimOdemeListesi({
           </button>
         )}
 
-        <button onClick={load} disabled={loading}
-          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-50" title="Yenile">
+        <button onClick={() => { tazeRef.current = true; load() }} disabled={loading}
+          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-50" title="Yenile (B2B'den taze çeker)">
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
         </button>
 

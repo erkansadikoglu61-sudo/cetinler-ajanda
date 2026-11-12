@@ -142,10 +142,20 @@ function scheduleRefresh(url: string, headers?: Record<string, string>): void {
  */
 export async function fetchPhpHtml(
   url: string,
-  opts?: { headers?: Record<string, string>; revalidateMs?: number },
+  opts?: { headers?: Record<string, string>; revalidateMs?: number; force?: boolean },
 ): Promise<string> {
   const ttl = opts?.revalidateMs ?? HTML_TTL_MS
   if (ttl <= 0) return fetchFromPhp(url, opts?.headers)
+
+  // force: kullanıcı "Yenile" dedi → cache'leri atla, PHP'den taze çek ve
+  // bellek + Storage kopyasını güncelle (B2B'de yeni girilen IBAN/TC hemen gelsin).
+  if (opts?.force) {
+    const html = await fetchFromPhp(url, opts.headers)
+    const at = Date.now()
+    htmlCache.set(url, { at, html })
+    if (looksValid(html)) runAfter(() => storeWrite(url, html, at))
+    return html
+  }
 
   const hit = htmlCache.get(url)
   if (hit && Date.now() - hit.at < ttl) return hit.html
