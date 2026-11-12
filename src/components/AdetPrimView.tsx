@@ -859,6 +859,13 @@ const ODEME_ISTISNALARI: { cari: string; allow?: string[]; deny?: string[]; yil?
 
 // IBAN'ı standart formata çevir: TR + 24 hane = 26 karakter, 4'erli gruplar
 // "TR05 0006 4000 0017 0001 3382 25". Uzunluk 26 değilse/boşsa geçersiz say.
+// TC geçerli mi: 11 hane ve hepsi aynı rakam değil (B2B'de TC yerine yer tutucu
+// "11111111111" girilmiş kayıtlar var → gerçek TC gibi gösterilmesin).
+function tcGecerliMi(v: string): boolean {
+  const t = (v || '').trim()
+  return /^\d{11}$/.test(t) && !/^(\d)\1{10}$/.test(t)
+}
+
 function formatIban(raw: string): { text: string; valid: boolean } {
   const cleaned = (raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
   if (cleaned.length !== 26 || !cleaned.startsWith('TR')) {
@@ -979,7 +986,6 @@ export function PrimOdemeListesi({
         })
       }
       const ibanGecerli = (v: string) => formatIban(v).valid
-      const tcGecerli   = (v: string) => /^\d{11}$/.test((v || '').trim()) && !/^(\d)\1{10}$/.test(v.trim())
       // İsim (gerekirse düzeltme haritasıyla) → en uygun B2B kaydı → güncel ad/IBAN/TC.
       const cozMerch = (rawName: string, cari = '', sube = '', tip = ''): { ad: string; iban: string; tc: string } => {
         const nm = duzeltIsim(rawName)
@@ -989,7 +995,7 @@ export function PrimOdemeListesi({
           (cari && sube && normOdeme(a.cari) === normOdeme(cari) && normOdeme(a.sube) === normOdeme(sube) ? 8 : 0) +
           (cari && normOdeme(a.cari) === normOdeme(cari) ? 4 : 0) +
           (tip && normOdeme(a.grubu) === normOdeme(tip) ? 2 : 0) +
-          (ibanGecerli(a.iban) ? 1 : 0) + (tcGecerli(a.tc) ? 1 : 0)
+          (ibanGecerli(a.iban) ? 1 : 0) + (tcGecerliMi(a.tc) ? 1 : 0)
         let best = list[0]
         for (const a of list) if (skor(a) > skor(best)) best = a
         return { ad: best.ad, iban: best.iban, tc: best.tc }
@@ -1153,7 +1159,7 @@ export function PrimOdemeListesi({
         r.subeAdi || '',
         r.supAdi || '',
         formatIban(r.iban).text,
-        r.tc || '',
+        tcGecerliMi(r.tc) ? r.tc : '',   // yer tutucu TC (ör. 11111111111) Excel'e yazılmaz
       ]),
       ['', '', 'TOPLAM', toplamPrim, toplamOdenecek, '', '', '', '', ''],
     ]
@@ -1361,11 +1367,15 @@ export function PrimOdemeListesi({
                         </td>
                       )
                     })()}
-                    <td className={clsx(
-                      'px-3 py-2 text-[11px] whitespace-nowrap',
-                      row.tc ? 'font-mono text-gray-600' : 'text-gray-300'
-                    )}>
-                      {row.tc || '—'}
+                    <td
+                      className={clsx(
+                        'px-3 py-2 text-[11px] whitespace-nowrap',
+                        tcGecerliMi(row.tc) ? 'font-mono text-gray-600'
+                          : row.tc ? 'text-amber-600 font-medium' : 'text-gray-300'
+                      )}
+                      title={row.tc && !tcGecerliMi(row.tc) ? `B2B'de TC alanında "${row.tc}" yazıyor — gerçek TC girilmemiş` : undefined}
+                    >
+                      {tcGecerliMi(row.tc) ? row.tc : row.tc ? 'TC girilmemiş' : '—'}
                     </td>
                   </tr>
                   )
