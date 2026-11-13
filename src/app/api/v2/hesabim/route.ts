@@ -2,12 +2,10 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
 import { GRUP_NORMALIZE, namesMatch } from '@/lib/sellout'
-import { computeSelloutPrimForMonth, type PrimTip, type NPMerchDetay } from '@/lib/nihaiPrim'
-import { parseHtmlTableByHeader, fetchPhpHtml } from '@/lib/merchSatis'
-import { MERCH_DETAY_URL } from '@/lib/selloutData'
+import { computeSelloutPrimForMonth, type PrimTip } from '@/lib/nihaiPrim'
 import type { Profile } from '@/lib/supabase'
 import { bsyAdetDurum, bsyAdetHesapla } from '@/lib/v2/bsyAdetPrim'
-import { v2Istek, donemSatirlari } from '@/lib/v2/sunucu'
+import { v2Istek, donemSatirlari, merchDetay } from '@/lib/v2/sunucu'
 import { GET as nihaiBsyGet } from '@/app/api/nihai-prim-bsy/route'
 
 // v2 — Hesabım: bu ayın anlık hakedişi + son 3 ay (ödendi / bekliyor).
@@ -32,20 +30,6 @@ function sonAylar(adet: number): { yil: number; ay: number; donem: string }[] {
     const t = new Date(d.getFullYear(), d.getMonth() - i, 1)
     out.push({ yil: t.getFullYear(), ay: t.getMonth() + 1, donem: `${t.getFullYear()}-${pad(t.getMonth() + 1)}` })
   }
-  return out
-}
-
-let mdCache: { at: number; rows: NPMerchDetay[] } | null = null
-async function merchDetay(): Promise<NPMerchDetay[]> {
-  if (mdCache && Date.now() - mdCache.at < 10 * 60 * 1000) return mdCache.rows
-  const { rows } = parseHtmlTableByHeader(await fetchPhpHtml(MERCH_DETAY_URL))
-  const out = rows.map(r => ({
-    merch_adi: (r['MERCH_ADI'] ?? '').trim(),
-    merch_grubu: (r['MERCH_TIPI'] ?? '').trim(),
-    sup_adi: (r['SUPERVIZOR'] ?? '').trim(),
-    jr_adi: (r['JR_SUPERVIZOR'] ?? '').trim(),
-  })).filter(r => r.merch_adi)
-  mdCache = { at: Date.now(), rows: out }
   return out
 }
 

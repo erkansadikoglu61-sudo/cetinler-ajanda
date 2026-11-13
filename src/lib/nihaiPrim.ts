@@ -49,6 +49,15 @@ export interface NPMerchDetay {
  * Çetinler Merch prim hakedişlerini hesaplar. Her kişi için o ayın toplam
  * primini döndürür ({tip, ad, prim, meta}).
  */
+/** Kategori bazlı hedef / gerçekleşme / prim (v2 ekranları için; toplam aynı) */
+export interface NPKategori { grup: string; hedef: number; gerc: number; prim: number }
+
+export interface NPKisiPrim {
+  tip: PrimTip; ad: string; prim: number
+  selfProfileId?: string; ownerSupAd?: string; ownerJrAd?: string
+  kategoriler?: NPKategori[]
+}
+
 export function computeSelloutPrimForMonth(params: {
   periodRows: NPSelloutRow[]
   profileTargets: NPProfileTarget[]
@@ -56,7 +65,7 @@ export function computeSelloutPrimForMonth(params: {
   merchDetay: NPMerchDetay[]
   team: Profile[]
   donem?: string   // 'YYYY-MM' — dönem bazlı özel kategori primi (calcPrim)
-}): Array<{ tip: PrimTip; ad: string; prim: number; selfProfileId?: string; ownerSupAd?: string; ownerJrAd?: string }> {
+}): NPKisiPrim[] {
   const { periodRows, profileTargets, merchTargets, merchDetay, team, donem } = params
 
   const getProfileHedef = (profileId: string, grup: string) =>
@@ -78,7 +87,7 @@ export function computeSelloutPrimForMonth(params: {
       .reduce((s, r) => s + r.satilan_adet, 0)
   }
 
-  const out: Array<{ tip: PrimTip; ad: string; prim: number; selfProfileId?: string; ownerSupAd?: string; ownerJrAd?: string }> = []
+  const out: NPKisiPrim[] = []
 
   const sups = team.filter(p => p.role === 'sup')
   const jrs  = team.filter(p => p.role === 'jr')
@@ -88,24 +97,30 @@ export function computeSelloutPrimForMonth(params: {
     const myJrs = jrs.filter(j => j.manager_id === sup.id)
     const apiNames = [sup.full_name, ...myJrs.map(j => j.full_name)]
     let tPrim = 0
+    const kategoriler: NPKategori[] = []
     for (const g of SELLOUT_GROUPS) {
       const h = getProfileHedef(sup.id, g)
       const v = getGerc(apiNames, g, sup.full_name)
-      tPrim += calcPrim(h, v, PRIM_SUP[g], donem)
+      const p = calcPrim(h, v, PRIM_SUP[g], donem)
+      tPrim += p
+      kategoriler.push({ grup: g, hedef: h, gerc: v, prim: p })
     }
-    out.push({ tip: 'Süpervizör', ad: sup.full_name, prim: tPrim, selfProfileId: sup.id })
+    out.push({ tip: 'Süpervizör', ad: sup.full_name, prim: tPrim, selfProfileId: sup.id, kategoriler })
   }
 
   // ── Jr. Süpervizör ──
   for (const jr of jrs) {
     const sup = team.find(p => p.id === jr.manager_id)
     let tPrim = 0
+    const kategoriler: NPKategori[] = []
     for (const g of SELLOUT_GROUPS) {
       const h = getProfileHedef(jr.id, g)
       const v = getGerc([jr.full_name], g)
-      tPrim += calcPrim(h, v, PRIM_JR[g], donem)
+      const p = calcPrim(h, v, PRIM_JR[g], donem)
+      tPrim += p
+      kategoriler.push({ grup: g, hedef: h, gerc: v, prim: p })
     }
-    out.push({ tip: 'Jr. Süpervizör', ad: jr.full_name, prim: tPrim, selfProfileId: jr.id, ownerSupAd: sup?.full_name })
+    out.push({ tip: 'Jr. Süpervizör', ad: jr.full_name, prim: tPrim, selfProfileId: jr.id, ownerSupAd: sup?.full_name, kategoriler })
   }
 
   // ── Çetinler Merch ──
@@ -124,15 +139,18 @@ export function computeSelloutPrimForMonth(params: {
 
   for (const name of merchNames) {
     let tPrim = 0
+    const kategoriler: NPKategori[] = []
     for (const g of SELLOUT_GROUPS) {
       const h = getMerchHedef(name, g)
       const v = periodRows
         .filter(r => r.merch_personel === name && GRUP_NORMALIZE[r.grup_aciklama] === g)
         .reduce((s, r) => s + r.satilan_adet, 0)
-      tPrim += calcPrim(h, v, PRIM_MERCH[g], donem)
+      const p = calcPrim(h, v, PRIM_MERCH[g], donem)
+      tPrim += p
+      kategoriler.push({ grup: g, hedef: h, gerc: v, prim: p })
     }
     const meta = merchMeta.get(name)
-    out.push({ tip: 'Çetinler Merch', ad: name, prim: tPrim, ownerSupAd: meta?.supAd, ownerJrAd: meta?.jrAd })
+    out.push({ tip: 'Çetinler Merch', ad: name, prim: tPrim, ownerSupAd: meta?.supAd, ownerJrAd: meta?.jrAd, kategoriler })
   }
 
   return out

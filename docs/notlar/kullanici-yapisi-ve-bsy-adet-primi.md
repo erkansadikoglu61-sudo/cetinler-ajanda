@@ -34,8 +34,14 @@
     Merch v1 Nihai Prim ile aynı hesap (lib/nihaiPrim); BSY ciro primi + adet
     simülasyonu yan yana.
   - Sellout satır yükleme ortak modüle alındı: `src/lib/selloutData.ts`.
-  - Sırada: Bayi Merch / Destek hakedişleri, Sup/Jr/Merch hedef girişinin v2'ye
-    taşınması, 2027 kategori setine göre Sup/Jr/Merch yapısı.
+  - Prim sekmesi üç bölüm (role göre): **Sup · Jr · Merch** (`/api/v2/ekip-prim`,
+    kategori detayı + hedef girişi: yönetici herkese, süpervizör kendi ekibine),
+    **BSY Adet**, **Bayi Merch · Destek** (`/api/v2/saha-prim`, v1 bayi-merch-prim
+    motoru + destek_hakedis; görünürlük Şubelerim kuralıyla).
+  - Şube modeli ortak modülde: `src/lib/v2/noktaModel.ts`.
+  - Açık: 2027 kategori seti ve prim tutarları Sup/Jr/Çetinler Merch için
+    (Süpürge, Mutfak & Diğer kalkıyor mu; yeni kategori primleri ve barem ne olacak).
+    Destek hakediş girişi/onayı şimdilik v1'de.
 - **Faz 3 — Ajanda:** görev penceresi Şubelerim kaynağından; eksik şube talebi;
   hatalı bilgi bildirimi.
 - **Faz 4 — Raporlar + geçiş:** Sellout/tahsilat/ziyaret raporları v2 kuralıyla;
@@ -200,3 +206,4 @@ Hepsinin sistemde kaydı var.
 - 2026-11-13: v2'de Dashboard sekmesi olmayacak. v2 çalışması başlatıldı (Faz 1: `/v2`,
   Hesabım + Şubelerim, tek görünürlük kuralı).
 - 2026-11-13: Aşama 2 başlatıldı (BSY adet primi + Hesabım hakediş/geçmiş).
+- 2026-11-13: Aşama 2 devamı: Sup/Jr/Merch prim + hedef girişi, Bayi Merch · Destek hakedişleri v2'de.

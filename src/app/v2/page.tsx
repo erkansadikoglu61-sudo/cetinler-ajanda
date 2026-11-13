@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useTeam } from '@/hooks/useTeam'
 import { HesabimView } from '@/components/v2/HesabimView'
 import { SubelerimView } from '@/components/v2/SubelerimView'
-import { BsyAdetPrimView } from '@/components/v2/BsyAdetPrimView'
+import { PrimView } from '@/components/v2/PrimView'
 import { V2Veri, V2_ROL_ADI } from '@/components/v2/types'
 
 // Çetinler Ajanda v2 — v1 (/app) ile yan yana hazırlanıyor.
@@ -156,7 +156,7 @@ export default function V2Page() {
 
         {veri && sekme === 'hesabim' && <HesabimView veri={veri} gorunum={gorunum} onSubelerim={() => setSekme('subelerim')} />}
         {veri && sekme === 'subelerim' && <SubelerimView veri={veri} />}
-        {sekme === 'prim' && <BsyAdetPrimView gorunum={gorunum} />}
+        {veri && sekme === 'prim' && <PrimView key={gorunum} rol={veri.kullanici.rol} gorunum={gorunum} />}
         {(sekme === 'ajanda' || sekme === 'raporlar') && (
           <section className="rounded-2xl border border-gray-200 bg-white p-5">
             <p className="text-xs uppercase tracking-wider text-gray-400">Yapım aşamasında</p>

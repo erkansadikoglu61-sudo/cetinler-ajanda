@@ -3,7 +3,9 @@
 import { NextResponse } from 'next/server'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { requireRole } from '@/lib/apiAuth'
-import { loadSelloutRows, type SelloutRow } from '@/lib/selloutData'
+import { loadSelloutRows, MERCH_DETAY_URL, type SelloutRow } from '@/lib/selloutData'
+import { parseHtmlTableByHeader, fetchPhpHtml } from '@/lib/merchSatis'
+import type { NPMerchDetay } from '@/lib/nihaiPrim'
 import type { V2Profil, V2BsyLink } from '@/lib/v2/nokta'
 
 export const V2_TUM_ROLLER = ['admin', 'bsy', 'sup', 'jr', 'merch', 'manager', 'ik']
@@ -67,3 +69,20 @@ export function buDonem(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
+
+// ── B2B merch-detay (Nihai Prim hesabı için sade alanlar) ──
+let mdCache: { at: number; rows: NPMerchDetay[] } | null = null
+export async function merchDetay(): Promise<NPMerchDetay[]> {
+  if (mdCache && Date.now() - mdCache.at < 10 * 60 * 1000) return mdCache.rows
+  const { rows } = parseHtmlTableByHeader(await fetchPhpHtml(MERCH_DETAY_URL))
+  const out = rows.map(r => ({
+    merch_adi: (r['MERCH_ADI'] ?? '').trim(),
+    merch_grubu: (r['MERCH_TIPI'] ?? '').trim(),
+    sup_adi: (r['SUPERVIZOR'] ?? '').trim(),
+    jr_adi: (r['JR_SUPERVIZOR'] ?? '').trim(),
+  })).filter(r => r.merch_adi)
+  mdCache = { at: Date.now(), rows: out }
+  return out
+}
+
+export const HERKESI_GOREN = ['admin', 'ik', 'manager']
