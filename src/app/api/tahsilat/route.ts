@@ -4,6 +4,7 @@ import * as path from 'path'
 import * as XLSX from 'xlsx'
 import { createClient } from '@supabase/supabase-js'
 import { BSY_KOD_TO_NAME } from '@/lib/bsy'
+import { donemBsyKodu } from '@/lib/merchSatis'
 import { downloadBsyExcel } from '@/lib/bsyExcel'
 
 // 27MB SAHA.xlsx indirilip parse edildiği için ağır bir route.
@@ -133,8 +134,11 @@ export async function GET(req: Request) {
     // Plasiyer Kodu'ndan BSY kodu al (format: "IB2 / Okan OĞUZ" veya "IB2")
     const plasiyerKod = hedefPlasiyerCol >= 0 ? String(r[hedefPlasiyerCol] ?? '').trim() : ''
     // Slash varsa öncesini al, yoksa tamamını al
-    const bsyKod = plasiyerKod ? plasiyerKod.split('/')[0].trim().toUpperCase() : ''
     const cariIsim = hedefCariIsimCol >= 0 ? String(r[hedefCariIsimCol] ?? '').trim() : ''
+    // Dönem bazlı BSY (ör. Evkur: Ekim 2026'dan itibaren MB9 → MB10)
+    const bsyKod = plasiyerKod
+      ? donemBsyKodu(plasiyerKod.split('/')[0], '', cariIsim, `${yil}-${String(ay).padStart(2, '0')}`)
+      : ''
 
     if (!bsyKod) continue
 
@@ -217,11 +221,14 @@ export async function GET(req: Request) {
     // Plasiyer Kodu'ndan BSY kodu al (format: "IB2 / Okan OĞUZ" veya "IB2")
     const plasiyerKod = gercPlasiyerCol >= 0 ? String(r[gercPlasiyerCol] ?? '').trim() : ''
     // Slash varsa öncesini al, yoksa tamamını al
-    const bsyKod = plasiyerKod ? plasiyerKod.split('/')[0].trim().toUpperCase() : ''
-    const bsyAdi = bsyKod ? (BSY_KOD_TO_NAME[bsyKod] || bsyKod) : ''
     const cariIsim = gercCariIsimCol >= 0 ? String(r[gercCariIsimCol] ?? '').trim() : ''
     const rowAy = gercAyCol >= 0 ? (typeof r[gercAyCol] === 'number' ? r[gercAyCol] : parseInt(String(r[gercAyCol] ?? '0'))) : 0
     const rowYil = gercYilCol >= 0 ? (typeof r[gercYilCol] === 'number' ? r[gercYilCol] : parseInt(String(r[gercYilCol] ?? '0'))) : 0
+    // Dönem bazlı BSY (ör. Evkur: Ekim 2026'dan itibaren MB9 → MB10)
+    const bsyKod = plasiyerKod
+      ? donemBsyKodu(plasiyerKod.split('/')[0], '', cariIsim, `${rowYil}-${String(rowAy).padStart(2, '0')}`)
+      : ''
+    const bsyAdi = bsyKod ? (BSY_KOD_TO_NAME[bsyKod] || bsyKod) : ''
     const tur = gercTurCol >= 0 ? String(r[gercTurCol] ?? '').trim() : ''
 
     if (!bsyAdi || rowYil !== yil) continue

@@ -235,6 +235,25 @@ const BSY_DONEMLERI: { cariKod: string; cariAdPrefix: string; donemler: { from: 
     ],
   },
 ]
+/**
+ * Excel/ERP satırları (Tahsilat vb.) için carinin dönemdeki BSY kodu.
+ * BSY_DONEMLERI'ndeki cariler (ör. Evkur: ≤2026-09 MB9 Atilla, ≥2026-10 MB10
+ * Erkan Sadıkoğlu) için ERP'de eski plasiyer kodu kalsa da dönemin BSY'si döner;
+ * diğer satırlarda kod aynen kalır.
+ */
+export function donemBsyKodu(bsyKod: string, cariKod: string, cariAd: string, donem: string): string {
+  const kod = (bsyKod || '').trim().toUpperCase()
+  const ad  = (cariAd || '').trim().toLocaleUpperCase('tr')
+  for (const o of BSY_DONEMLERI) {
+    if ((cariKod || '').trim() !== o.cariKod && !ad.startsWith(o.cariAdPrefix)) continue
+    const kodlar = new Set(['', ...o.donemler.map(d => d.kod)])
+    if (!kodlar.has(kod)) continue
+    const d = o.donemler.find(x => donem >= x.from && donem <= x.to)
+    if (d) return d.kod
+  }
+  return kod
+}
+
 function bugununDonemi(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`

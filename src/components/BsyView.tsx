@@ -1065,7 +1065,7 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
             <TahsilatDetayTablosu
               detay={isBsy && bsyAdi
                 ? tahsilatDetay.filter(r => r.bsyAdi === bsyAdi)
-                : tahsilatDetay}
+                : tahsilatDetay.filter(r => bsyDonemdeGorunur(r.bsyAdi, yil, ay))}
               ay={ay}
               yil={yil}
               tekBsy={isBsy}
