@@ -271,3 +271,15 @@ export function calcTieredPrimBsy(
 
   return { elxPrim, reluxPrim, topPrim }
 }
+
+// ── Görevden ayrılan BSY'ler (BSY Hedef Takip / hedef girişi) ─────────
+// sonDonem'den SONRAKİ dönemlerde BSY Hedef Takip tablosunda ve hedef
+// girişinde gösterilmez; geçmiş dönemlerde görünmeye devam eder.
+export const BSY_AYRILANLAR: { ad: string; sonDonem: string }[] = [
+  { ad: 'Atilla YILMAZ', sonDonem: '2026-10' },   // Kasım 2026 ve sonrası görünmesin
+]
+export function bsyDonemdeGorunur(ad: string, yil: number, ay: number): boolean {
+  const donem = `${yil}-${String(ay).padStart(2, '0')}`
+  const a = BSY_AYRILANLAR.find(x => x.ad.toLocaleLowerCase('tr') === (ad || '').toLocaleLowerCase('tr'))
+  return !a || donem <= a.sonDonem
+}
