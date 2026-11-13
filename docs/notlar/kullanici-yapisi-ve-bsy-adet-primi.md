@@ -8,9 +8,27 @@
   uygun bir şekilde geçiş yapılacak.
 - v2'de ciro tabanlı prim yok; **tamamen adet tabanlı** prim yönetimi.
 
-> Durum: **Henüz uygulanmadı.** Kullanıcı bilgisayara geçince birlikte başlanacak.
-> Canlıya dokunmadan ayrı (paralel) hazırlanacak, kontrol sonrası canlıya alınacak.
+> Durum: **Başladı (2026-11-13).** v2, v1'e (`/app`) dokunmadan `/v2` adresinde
+> yan yana hazırlanıyor; geliştirme süresince yalnızca yönetici erişiyor.
 > Kullanıcı yol boyunca ek notlar iletecek — buraya eklenecek.
+- v2'de **Dashboard sekmesi olmayacak**. Açılış ekranı herkes için **Hesabım**.
+
+## 0b. v2 iş planı (fazlar)
+- **Faz 1 — Temel (yapıldı):**
+  - Tek "şube → kullanıcılar" modeli + tek görünürlük kuralı: `src/lib/v2/nokta.ts`
+  - Tek veri ucu: `/api/v2/noktalar` (B2B cari-şube + merch-detay + destek; görünürlük
+    sunucuda, IBAN yalnızca kişinin kendisine)
+  - `/v2` kabuğu: Hesabım · Şubelerim · Ajanda · Prim · Raporlar (Dashboard yok)
+  - Hesabım: kimlik kartı (ad, rol, bağlı olduğu, IBAN, cari/şube/ekip sayısı)
+  - Şubelerim: cariye göre gruplu, aramalı, Benim/Ekibim filtresi, şubedeki tüm kişiler
+  - Yönetici "Görünüm" seçimi: herhangi bir kullanıcının gözünden kontrol
+  - Yönetici veri kontrolü: BSY'siz / Süpervizörsüz / kodsuz şube, eşleşmeyen destek
+- **Faz 2 — Adet prim motoru:** tüm roller için tek motor; BSY kategori adet hedefi
+  girişi + Kasım–Aralık simülasyonu; Hesabım bakiye + son 3 ay ödendi/bekliyor.
+- **Faz 3 — Ajanda:** görev penceresi Şubelerim kaynağından; eksik şube talebi;
+  hatalı bilgi bildirimi.
+- **Faz 4 — Raporlar + geçiş:** Sellout/tahsilat/ziyaret raporları v2 kuralıyla;
+  tüm kullanıcılara açılış ve v1'den geçiş.
 
 ## 1. Temel ilke: her şube bir "nokta"
 - Kullanıcılar **carilere bağlı şubeler** üzerinden belirlenir.
@@ -168,3 +186,5 @@ Hepsinin sistemde kaydı var.
   %100 üstü tavan = ana prim; ay bazlı ekstra uygulama ayrı parametreyle tanımlanacak.
 - 2026-11-09: Ajanda/takvim de v2'de optimize edilecek; Sup/Jr/BSY için "Şubelerim"
   ekranı (bağlı tüm şubeler + cari), eksik şube talebi, modal ile aynı kaynak.
+- 2026-11-13: v2'de Dashboard sekmesi olmayacak. v2 çalışması başlatıldı (Faz 1: `/v2`,
+  Hesabım + Şubelerim, tek görünürlük kuralı).
