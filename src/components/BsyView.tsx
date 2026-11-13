@@ -8,7 +8,7 @@ import clsx from 'clsx'
 import { useBsyCiro, BRAND_KEYS, BrandKey } from '@/hooks/useBsyCiro'
 import { useBsyHedef } from '@/hooks/useBsyHedef'
 import { useBsyKisiHedef } from '@/hooks/useBsyKisiHedef'
-import { BRAND_LABEL, calcBsyPrims, PRIM_EXCLUDED_BSYS, NEW_LAYOUT_BRANDS, calcTieredPrimBsy, DEFAULT_BSY_PARAMS } from '@/lib/bsy'
+import { BRAND_LABEL, calcBsyPrims, PRIM_EXCLUDED_BSYS, NEW_LAYOUT_BRANDS, calcTieredPrimBsy, DEFAULT_BSY_PARAMS, bsyDonemdeGorunur } from '@/lib/bsy'
 import type { BsyBrandRow } from '@/hooks/useBsyCiro'
 import { supabase } from '@/lib/supabase'
 
@@ -821,9 +821,13 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
   }
 
   const {
-    bsyRows, brandTotals, genelToplamGercCiro,
+    bsyRows: bsyRowsTum, brandTotals, genelToplamGercCiro,
     yillar, loading, error, source, reload,
   } = useBsyCiro(yil, ay)
+  // Görevden ayrılan BSY'ler (lib/bsy BSY_AYRILANLAR) son dönemlerinden sonra gösterilmez
+  const bsyRows = useMemo(() => bsyRowsTum.filter(r => bsyDonemdeGorunur(r.bsyAdi, yil, ay)), [bsyRowsTum, yil, ay])
+  const gorunenBsyNames = useMemo(() => allBsyNames.filter(n => bsyDonemdeGorunur(n, yil, ay)), [allBsyNames, yil, ay])
+  const gorunenTahsilatRows = useMemo(() => tahsilatRows.filter(r => bsyDonemdeGorunur(r.bsyAdi, yil, ay)), [tahsilatRows, yil, ay])
 
   const {
     hedefMap, loading: hedefLoading, saving, reload: reloadHedef, save,
@@ -1038,11 +1042,11 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
             yil={yil}
             ay={ay}
             bsyRows={bsyRows}
-            allBsyNames={allBsyNames}
+            allBsyNames={gorunenBsyNames}
             getKisiHedef={getKisiHedef}
             getKisiExtra={getKisiExtra}
             params={activeParams}
-            tahsilatRows={tahsilatRows}
+            tahsilatRows={gorunenTahsilatRows}
           />
 
 
@@ -1052,7 +1056,7 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
           <TahsilatTablosu
             yil={yil}
             ay={ay}
-            rows={tahsilatRows}
+            rows={gorunenTahsilatRows}
             loading={tahsilatLoading}
           />
 
@@ -1091,7 +1095,7 @@ export function BsyView({ isAdmin = false, isBsy = false, bsyAdi = '' }: { isAdm
         <KisiHedefModal
           yil={yil}
           ay={ay}
-          bsyAdlar={isBsy && bsyAdi ? [bsyAdi] : (allBsyNames.length > 0 ? allBsyNames : bsyRows.map(r => r.bsyAdi))}
+          bsyAdlar={isBsy && bsyAdi ? [bsyAdi] : (gorunenBsyNames.length > 0 ? gorunenBsyNames : bsyRows.map(r => r.bsyAdi))}
           getKisiHedef={getKisiHedef}
           saving={kisiSaving}
           onSave={saveKisi}

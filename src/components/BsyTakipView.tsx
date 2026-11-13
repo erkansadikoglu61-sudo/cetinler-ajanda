@@ -7,7 +7,7 @@ import clsx from 'clsx'
 import { useBsyCiro, BRAND_KEYS, BrandKey } from '@/hooks/useBsyCiro'
 import { useBsyHedef } from '@/hooks/useBsyHedef'
 import { useBsyKisiHedef } from '@/hooks/useBsyKisiHedef'
-import { BRAND_LABEL, calcBsyPrims, PRIM_EXCLUDED_BSYS, bsyDonemdeGorunur } from '@/lib/bsy'
+import { BRAND_LABEL, calcBsyPrims, PRIM_EXCLUDED_BSYS } from '@/lib/bsy'
 import type { BsyBrandRow } from '@/hooks/useBsyCiro'
 import { supabase } from '@/lib/supabase'
 
@@ -920,10 +920,7 @@ export function BsyTakipView() {
     }
   }
 
-  const { bsyRows: bsyRowsTum, brandTotals, genelToplamGercCiro, yillar, loading, error, source, reload } = useBsyCiro(yil, ay)
-  // Görevden ayrılan BSY'ler (lib/bsy BSY_AYRILANLAR) son dönemlerinden sonra gösterilmez
-  const bsyRows = useMemo(() => bsyRowsTum.filter(r => bsyDonemdeGorunur(r.bsyAdi, yil, ay)), [bsyRowsTum, yil, ay])
-  const gorunenBsyNames = useMemo(() => allBsyNames.filter(n => bsyDonemdeGorunur(n, yil, ay)), [allBsyNames, yil, ay])
+  const { bsyRows, brandTotals, genelToplamGercCiro, yillar, loading, error, source, reload } = useBsyCiro(yil, ay)
   const { hedefMap, loading: hedefLoading, saving, reload: reloadHedef, save } = useBsyHedef(yil, ay)
   const { loading: kisiLoading, saving: kisiSaving, reload: reloadKisi, getKisiHedef, getKisiExtra, save: saveKisi, error: kisiError } = useBsyKisiHedef(yil, ay)
 
@@ -1038,7 +1035,7 @@ export function BsyTakipView() {
           {/* Yeni layout (ay ≥ 5) */}
           {isYeniLayout && (
             <BsyKisiTable
-              yil={yil} ay={ay} bsyRows={bsyRows} allBsyNames={gorunenBsyNames}
+              yil={yil} ay={ay} bsyRows={bsyRows} allBsyNames={allBsyNames}
               getKisiHedef={getKisiHedef} getKisiExtra={getKisiExtra}
               params={params} tahsilatRows={tahsilatRows}
             />
@@ -1146,7 +1143,7 @@ export function BsyTakipView() {
       )}
       {showKisiModal && isYeniLayout && (
         <KisiHedefModal yil={yil} ay={ay}
-          bsyAdlar={gorunenBsyNames.length > 0 ? gorunenBsyNames : bsyRows.map(r => r.bsyAdi)}
+          bsyAdlar={allBsyNames.length > 0 ? allBsyNames : bsyRows.map(r => r.bsyAdi)}
           getKisiHedef={getKisiHedef} saving={kisiSaving} onSave={saveKisi}
           onClose={() => setShowKisiModal(false)} />
       )}
