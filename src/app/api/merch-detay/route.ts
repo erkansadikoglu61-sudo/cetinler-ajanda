@@ -18,14 +18,16 @@ interface MerchDetay {
   jr_adi: string
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  // ?yenile=1 → cache'i atla, B2B'den taze çek (Prim Ödeme "Yenile" butonu)
+  const yenile = new URL(req.url).searchParams.get('yenile') === '1'
   try {
     // export_merch_detay.php'den tüm merch bilgilerini çek.
     // Başlık ismine göre ayrıştırılır — export'a kolon eklendiğinde (ör.
     // MERCH_TC_NO) sabit indeksler kayıp cari/şube/bsy/sup alanlarını
     // bozuyordu; header bazlı okuma buna dayanıklıdır.
     const phpUrl = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_detay.php'
-    const { rows: mdRows } = parseHtmlTableByHeader(await fetchPhpHtml(phpUrl))
+    const { rows: mdRows } = parseHtmlTableByHeader(await fetchPhpHtml(phpUrl, { force: yenile }))
     const merchMap = new Map<string, MerchDetay>()
 
     for (const r of mdRows) {

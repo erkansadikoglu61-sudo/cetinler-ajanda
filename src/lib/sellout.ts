@@ -110,6 +110,7 @@ export function namesMatch(a: string, b: string): boolean {
 // geçmiş dönemlerde görünmeye devam eder.
 const AYRILANLAR: { ad: string; sonDonem: string }[] = [
   { ad: 'Atilla YILMAZ', sonDonem: '2026-09' },   // 30.09.2026'da ayrıldı
+  { ad: 'Merve İnci',    sonDonem: '2026-10' },   // Ekim 2026 son ay; yerine Burçin Acar
 ]
 
 /** Kişi verilen dönemde görevde mi? (ayrılanlar listesine göre) */

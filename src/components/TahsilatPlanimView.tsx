@@ -11,6 +11,43 @@ const MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
 
 const BSY_LISTESI = Object.values(BSY_KOD_TO_NAME).sort()
 
+// /api/tahsilat-planim, Burak Kılıç (IB1) için Okan Oğuz'un (IB2) carilerini de
+// döndürür (Burak görebilsin diye). Birden fazla BSY birlikte çekildiğinde
+// (admin "Tümü", Burak'ın kendi ekranı) aynı cari iki kez geliyordu.
+// Cari kodu bazında teke düşürülür; asıl sahibinin (ör. Okan) satırı tutulur.
+// Kopyada girilmiş plan varsa ve sahibin satırında yoksa plan taşınır (kaybolmaz).
+function tekillestir(gruplar: { bsy: string; rows: TahsilatPlanimRow[] }[]): TahsilatPlanimRow[] {
+  const toplayici = (BSY_KOD_TO_NAME['IB1'] ?? '').toLocaleLowerCase('tr')
+  const isToplayici = (b: string) => b.toLocaleLowerCase('tr') === toplayici
+  const planVar = (r: TahsilatPlanimRow) => !!(r.tahsilatHaftasi || r.tutar || r.tahsilatTuru)
+
+  const sahip = new Map<string, TahsilatPlanimRow>()   // cariKod → asıl sahibinin satırı
+  for (const g of gruplar) {
+    if (isToplayici(g.bsy)) continue
+    for (const r of g.rows) if (!sahip.has(r.cariKod)) sahip.set(r.cariKod, r)
+  }
+
+  const out: TahsilatPlanimRow[] = []
+  const seen = new Set<string>()
+  for (const g of gruplar) {
+    for (const r of g.rows) {
+      if (seen.has(r.cariKod)) continue
+      const s = sahip.get(r.cariKod)
+      if (isToplayici(g.bsy) && s && s !== r) {
+        if (!planVar(s) && planVar(r)) {
+          s.tahsilatHaftasi = r.tahsilatHaftasi
+          s.tutar = r.tutar
+          s.tahsilatTuru = r.tahsilatTuru
+        }
+        continue   // sahibinin grubunda yer alacak
+      }
+      seen.add(r.cariKod)
+      out.push(r)
+    }
+  }
+  return out
+}
+
 function fmtCur(n: number) {
   return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
@@ -146,7 +183,7 @@ export function TahsilatPlanimView({
           })
 
           const results = await Promise.all(promises)
-          allRows = results.flat()
+          allRows = tekillestir(results.map((rows, i) => ({ bsy: BSY_LISTESI[i], rows })))
         }
       } else {
         // BSY kullanıcısı için
@@ -154,6 +191,7 @@ export function TahsilatPlanimView({
           ? [bsyAdi, 'Okan Oğuz']
           : [bsyAdi]
 
+        const gruplar: { bsy: string; rows: TahsilatPlanimRow[] }[] = []
         for (const bsy of bsyAdlari) {
           const res = await authFetch(`/api/tahsilat-planim?yil=${yil}&ay=${ay}&bsyAdi=${encodeURIComponent(bsy)}`)
           const data = await res.json()
@@ -161,8 +199,9 @@ export function TahsilatPlanimView({
             ...r,
             _bsyAdi: bsy
           }))
-          allRows.push(...rowsWithBsy)
+          gruplar.push({ bsy, rows: rowsWithBsy })
         }
+        allRows = tekillestir(gruplar)
       }
 
       setRows(allRows)
@@ -238,13 +277,27 @@ export function TahsilatPlanimView({
     { baslik: 'Aralık',  field: 'aralik'  },
   ]
 
-  // Ay başlıklarını ve değerlerini dinamik oluştur: Önceki + Ocak'tan mevcut aya kadar
+  // Ay kolonları: Önceki + son 6 ay (kayan pencere; ör. Kasım'da Haziran–Kasım).
+  // Pencereden önceki aylar (ör. Ocak–Mayıs) "Önceki" kolonuna toplanır; satır
+  // Toplamı değişmez. Her ay pencere bir ay kayar.
+  const PENCERE_AY = 6
   const ayKolonlari = useMemo(() => {
+    const bas = Math.max(1, ay - PENCERE_AY + 1)                 // pencerenin ilk ayı (1-12)
+    const oncekiAylar = ALL_AY_KOLONLARI.slice(0, bas - 1)
     return [
-      { baslik: 'Önceki', field: 'onceki' as keyof TahsilatPlanimRow },
-      ...ALL_AY_KOLONLARI.slice(0, ay),
+      {
+        baslik: 'Önceki',
+        aciklama: oncekiAylar.length
+          ? `Önceki yıllar + ${oncekiAylar[0].baslik}–${oncekiAylar[oncekiAylar.length - 1].baslik}`
+          : 'Önceki yıllar',
+        fields: ['onceki' as keyof TahsilatPlanimRow, ...oncekiAylar.map(k => k.field)],
+      },
+      ...ALL_AY_KOLONLARI.slice(bas - 1, ay).map(k => ({ baslik: k.baslik, aciklama: k.baslik, fields: [k.field] })),
     ]
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ay])
+  const kolonDeger = (row: TahsilatPlanimRow, fields: (keyof TahsilatPlanimRow)[]) =>
+    fields.reduce((s, f) => s + (Number(row[f]) || 0), 0)
 
   const haftaSecenekleri = useMemo(() => getHaftaSecenekleri(ay), [ay])
 
@@ -337,7 +390,7 @@ export function TahsilatPlanimView({
                     </th>
                   )}
                   {ayKolonlari.map((kolon, i) => (
-                    <th key={i} className="border-r border-purple-500 px-1 py-1.5 text-right w-[70px]">
+                    <th key={i} title={kolon.aciklama} className="border-r border-purple-500 px-1 py-1.5 text-right w-[70px]">
                       {kolon.baslik}
                     </th>
                   ))}
@@ -381,7 +434,7 @@ export function TahsilatPlanimView({
 
                       {/* Ay kolonları */}
                       {ayKolonlari.map((kolon, i) => {
-                        const deger = row[kolon.field] as number ?? 0
+                        const deger = kolonDeger(row, kolon.fields)
                         return (
                           <td key={i} className="border-r border-gray-100 px-1 py-1 text-right text-gray-600 tabular-nums">
                             {deger > 0 ? Math.round(deger).toLocaleString('tr-TR') : '—'}
@@ -475,6 +528,34 @@ export function TahsilatPlanimView({
                   )
                 })}
               </tbody>
+
+              {/* Kolon toplamları */}
+              <tfoot className="sticky bottom-0 z-20">
+                <tr className="bg-purple-100 text-purple-900 font-bold border-t-2 border-purple-300">
+                  <td colSpan={isAdmin && !selectedBsy ? 3 : 2} className="sticky left-0 z-30 bg-purple-100 border-r border-purple-200 px-1 py-1.5 text-left">
+                    TOPLAM
+                  </td>
+                  {ayKolonlari.map((kolon, i) => {
+                    const t = filteredRows.reduce((s, r) => s + kolonDeger(r, kolon.fields), 0)
+                    return (
+                      <td key={i} className="border-r border-purple-200 px-1 py-1.5 text-right tabular-nums">
+                        {t > 0 ? Math.round(t).toLocaleString('tr-TR') : '—'}
+                      </td>
+                    )
+                  })}
+                  <td className="border-r border-purple-200 px-1 py-1.5 text-right tabular-nums">
+                    {Math.round(filteredRows.reduce((s, r) => s + (Number(r.toplam) || 0), 0)).toLocaleString('tr-TR')}
+                  </td>
+                  <td className="border-r border-purple-200 px-1 py-1.5" />
+                  <td className="border-r border-purple-200 px-1 py-1.5 text-right tabular-nums">
+                    {(() => {
+                      const t = filteredRows.reduce((s, r) => s + (Number(secimler.get(r.cariKod)?.tutar) || 0), 0)
+                      return t > 0 ? Math.round(t).toLocaleString('tr-TR') : '—'
+                    })()}
+                  </td>
+                  <td className="border-r border-purple-200 px-1 py-1.5" />
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}

@@ -859,6 +859,13 @@ const ODEME_ISTISNALARI: { cari: string; allow?: string[]; deny?: string[]; yil?
 
 // IBAN'ı standart formata çevir: TR + 24 hane = 26 karakter, 4'erli gruplar
 // "TR05 0006 4000 0017 0001 3382 25". Uzunluk 26 değilse/boşsa geçersiz say.
+// TC geçerli mi: 11 hane ve hepsi aynı rakam değil (B2B'de TC yerine yer tutucu
+// "11111111111" girilmiş kayıtlar var → gerçek TC gibi gösterilmesin).
+function tcGecerliMi(v: string): boolean {
+  const t = (v || '').trim()
+  return /^\d{11}$/.test(t) && !/^(\d)\1{10}$/.test(t)
+}
+
 function formatIban(raw: string): { text: string; valid: boolean } {
   const cleaned = (raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
   if (cleaned.length !== 26 || !cleaned.startsWith('TR')) {
@@ -942,6 +949,8 @@ export function PrimOdemeListesi({
     return rawName.replace(/\s+sv\s*$/i, '').trim()
   }
 
+  // "Yenile" butonu: B2B merch detayını cache'siz çek (yeni girilen IBAN/TC hemen gelsin)
+  const tazeRef = useRef(false)
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -950,31 +959,58 @@ export function PrimOdemeListesi({
       const [bayiRes, destekRes, detayRes, digerRes] = await Promise.all([
         fetch(`/api/bayi-merch-prim?yil=${yil}&ay=${ay}`),
         authFetch(`/api/destek-hakedis?yil=${yil}&ay=${ay}`),
-        fetch('/api/merch-detay'),
+        fetch(`/api/merch-detay${tazeRef.current ? '?yenile=1' : ''}`),
         authFetch(`/api/diger-prim?donem=${donem}&user=${userId}&mode=odeme`),
       ])
       const [bayiData, destekData, detayData] = await Promise.all([bayiRes.json(), destekRes.json(), detayRes.json()])
+      tazeRef.current = false
       // Diğer kayıtları yüklenemezse (ör. yetki) liste yine de gösterilir
       const digerData = digerRes.ok ? await digerRes.json() : { rows: [] }
       if (!bayiRes.ok) throw new Error(bayiData.error ?? 'Bayi Merch yükleme hatası')
 
-      // merch-detay'ı STABİL kimlik MERCH_ID etrafında indexle. Soyisim/IBAN
-      // değişse bile MERCH_ID değişmez → güncel ad/IBAN/TC her zaman ID'den gelir.
-      const byId     = new Map<string, { ad: string; iban: string; tc: string }>()  // merch_id → güncel bilgi
-      const idByName = new Map<string, string>()                                     // normalize(ad) → merch_id
+      // merch-detay: aynı isimde birden fazla B2B kaydı olabiliyor (ör. eski/test
+      // kaydı TC'si 11111111111, asıl destek kaydı başka şubede). Önceden ADA göre
+      // İLK kayıt alındığı için yanlış IBAN/TC geliyordu. Artık satırın cari+şube'si
+      // ve tipiyle en iyi eşleşen kayıt seçilir; eşitlikte geçerli IBAN/TC'li olan.
+      type Aday = { id: string; ad: string; iban: string; tc: string; grubu: string; cari: string; sube: string }
+      const adaylar = new Map<string, Aday[]>()   // normalize(ad) → B2B kayıtları
       for (const d of (detayData.data ?? [])) {
         const id = ((d.merch_id as string) || '').trim()
         if (!id) continue  // Supabase'den eklenen (id'siz) destek kayıtlarını atla
-        if (!byId.has(id)) byId.set(id, { ad: d.merch_adi as string, iban: (d.iban as string) || '', tc: (d.merch_tc as string) || '' })
         const k = normOdeme(d.merch_adi as string)
-        if (k && !idByName.has(k)) idByName.set(k, id)
+        if (!k) continue
+        if (!adaylar.has(k)) adaylar.set(k, [])
+        adaylar.get(k)!.push({
+          id, ad: d.merch_adi as string, iban: (d.iban as string) || '', tc: (d.merch_tc as string) || '',
+          grubu: (d.merch_grubu as string) || '', cari: (d.cari_adi as string) || '', sube: (d.sube_adi as string) || '',
+        })
       }
-      // İsim (gerekirse düzeltme haritasıyla) → MERCH_ID → güncel ad/IBAN/TC.
-      const cozMerch = (rawName: string): { ad: string; iban: string; tc: string } => {
-        const nm  = duzeltIsim(rawName)
-        const id  = idByName.get(normOdeme(nm))
-        const cur = id ? byId.get(id) : undefined
-        return { ad: cur?.ad ?? nm, iban: cur?.iban ?? '', tc: cur?.tc ?? '' }
+      const ibanGecerli = (v: string) => formatIban(v).valid
+      // İsim (gerekirse düzeltme haritasıyla) → en uygun B2B kaydı → güncel ad/IBAN/TC.
+      const cozMerch = (rawName: string, cari = '', sube = '', tip = ''): { ad: string; iban: string; tc: string } => {
+        const nm = duzeltIsim(rawName)
+        const list = adaylar.get(normOdeme(nm)) ?? []
+        if (list.length === 0) return { ad: nm, iban: '', tc: '' }
+        const skor = (a: Aday) =>
+          (cari && sube && normOdeme(a.cari) === normOdeme(cari) && normOdeme(a.sube) === normOdeme(sube) ? 8 : 0) +
+          (cari && normOdeme(a.cari) === normOdeme(cari) ? 4 : 0) +
+          (tip && normOdeme(a.grubu) === normOdeme(tip) ? 2 : 0) +
+          (ibanGecerli(a.iban) ? 1 : 0) + (tcGecerliMi(a.tc) ? 1 : 0)
+        let best = list[0]
+        for (const a of list) if (skor(a) > skor(best)) best = a
+        // IBAN: seçilen kayıtta yoksa kişinin B2B'deki başka kaydından al —
+        // önce aynı MERCH_ID'li kayıtlar, sonra aynı isimli kayıtlarda TEK farklı
+        // geçerli IBAN varsa o (aynı isimde farklı kişilere yanlış IBAN yazılmasın).
+        let iban = best.iban
+        if (!ibanGecerli(iban)) {
+          const ayniId = list.find(a => a.id === best.id && ibanGecerli(a.iban))
+          if (ayniId) iban = ayniId.iban
+          else {
+            const farkli = [...new Set(list.filter(a => ibanGecerli(a.iban)).map(a => formatIban(a.iban).text))]
+            if (farkli.length === 1) iban = farkli[0]
+          }
+        }
+        return { ad: best.ad, iban, tc: best.tc }
       }
 
       const combined: PrimOdemeRow[] = []
@@ -982,7 +1018,7 @@ export function PrimOdemeListesi({
       // Bayi Merch
       for (const r of (bayiData.rows ?? [])) {
         if ((r.primHakdis ?? 0) <= 0) continue
-        const m = cozMerch(r.bayiMerch as string)
+        const m = cozMerch(r.bayiMerch as string, r.cariAdi, r.subeAdi, 'Bayi Merch')
         combined.push({
           merchTipi: 'Bayi Merch',
           merchAdi:  m.ad,
@@ -999,7 +1035,7 @@ export function PrimOdemeListesi({
       // Destek Personeli
       for (const h of (destekData.rows ?? [])) {
         if ((h.hakedis ?? 0) <= 0) continue
-        const m = cozMerch(h.merch_adi as string)
+        const m = cozMerch(h.merch_adi as string, h.cari_adi ?? '', h.sube_adi ?? '', 'Destek Personeli')
         combined.push({
           merchTipi: 'Destek Personeli',
           merchAdi:  m.ad,
@@ -1026,7 +1062,7 @@ export function PrimOdemeListesi({
       }
       for (const d of (digerData.rows ?? [])) {
         if ((d.hakedis ?? 0) <= 0) continue
-        const m = cozMerch(d.kullanici_adi as string)
+        const m = cozMerch(d.kullanici_adi as string, d.cari_adi ?? '', d.sube_adi ?? '', (d.grup as string) || '')
         const sb = subeBilgi.get(`${normOdeme(d.cari_adi)}||${normOdeme(d.sube_adi)}`)
         combined.push({
           merchTipi: (d.grup as string) || 'Diğer',
@@ -1135,7 +1171,7 @@ export function PrimOdemeListesi({
         r.subeAdi || '',
         r.supAdi || '',
         formatIban(r.iban).text,
-        r.tc || '',
+        tcGecerliMi(r.tc) ? r.tc : '',   // yer tutucu TC (ör. 11111111111) Excel'e yazılmaz
       ]),
       ['', '', 'TOPLAM', toplamPrim, toplamOdenecek, '', '', '', '', ''],
     ]
@@ -1224,8 +1260,8 @@ export function PrimOdemeListesi({
           </button>
         )}
 
-        <button onClick={load} disabled={loading}
-          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-50" title="Yenile">
+        <button onClick={() => { tazeRef.current = true; load() }} disabled={loading}
+          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 disabled:opacity-50" title="Yenile (B2B'den taze çeker)">
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
         </button>
 
@@ -1343,11 +1379,15 @@ export function PrimOdemeListesi({
                         </td>
                       )
                     })()}
-                    <td className={clsx(
-                      'px-3 py-2 text-[11px] whitespace-nowrap',
-                      row.tc ? 'font-mono text-gray-600' : 'text-gray-300'
-                    )}>
-                      {row.tc || '—'}
+                    <td
+                      className={clsx(
+                        'px-3 py-2 text-[11px] whitespace-nowrap',
+                        tcGecerliMi(row.tc) ? 'font-mono text-gray-600'
+                          : row.tc ? 'text-amber-600 font-medium' : 'text-gray-300'
+                      )}
+                      title={row.tc && !tcGecerliMi(row.tc) ? `B2B'de TC alanında "${row.tc}" yazıyor — gerçek TC girilmemiş` : undefined}
+                    >
+                      {tcGecerliMi(row.tc) ? row.tc : row.tc ? 'TC girilmemiş' : '—'}
                     </td>
                   </tr>
                   )

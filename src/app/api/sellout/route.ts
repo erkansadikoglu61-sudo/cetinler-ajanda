@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { parseHtmlTableByHeader, num, fetchPhpHtml } from '@/lib/merchSatis'
 import { normalizeName } from '@/lib/sellout'
+import { donemJrAdi } from '@/lib/supDevir'
 
 // 28MB PHP fetch + 62k satır parse soğuk çağrıda ~10sn sürüyor; varsayılan
 // timeout'a takılıp 504 (→ boş sellout) üretmemesi için süreyi uzatıyoruz.
@@ -109,7 +110,7 @@ export async function GET() {
       for (const r of rows) {
         if (r.donem < JR_ATAMA_BASLANGIC) continue
         const jr = jrOf(r.sube_kod.trim(), r.supervisor_adi, r.merch_personel)
-        if (jr) r.supervisor_adi = jr
+        if (jr) r.supervisor_adi = donemJrAdi(jr, r.donem)  // Jr devri: geçmiş ay eski Jr'da kalır
       }
     } catch (e) {
       console.error('[sellout] merch-detay (Jr ataması) alınamadı:', e)
