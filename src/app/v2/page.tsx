@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useTeam } from '@/hooks/useTeam'
 import { HesabimView } from '@/components/v2/HesabimView'
 import { SubelerimView } from '@/components/v2/SubelerimView'
+import { BsyAdetPrimView } from '@/components/v2/BsyAdetPrimView'
 import { V2Veri, V2_ROL_ADI } from '@/components/v2/types'
 
 // Çetinler Ajanda v2 — v1 (/app) ile yan yana hazırlanıyor.
@@ -28,22 +29,13 @@ const SEKMELER: { key: Sekme; label: string; icon: typeof Wallet }[] = [
   { key: 'raporlar',  label: 'Raporlar',  icon: BarChart2 },
 ]
 
-const YAKINDA: Record<Exclude<Sekme, 'hesabim' | 'subelerim'>, { baslik: string; maddeler: string[] }> = {
+const YAKINDA: Record<'ajanda' | 'raporlar', { baslik: string; maddeler: string[] }> = {
   ajanda: {
     baslik: 'Ajanda / Takvim',
     maddeler: [
       'Görev penceresi Şubelerim ile aynı kaynaktan beslenecek — listede gördüğünüz her şube seçilebilecek.',
       'Hızlı, önbellekli şube araması; "Diğer" / elle isim girişi en aza inecek.',
       'Haftalık / aylık program girişi BSY, Süpervizör ve Jr. için.',
-    ],
-  },
-  prim: {
-    baslik: 'Adet prim',
-    maddeler: [
-      'Tüm roller için tek adet prim motoru (ciro primi 2027\'de kalkıyor).',
-      'BSY kategori bazlı adet hedefi: Kasım–Aralık 2026 simülasyon, Ocak 2027 canlı.',
-      'Barem: %50 altı 0 · %50–80 (ana prim / 2) × oran · %80 ve üstü ana prim.',
-      'Ödendi / bekliyor bilgisi tek ödeme kaynağından Hesabım\'a yansıyacak.',
     ],
   },
   raporlar: {
@@ -162,9 +154,10 @@ export default function V2Page() {
           </div>
         )}
 
-        {veri && sekme === 'hesabim' && <HesabimView veri={veri} onSubelerim={() => setSekme('subelerim')} />}
+        {veri && sekme === 'hesabim' && <HesabimView veri={veri} gorunum={gorunum} onSubelerim={() => setSekme('subelerim')} />}
         {veri && sekme === 'subelerim' && <SubelerimView veri={veri} />}
-        {(sekme === 'ajanda' || sekme === 'prim' || sekme === 'raporlar') && (
+        {sekme === 'prim' && <BsyAdetPrimView gorunum={gorunum} />}
+        {(sekme === 'ajanda' || sekme === 'raporlar') && (
           <section className="rounded-2xl border border-gray-200 bg-white p-5">
             <p className="text-xs uppercase tracking-wider text-gray-400">Yapım aşamasında</p>
             <h2 className="text-lg font-semibold text-gray-800 mt-1">{YAKINDA[sekme].baslik}</h2>

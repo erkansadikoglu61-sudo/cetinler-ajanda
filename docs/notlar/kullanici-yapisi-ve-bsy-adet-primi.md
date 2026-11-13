@@ -23,8 +23,19 @@
   - Şubelerim: cariye göre gruplu, aramalı, Benim/Ekibim filtresi, şubedeki tüm kişiler
   - Yönetici "Görünüm" seçimi: herhangi bir kullanıcının gözünden kontrol
   - Yönetici veri kontrolü: BSY'siz / Süpervizörsüz / kodsuz şube, eşleşmeyen destek
-- **Faz 2 — Adet prim motoru:** tüm roller için tek motor; BSY kategori adet hedefi
-  girişi + Kasım–Aralık simülasyonu; Hesabım bakiye + son 3 ay ödendi/bekliyor.
+- **Faz 2 — Adet prim (başladı, 2026-11-13):**
+  - BSY adet primi: `src/lib/v2/bsyAdetPrim.ts` (kategoriler, ana primler, %50/%80
+    barem parametrik), `/api/v2/bsy-adet` (gerçekleşme = satırın BSY kodu, Evkur dönem
+    kuralı dahil; hedefler `sellout_targets_profile`'da BSY profil id'siyle — yeni
+    tablo yok), `/v2` Prim sekmesi: dönem seçimi, yönetici hedef girişi, simülasyon
+    uyarısı (Kasım–Aralık 2026), 2027 Ocak'tan canlı.
+  - Hesabım: `/api/v2/hesabim` — bu ayın anlık hakedişi + son 3 ay tutar ve
+    ödendi/bekliyor (nihai_prim_odeme) + ek prim (nihai_prim_ek). Sup/Jr/Çetinler
+    Merch v1 Nihai Prim ile aynı hesap (lib/nihaiPrim); BSY ciro primi + adet
+    simülasyonu yan yana.
+  - Sellout satır yükleme ortak modüle alındı: `src/lib/selloutData.ts`.
+  - Sırada: Bayi Merch / Destek hakedişleri, Sup/Jr/Merch hedef girişinin v2'ye
+    taşınması, 2027 kategori setine göre Sup/Jr/Merch yapısı.
 - **Faz 3 — Ajanda:** görev penceresi Şubelerim kaynağından; eksik şube talebi;
   hatalı bilgi bildirimi.
 - **Faz 4 — Raporlar + geçiş:** Sellout/tahsilat/ziyaret raporları v2 kuralıyla;
@@ -188,3 +199,4 @@ Hepsinin sistemde kaydı var.
   ekranı (bağlı tüm şubeler + cari), eksik şube talebi, modal ile aynı kaynak.
 - 2026-11-13: v2'de Dashboard sekmesi olmayacak. v2 çalışması başlatıldı (Faz 1: `/v2`,
   Hesabım + Şubelerim, tek görünürlük kuralı).
+- 2026-11-13: Aşama 2 başlatıldı (BSY adet primi + Hesabım hakediş/geçmiş).

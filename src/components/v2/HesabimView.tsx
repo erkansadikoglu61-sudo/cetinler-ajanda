@@ -1,30 +1,45 @@
 'use client'
 
-import { useState } from 'react'
-import { Copy, Check, Store, Building2, Users, ChevronRight, Wallet, Clock } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Copy, Check, Store, Building2, Users, ChevronRight, Wallet, Clock, CheckCircle2, FlaskConical } from 'lucide-react'
+import clsx from 'clsx'
 import { MONTHS_TR } from '@/lib/constants'
-import { V2Veri, V2_ROL_ADI, ibanBicimle } from './types'
+import { V2Veri, V2Hesabim, V2_ROL_ADI, ibanBicimle, tl } from './types'
 
 interface Props {
   veri: V2Veri
+  gorunum: string
   onSubelerim: () => void
 }
 
-/** Son 3 ay + bu ay (bu ay en üstte) */
-function sonAylar(): { yil: number; ay: number }[] {
-  const d = new Date()
-  const out: { yil: number; ay: number }[] = []
-  for (let i = 0; i < 4; i++) {
-    const t = new Date(d.getFullYear(), d.getMonth() - i, 1)
-    out.push({ yil: t.getFullYear(), ay: t.getMonth() + 1 })
-  }
-  return out
+function tarihTr(iso: string | null): string {
+  if (!iso) return ''
+  const [y, m, d] = iso.slice(0, 10).split('-')
+  return `${d}.${m}.${y}`
 }
 
-export function HesabimView({ veri, onSubelerim }: Props) {
+export function HesabimView({ veri, gorunum, onSubelerim }: Props) {
   const k = veri.kullanici
   const [kopyalandi, setKopyalandi] = useState(false)
-  const aylar = sonAylar()
+  const [hesap, setHesap] = useState<V2Hesabim | null>(null)
+  const [hesapHata, setHesapHata] = useState('')
+
+  useEffect(() => {
+    let iptal = false
+    setHesap(null)
+    setHesapHata('')
+    const qs = gorunum ? `?gorunum=${encodeURIComponent(gorunum)}` : ''
+    fetch(`/api/v2/hesabim${qs}`)
+      .then(async r => {
+        const j = await r.json()
+        if (!r.ok) throw new Error(j.error || 'Hakediş alınamadı')
+        if (!iptal) setHesap(j as V2Hesabim)
+      })
+      .catch(e => { if (!iptal) setHesapHata(e instanceof Error ? e.message : String(e)) })
+    return () => { iptal = true }
+  }, [gorunum])
+
+  const buAy = hesap?.aylar[0]
 
   const kopyala = async () => {
     try {
@@ -83,31 +98,52 @@ export function HesabimView({ veri, onSubelerim }: Props) {
       </section>
 
       {/* Bakiye kartı */}
-      <section className="rounded-2xl border border-gray-200 bg-white p-5">
-        <div className="flex items-center gap-2 text-gray-500 text-sm">
-          <Wallet size={16} /> {MONTHS_TR[aylar[0].ay - 1]} {aylar[0].yil} hakedişi
-        </div>
-        <p className="mt-2 text-3xl font-semibold text-gray-300">— ₺</p>
-        <p className="mt-1 text-xs text-gray-400">
-          Anlık hakediş, adet prim motoru v2'ye bağlandığında burada görünecek.
-        </p>
-      </section>
+      {hesap?.tip !== null && (
+        <section className="rounded-2xl border border-gray-200 bg-white p-5">
+          <div className="flex items-center gap-2 text-gray-500 text-sm">
+            <Wallet size={16} />
+            {buAy ? `${MONTHS_TR[buAy.ay - 1]} ${buAy.yil} hakedişi` : 'Bu ayın hakedişi'}
+          </div>
+          {!hesap && !hesapHata && <div className="mt-3 h-9 w-40 rounded-lg bg-gray-100 animate-pulse" />}
+          {hesapHata && <p className="mt-2 text-sm text-red-600">{hesapHata}</p>}
+          {buAy && (
+            <>
+              <p className="mt-2 text-3xl font-semibold text-gray-900 tabular-nums">{tl(buAy.toplam)}</p>
+              <p className="mt-1 text-xs text-gray-400">Ay sonuna kadar satışlarla birlikte güncellenir.</p>
+              {buAy.ekPrim > 0 && <p className="mt-1 text-xs text-gray-500">Ek prim dahil: {tl(buAy.ekPrim)}</p>}
+              {buAy.adetSimulasyon !== null && (
+                <div className="mt-3 flex items-center gap-2 rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-800">
+                  <FlaskConical size={14} className="shrink-0" />
+                  <span>Adet primi simülasyonu: <b className="tabular-nums">{tl(buAy.adetSimulasyon)}</b> — ödemeye yansımaz (2027 Ocak&apos;ta devreye girer).</span>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      )}
 
       {/* Son 3 ay */}
-      <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 text-sm font-medium text-gray-700">Prim geçmişi</div>
-        <ul className="divide-y divide-gray-100">
-          {aylar.map((a, i) => (
-            <li key={`${a.yil}-${a.ay}`} className="px-5 py-3 flex items-center justify-between text-sm">
-              <span className="text-gray-700">{MONTHS_TR[a.ay - 1]} {a.yil}</span>
-              <span className="flex items-center gap-1.5 text-xs text-gray-400">
-                <Clock size={12} />
-                {i === 0 ? 'Hakediş devam ediyor' : 'Ödeme bilgisi bağlanacak'}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {hesap?.tip !== null && (
+        <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 text-sm font-medium text-gray-700">Prim geçmişi</div>
+          {!hesap && !hesapHata && <div className="px-5 py-4"><div className="h-4 w-full rounded bg-gray-100 animate-pulse" /></div>}
+          <ul className="divide-y divide-gray-100">
+            {(hesap?.aylar ?? []).slice(1).map(a => (
+              <li key={a.donem} className="px-5 py-3 flex items-center justify-between gap-3 text-sm">
+                <span className="text-gray-700">{MONTHS_TR[a.ay - 1]} {a.yil}</span>
+                <span className="flex items-center gap-3">
+                  <span className="tabular-nums font-medium text-gray-900">{tl(a.toplam)}</span>
+                  <span className={clsx('inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full',
+                    a.durum === 'odendi' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700')}>
+                    {a.durum === 'odendi' ? <CheckCircle2 size={11} /> : <Clock size={11} />}
+                    {a.durum === 'odendi' ? `Ödendi${a.odemeTarihi ? ' · ' + tarihTr(a.odemeTarihi) : ''}` : 'Bekliyor'}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Şubelerim özeti */}
       <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">

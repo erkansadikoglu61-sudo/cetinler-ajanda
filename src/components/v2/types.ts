@@ -36,3 +36,24 @@ export function ibanBicimle(iban: string): string {
   const s = iban.replace(/\s/g, '').toUpperCase()
   return s.replace(/(.{4})/g, '$1 ').trim()
 }
+
+export interface V2HesabimAy {
+  donem: string
+  yil: number
+  ay: number
+  prim: number
+  ekPrim: number
+  toplam: number
+  durum: 'devam' | 'odendi' | 'bekliyor'
+  odemeTarihi: string | null
+  adetSimulasyon: number | null
+}
+
+export interface V2Hesabim {
+  tip: string | null
+  aylar: V2HesabimAy[]
+}
+
+export function tl(n: number): string {
+  return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺'
+}
