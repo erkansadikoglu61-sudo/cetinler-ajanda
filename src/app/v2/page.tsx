@@ -13,6 +13,8 @@ import { HesabimView } from '@/components/v2/HesabimView'
 import { SubelerimView } from '@/components/v2/SubelerimView'
 import { PrimView } from '@/components/v2/PrimView'
 import { AjandaView, type AjandaKisi } from '@/components/v2/AjandaView'
+import { RaporlarView } from '@/components/v2/RaporlarView'
+import { v2Erisimi } from '@/lib/v2/erisim'
 import { V2Veri, V2_ROL_ADI } from '@/components/v2/types'
 
 // Çetinler Ajanda v2 — v1 (/app) ile yan yana hazırlanıyor.
@@ -30,16 +32,6 @@ const SEKMELER: { key: Sekme; label: string; icon: typeof Wallet }[] = [
   { key: 'raporlar',  label: 'Raporlar',  icon: BarChart2 },
 ]
 
-const YAKINDA: Record<'raporlar', { baslik: string; maddeler: string[] }> = {
-  raporlar: {
-    baslik: 'Raporlar',
-    maddeler: [
-      'Sellout, tahsilat ve ziyaret raporları tek görünürlük kuralıyla.',
-      'Dashboard sekmesi v2\'de yok.',
-    ],
-  },
-}
-
 export default function V2Page() {
   const router = useRouter()
   const { user, profile, loading, signOut } = useAuth()
@@ -55,7 +47,7 @@ export default function V2Page() {
   }, [loading, user, router])
 
   const yukle = useCallback(async (yenile = false) => {
-    if (!profile || profile.role !== 'admin') return
+    if (!profile || !v2Erisimi(profile.role, profile.full_name)) return
     setYukleniyor(true)
     setHata('')
     try {
@@ -111,7 +103,7 @@ export default function V2Page() {
     )
   }
 
-  if (profile.role !== 'admin') {
+  if (!v2Erisimi(profile.role, profile.full_name)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-gray-50 px-6 text-center">
         <p className="text-lg font-semibold text-gray-800">Çetinler Ajanda v2 hazırlanıyor</p>
@@ -158,6 +150,7 @@ export default function V2Page() {
 
       <main className="max-w-3xl mx-auto px-4 py-4 space-y-4">
         {/* Yönetici: kullanıcının gözünden bak */}
+        {profile.role === 'admin' && (
         <label className="flex items-center gap-2 rounded-xl border border-dashed border-gray-300 bg-white px-3 py-2 text-sm">
           <Eye size={15} className="text-gray-400 shrink-0" />
           <span className="text-gray-500 shrink-0">Görünüm:</span>
@@ -169,6 +162,7 @@ export default function V2Page() {
             ))}
           </select>
         </label>
+        )}
 
         {hata && <p className="rounded-xl bg-red-50 text-red-700 text-sm px-4 py-3">{hata}</p>}
 
@@ -185,15 +179,8 @@ export default function V2Page() {
           <AjandaView key={gorunum} kisiler={ajandaKisileri} oturum={{ id: profile.id, rol: profile.role }}
             benRol={veri.kullanici.rol} gorunum={gorunum} />
         )}
-        {sekme === 'raporlar' && (
-          <section className="rounded-2xl border border-gray-200 bg-white p-5">
-            <p className="text-xs uppercase tracking-wider text-gray-400">Yapım aşamasında</p>
-            <h2 className="text-lg font-semibold text-gray-800 mt-1">{YAKINDA.raporlar.baslik}</h2>
-            <ul className="mt-3 space-y-2 text-sm text-gray-600 list-disc ml-5">
-              {YAKINDA.raporlar.maddeler.map(m => <li key={m}>{m}</li>)}
-            </ul>
-            <Link href="/app" className="inline-block mt-4 text-sm text-brand-600">Şimdilik v1'de aç →</Link>
-          </section>
+        {veri && sekme === 'raporlar' && (
+          <RaporlarView key={gorunum} rol={veri.kullanici.rol} gorunum={gorunum} kisiler={ajandaKisileri} />
         )}
       </main>
 

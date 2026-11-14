@@ -57,8 +57,18 @@
     v1 ile ortak), bekleyen talepler için Şubelerim sekmesinde rozet.
   - Açık: telefona anlık bildirim (web push) — VAPID anahtarı + service worker kurulumu
     gerekiyor; şimdilik uygulama içi rozet.
-- **Faz 4 — Raporlar + geçiş:** Sellout/tahsilat/ziyaret raporları v2 kuralıyla;
-  tüm kullanıcılara açılış ve v1'den geçiş.
+- **Faz 4 — Raporlar + geçiş (başladı, 2026-11-14):**
+  - Kullanıcı kararı (2026-11-14): v2 canlıda `/v2`'de **yalnızca yöneticiye açık** kalır;
+    tüm kullanıcılara açma ayrıca onayla yapılır.
+  - Raporlar sekmesi: **Ziyaret** (aylık check-in, nokta sayısı, ziyaret hedefi, Excel),
+    **Sellout** (`/api/v2/rapor/sellout`: şube × kategori adet, Şubelerim görünürlüğü,
+    Excel), **Tahsilat** (`/api/v2/rapor/tahsilat`: v1 /api/tahsilat motoru; BSY kendi,
+    yönetici tümü; cari detayı, Excel).
+  - Erişim anahtarı: `src/lib/v2/erisim.ts` — `V2_ACIK_ROLLER` (şu an ['admin']) ve
+    `V2_PILOT_KULLANICILAR` (boş). Geçiş: önce pilot kullanıcılar, sonra roller.
+  - Geçiş öncesi yapılacaklar: v1'den v2'ye bağlantı/yönlendirme, PWA açılış adresi
+    (manifest start_url), v1'de kalan ekranların (Kullanıcılar, Noktalarımız yönetimi,
+    Destek hakediş girişi, Nihai Prim / Prim Ödeme Listesi, Diğer prim) v2'deki yeri.
 
 ## 1. Temel ilke: her şube bir "nokta"
 - Kullanıcılar **carilere bağlı şubeler** üzerinden belirlenir.
@@ -222,3 +232,4 @@ Hepsinin sistemde kaydı var.
 - 2026-11-13: Aşama 2 devamı: Sup/Jr/Merch prim + hedef girişi, Bayi Merch · Destek hakedişleri v2'de.
 - 2026-11-14: Aşama 3 başlatıldı (v2 Ajanda, Şubelerim kaynaklı görev penceresi, talepler).
 - 2026-11-14: Aşama 3 devamı: görev notları, aylık görünüm, ziyaret hedefi, talep rozeti.
+- 2026-11-14: v2 canlıda yalnızca yöneticiye açık kalacak (kullanıcı onayı). Aşama 4: Raporlar + erişim anahtarı.
