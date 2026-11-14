@@ -5,6 +5,7 @@ import { Copy, Check, Store, Building2, Users, ChevronRight, Wallet, Clock, Chec
 import clsx from 'clsx'
 import { MONTHS_TR } from '@/lib/constants'
 import { V2Veri, V2Hesabim, V2_ROL_ADI, ibanBicimle, tl } from './types'
+import { TalepModal } from './Talepler'
 
 interface Props {
   veri: V2Veri
@@ -23,6 +24,8 @@ export function HesabimView({ veri, gorunum, onSubelerim }: Props) {
   const [kopyalandi, setKopyalandi] = useState(false)
   const [hesap, setHesap] = useState<V2Hesabim | null>(null)
   const [hesapHata, setHesapHata] = useState('')
+  const [talep, setTalep] = useState(false)
+  const [talepGitti, setTalepGitti] = useState(false)
 
   useEffect(() => {
     let iptal = false
@@ -95,7 +98,15 @@ export function HesabimView({ veri, gorunum, onSubelerim }: Props) {
             <p className="text-[11px] text-white/70">Ekip</p>
           </div>
         </div>
+
+        <button onClick={() => setTalep(true)}
+          className="mt-4 w-full rounded-xl border border-white/25 py-2 text-xs text-white/85 hover:bg-white/10">
+          {talepGitti ? 'Bildiriminiz iletildi ✓' : 'Bilgilerimde hata var — bildir'}
+        </button>
       </section>
+      {talep && (
+        <TalepModal tip="hatali_bilgi" ilgiliId={k.id} onClose={() => setTalep(false)} onGonderildi={() => setTalepGitti(true)} />
+      )}
 
       {/* Bakiye kartı */}
       {hesap?.tip !== null && (

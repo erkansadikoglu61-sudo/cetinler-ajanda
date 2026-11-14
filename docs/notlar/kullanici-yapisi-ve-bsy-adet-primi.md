@@ -42,8 +42,17 @@
   - Açık: 2027 kategori seti ve prim tutarları Sup/Jr/Çetinler Merch için
     (Süpürge, Mutfak & Diğer kalkıyor mu; yeni kategori primleri ve barem ne olacak).
     Destek hakediş girişi/onayı şimdilik v1'de.
-- **Faz 3 — Ajanda:** görev penceresi Şubelerim kaynağından; eksik şube talebi;
-  hatalı bilgi bildirimi.
+- **Faz 3 — Ajanda (başladı, 2026-11-14):**
+  - `/v2` Ajanda sekmesi: haftalık görünüm (gün başına check-in/görev sayısı), kişi
+    filtresi (bakılan kullanıcı + alt kullanıcıları), görev ekle/düzenle/sil, check-in.
+    Kayıt v1 ile aynı `tasks` tablosu ve "Cari / Şube" biçimi → v1 raporları etkilenmez.
+  - Görev penceresi şube listesi: `/api/v2/gorev-subeleri?kisi=` — görev kime açılıyorsa
+    onun Şubelerim listesi (aynı kural); aramalı, önbellekli.
+  - Talepler: `v2_talepler` tablosu (`v2_talepler_migration.sql` — Supabase'de bir kez
+    çalıştırılmalı), `/api/v2/talepler`. Eksik şube bildir (görev penceresi + Şubelerim),
+    hatalı bilgi bildir (Hesabım). Talebi admin ya da açanın üstü "Çözüldü/Reddet" ile kapatır.
+  - Check-in konumu ortak modülde: `src/lib/checkin.ts` (v1 useTasks da kullanıyor).
+  - Sırada: görev notları, aylık görünüm, ziyaret hedefi takibi, talep bildirimi (push).
 - **Faz 4 — Raporlar + geçiş:** Sellout/tahsilat/ziyaret raporları v2 kuralıyla;
   tüm kullanıcılara açılış ve v1'den geçiş.
 
@@ -207,3 +216,4 @@ Hepsinin sistemde kaydı var.
   Hesabım + Şubelerim, tek görünürlük kuralı).
 - 2026-11-13: Aşama 2 başlatıldı (BSY adet primi + Hesabım hakediş/geçmiş).
 - 2026-11-13: Aşama 2 devamı: Sup/Jr/Merch prim + hedef girişi, Bayi Merch · Destek hakedişleri v2'de.
+- 2026-11-14: Aşama 3 başlatıldı (v2 Ajanda, Şubelerim kaynaklı görev penceresi, talepler).

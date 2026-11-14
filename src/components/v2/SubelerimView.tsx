@@ -1,11 +1,12 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Search, X, ChevronDown, ChevronRight, Building2, AlertTriangle } from 'lucide-react'
+import { Search, X, ChevronDown, ChevronRight, Building2, AlertTriangle, AlertCircle } from 'lucide-react'
 import clsx from 'clsx'
 import { cariyeGoreGrupla, sadeAd } from '@/lib/v2/nokta'
 import type { V2GorunurNokta } from '@/lib/v2/nokta'
 import { V2Veri } from './types'
+import { TalepModal, TaleplerListesi } from './Talepler'
 
 type Filtre = 'tumu' | 'kendi' | 'ekip'
 
@@ -58,7 +59,9 @@ function SubeSatiri({ n }: { n: V2GorunurNokta }) {
   )
 }
 
-export function SubelerimView({ veri }: { veri: V2Veri }) {
+export function SubelerimView({ veri, gorunum }: { veri: V2Veri; gorunum: string }) {
+  const [talep, setTalep] = useState(false)
+  const [talepSayac, setTalepSayac] = useState(0)
   const [arama, setArama] = useState('')
   const [filtre, setFiltre] = useState<Filtre>('tumu')
   const [acikCariler, setAcikCariler] = useState<Set<string>>(new Set())
@@ -108,6 +111,8 @@ export function SubelerimView({ veri }: { veri: V2Veri }) {
         </details>
       )}
 
+      <TaleplerListesi gorunum={gorunum} yenile={talepSayac} />
+
       <div className="relative">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
@@ -137,7 +142,12 @@ export function SubelerimView({ veri }: { veri: V2Veri }) {
         </div>
       )}
 
-      <p className="text-xs text-gray-400">{gruplar.length} cari · {toplam} şube</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gray-400">{gruplar.length} cari · {toplam} şube</p>
+        <button onClick={() => setTalep(true)} className="flex items-center gap-1 text-xs font-medium text-brand-600">
+          <AlertCircle size={13} /> Eksik şube bildir
+        </button>
+      </div>
 
       <div className="space-y-2">
         {gruplar.map(g => {
@@ -166,6 +176,10 @@ export function SubelerimView({ veri }: { veri: V2Veri }) {
           <p className="text-sm text-gray-400 text-center py-8">Şube bulunamadı.</p>
         )}
       </div>
+      {talep && (
+        <TalepModal tip="eksik_sube" ilgiliId={veri.kullanici.id} onClose={() => setTalep(false)}
+          onGonderildi={() => setTalepSayac(n => n + 1)} />
+      )}
     </div>
   )
 }

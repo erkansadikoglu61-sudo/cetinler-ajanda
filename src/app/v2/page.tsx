@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Wallet, Store, CalendarDays, Award, BarChart2, RefreshCw, LogOut, Eye } from 'lucide-react'
@@ -12,6 +12,7 @@ import { useTeam } from '@/hooks/useTeam'
 import { HesabimView } from '@/components/v2/HesabimView'
 import { SubelerimView } from '@/components/v2/SubelerimView'
 import { PrimView } from '@/components/v2/PrimView'
+import { AjandaView, type AjandaKisi } from '@/components/v2/AjandaView'
 import { V2Veri, V2_ROL_ADI } from '@/components/v2/types'
 
 // Çetinler Ajanda v2 — v1 (/app) ile yan yana hazırlanıyor.
@@ -29,15 +30,7 @@ const SEKMELER: { key: Sekme; label: string; icon: typeof Wallet }[] = [
   { key: 'raporlar',  label: 'Raporlar',  icon: BarChart2 },
 ]
 
-const YAKINDA: Record<'ajanda' | 'raporlar', { baslik: string; maddeler: string[] }> = {
-  ajanda: {
-    baslik: 'Ajanda / Takvim',
-    maddeler: [
-      'Görev penceresi Şubelerim ile aynı kaynaktan beslenecek — listede gördüğünüz her şube seçilebilecek.',
-      'Hızlı, önbellekli şube araması; "Diğer" / elle isim girişi en aza inecek.',
-      'Haftalık / aylık program girişi BSY, Süpervizör ve Jr. için.',
-    ],
-  },
+const YAKINDA: Record<'raporlar', { baslik: string; maddeler: string[] }> = {
   raporlar: {
     baslik: 'Raporlar',
     maddeler: [
@@ -81,6 +74,17 @@ export default function V2Page() {
   }, [profile, gorunum])
 
   useEffect(() => { yukle() }, [yukle])
+
+  // Ajanda: bakılan kullanıcı + alt kullanıcıları; yönetici kendisine bakarken tüm ekip
+  const ajandaKisileri = useMemo<AjandaKisi[]>(() => {
+    if (!veri) return []
+    const k = veri.kullanici
+    if (k.rol === 'admin') {
+      return [{ id: k.id, ad: k.ad, rol: k.rol },
+        ...team.filter(p => p.id !== k.id && ['bsy', 'sup', 'jr'].includes(p.role)).map(p => ({ id: p.id, ad: p.full_name, rol: p.role }))]
+    }
+    return [{ id: k.id, ad: k.ad, rol: k.rol }, ...k.altlar]
+  }, [veri, team])
 
   if (loading || !profile) {
     return (
@@ -155,14 +159,18 @@ export default function V2Page() {
         )}
 
         {veri && sekme === 'hesabim' && <HesabimView veri={veri} gorunum={gorunum} onSubelerim={() => setSekme('subelerim')} />}
-        {veri && sekme === 'subelerim' && <SubelerimView veri={veri} />}
+        {veri && sekme === 'subelerim' && <SubelerimView veri={veri} gorunum={gorunum} />}
         {veri && sekme === 'prim' && <PrimView key={gorunum} rol={veri.kullanici.rol} gorunum={gorunum} />}
-        {(sekme === 'ajanda' || sekme === 'raporlar') && (
+        {veri && sekme === 'ajanda' && (
+          <AjandaView key={gorunum} kisiler={ajandaKisileri} oturum={{ id: profile.id, rol: profile.role }}
+            benRol={veri.kullanici.rol} gorunum={gorunum} />
+        )}
+        {sekme === 'raporlar' && (
           <section className="rounded-2xl border border-gray-200 bg-white p-5">
             <p className="text-xs uppercase tracking-wider text-gray-400">Yapım aşamasında</p>
-            <h2 className="text-lg font-semibold text-gray-800 mt-1">{YAKINDA[sekme].baslik}</h2>
+            <h2 className="text-lg font-semibold text-gray-800 mt-1">{YAKINDA.raporlar.baslik}</h2>
             <ul className="mt-3 space-y-2 text-sm text-gray-600 list-disc ml-5">
-              {YAKINDA[sekme].maddeler.map(m => <li key={m}>{m}</li>)}
+              {YAKINDA.raporlar.maddeler.map(m => <li key={m}>{m}</li>)}
             </ul>
             <Link href="/app" className="inline-block mt-4 text-sm text-brand-600">Şimdilik v1'de aç →</Link>
           </section>
