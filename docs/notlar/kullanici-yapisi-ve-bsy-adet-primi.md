@@ -233,3 +233,7 @@ Hepsinin sistemde kaydı var.
 - 2026-11-14: Aşama 3 başlatıldı (v2 Ajanda, Şubelerim kaynaklı görev penceresi, talepler).
 - 2026-11-14: Aşama 3 devamı: görev notları, aylık görünüm, ziyaret hedefi, talep rozeti.
 - 2026-11-14: v2 canlıda yalnızca yöneticiye açık kalacak (kullanıcı onayı). Aşama 4: Raporlar + erişim anahtarı.
+- 2026-11-14: v2'ye geçince v1 KAPANACAK. Bu yüzden Kullanıcılar, Noktalarımız yönetimi,
+  Destek hakediş girişi, Nihai Prim / Prim Ödeme Listesi ve Diğer prim v2'de olmalı →
+  v2 "Yönetim" sekmesi (v1 bileşenleri, aynı yetkiler). v2, kullanıcının tüm istekleri
+  son halini almadan kimseye gösterilmeyecek (erişim yalnızca admin).

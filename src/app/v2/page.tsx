@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Wallet, Store, CalendarDays, Award, BarChart2, RefreshCw, LogOut, Eye } from 'lucide-react'
+import { Wallet, Store, CalendarDays, Award, BarChart2, RefreshCw, LogOut, Eye, Settings } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/hooks/useAuth'
 import { useTeam } from '@/hooks/useTeam'
@@ -15,6 +15,7 @@ import { PrimView } from '@/components/v2/PrimView'
 import { AjandaView, type AjandaKisi } from '@/components/v2/AjandaView'
 import { RaporlarView } from '@/components/v2/RaporlarView'
 import { v2Erisimi } from '@/lib/v2/erisim'
+import { YonetimView, yonetimBolumleri } from '@/components/v2/YonetimView'
 import { V2Veri, V2_ROL_ADI } from '@/components/v2/types'
 
 // Çetinler Ajanda v2 — v1 (/app) ile yan yana hazırlanıyor.
@@ -22,7 +23,7 @@ import { V2Veri, V2_ROL_ADI } from '@/components/v2/types'
 // Geliştirme süresince yalnızca yönetici erişir; yönetici "Görünüm" ile
 // herhangi bir kullanıcının gözünden kontrol edebilir.
 
-type Sekme = 'hesabim' | 'subelerim' | 'ajanda' | 'prim' | 'raporlar'
+type Sekme = 'hesabim' | 'subelerim' | 'ajanda' | 'prim' | 'raporlar' | 'yonetim'
 
 const SEKMELER: { key: Sekme; label: string; icon: typeof Wallet }[] = [
   { key: 'hesabim',   label: 'Hesabım',   icon: Wallet },
@@ -35,7 +36,7 @@ const SEKMELER: { key: Sekme; label: string; icon: typeof Wallet }[] = [
 export default function V2Page() {
   const router = useRouter()
   const { user, profile, loading, signOut } = useAuth()
-  const { team } = useTeam(profile)
+  const { team, bsyLinks } = useTeam(profile)
   const [sekme, setSekme] = useState<Sekme>('hesabim')
   const [gorunum, setGorunum] = useState<string>('')
   const [veri, setVeri] = useState<V2Veri | null>(null)
@@ -95,6 +96,12 @@ export default function V2Page() {
     return [{ id: k.id, ad: k.ad, rol: k.rol }, ...k.altlar]
   }, [veri, team])
 
+  // Yönetim sekmesi: oturumdaki kullanıcının rolüne göre (v1 yetkileriyle aynı)
+  const sekmeler = useMemo(() => {
+    const yon = profile && yonetimBolumleri(profile.role).length > 0
+    return yon ? [...SEKMELER, { key: 'yonetim' as Sekme, label: 'Yönetim', icon: Settings }] : SEKMELER
+  }, [profile])
+
   if (loading || !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -119,11 +126,11 @@ export default function V2Page() {
     <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
       {/* Üst bar */}
       <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-gray-200">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3">
+        <div className={clsx('mx-auto px-4 h-14 flex items-center gap-3', sekme === 'yonetim' ? 'max-w-7xl' : 'max-w-3xl')}>
           <span className="font-semibold text-brand-700">Çetinler Ajanda</span>
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-brand-100 text-brand-700">v2</span>
           <nav className="hidden md:flex items-center gap-1 ml-4">
-            {SEKMELER.map(s => (
+            {sekmeler.map(s => (
               <button key={s.key} onClick={() => setSekme(s.key)}
                 className={clsx('px-3 py-1.5 rounded-lg text-sm',
                   sekme === s.key ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100')}>
@@ -148,7 +155,7 @@ export default function V2Page() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-4 space-y-4">
+      <main className={clsx('mx-auto px-4 py-4 space-y-4', sekme === 'yonetim' ? 'max-w-7xl' : 'max-w-3xl')}>
         {/* Yönetici: kullanıcının gözünden bak */}
         {profile.role === 'admin' && (
         <label className="flex items-center gap-2 rounded-xl border border-dashed border-gray-300 bg-white px-3 py-2 text-sm">
@@ -179,14 +186,17 @@ export default function V2Page() {
           <AjandaView key={gorunum} kisiler={ajandaKisileri} oturum={{ id: profile.id, rol: profile.role }}
             benRol={veri.kullanici.rol} gorunum={gorunum} />
         )}
+        {sekme === 'yonetim' && (
+          <YonetimView profile={profile} team={team} bsyLinks={bsyLinks} gorunumVar={!!gorunum} />
+        )}
         {veri && sekme === 'raporlar' && (
           <RaporlarView key={gorunum} rol={veri.kullanici.rol} gorunum={gorunum} kisiler={ajandaKisileri} />
         )}
       </main>
 
       {/* Mobil alt menü */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-white border-t border-gray-200 grid grid-cols-5">
-        {SEKMELER.map(({ key, label, icon: Icon }) => (
+      <nav className={clsx('md:hidden fixed bottom-0 inset-x-0 z-20 bg-white border-t border-gray-200 grid', sekmeler.length > 5 ? 'grid-cols-6' : 'grid-cols-5')}>
+        {sekmeler.map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setSekme(key)}
             className={clsx('relative flex flex-col items-center gap-0.5 py-2 text-[11px]',
               sekme === key ? 'text-brand-600' : 'text-gray-400')}>
