@@ -6,7 +6,8 @@ import {
   MessageSquare, Send, Target,
 } from 'lucide-react'
 import clsx from 'clsx'
-import { supabase, type Task, type TaskNote } from '@/lib/supabase'
+import { supabase, type Task, type TaskNote, type Profile } from '@/lib/supabase'
+import { CompletedVisitsView } from '@/components/ZiyaretlerView'
 import { TASK_TYPES } from '@/lib/constants'
 import { checkinKonumu } from '@/lib/checkin'
 import { sadeAd } from '@/lib/v2/nokta'
@@ -29,6 +30,8 @@ interface Props {
   /** Bakılan kullanıcının rolü (Bayi Ziyareti kısıtı vb.) */
   benRol: string
   gorunum: string
+  /** Profil listesi (Gerçekleşen Ziyaretler adları/renkleri için) */
+  team: Profile[]
 }
 
 const GUNLER = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
@@ -454,8 +457,8 @@ function ZiyaretHedefi({ kisiler, yil, ay, yenile }: { kisiler: AjandaKisi[]; yi
 }
 
 // ─── Ana görünüm ───────────────────────────────────────────────
-export function AjandaView({ kisiler, oturum, benRol, gorunum }: Props) {
-  const [mod, setMod] = useState<'hafta' | 'ay'>('hafta')
+export function AjandaView({ kisiler, oturum, benRol, gorunum, team }: Props) {
+  const [mod, setMod] = useState<'hafta' | 'ay' | 'gerceklesen'>('hafta')
   const [hafta, setHafta] = useState(() => haftaBasi(new Date()))
   const [ayBasi, setAyBasi] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })
   const [secili, setSecili] = useState(() => isoGun(new Date()))
@@ -503,7 +506,7 @@ export function AjandaView({ kisiler, oturum, benRol, gorunum }: Props) {
   const filtreli = gorevler.filter(g => !kisiFiltre || g.pid === kisiFiltre)
   const gunGorevleri = filtreli.filter(g => g.date === secili)
   const bugun = isoGun(new Date())
-  const ayBaslik = mod === 'ay' ? `${AYLAR_UZUN[ayBasi.getMonth()]} ${ayBasi.getFullYear()}` : (() => {
+  const ayBaslik = mod !== 'hafta' ? `${AYLAR_UZUN[ayBasi.getMonth()]} ${ayBasi.getFullYear()}` : (() => {
     const a = gunler[0], b = gunler[6]
     return a.getMonth() === b.getMonth()
       ? `${a.getDate()}–${b.getDate()} ${AYLAR[a.getMonth()]} ${a.getFullYear()}`
@@ -511,7 +514,7 @@ export function AjandaView({ kisiler, oturum, benRol, gorunum }: Props) {
   })()
 
   const haftaDegistir = (n: number) => {
-    if (mod === 'ay') {
+    if (mod !== 'hafta') {
       const y = new Date(ayBasi.getFullYear(), ayBasi.getMonth() + n, 1)
       setAyBasi(y)
       setSecili(isoGun(y))
@@ -527,13 +530,13 @@ export function AjandaView({ kisiler, oturum, benRol, gorunum }: Props) {
     setAyBasi(new Date(d.getFullYear(), d.getMonth(), 1))
     setSecili(bugun)
   }
-  const modDegistir = (m: 'hafta' | 'ay') => {
+  const modDegistir = (m: 'hafta' | 'ay' | 'gerceklesen') => {
     const s = new Date(secili + 'T12:00:00')
     setHafta(haftaBasi(s))
     setAyBasi(new Date(s.getFullYear(), s.getMonth(), 1))
     setMod(m)
   }
-  const hedefAy = mod === 'ay' ? ayBasi : new Date(secili + 'T12:00:00')
+  const hedefAy = mod !== 'hafta' ? ayBasi : new Date(secili + 'T12:00:00')
 
   return (
     <div className="space-y-3">
@@ -547,14 +550,22 @@ export function AjandaView({ kisiler, oturum, benRol, gorunum }: Props) {
       </div>
 
       <div className="flex gap-1 rounded-xl bg-gray-100 p-1">
-        {(['hafta', 'ay'] as const).map(m => (
+        {(['hafta', 'ay', 'gerceklesen'] as const).map(m => (
           <button key={m} onClick={() => modDegistir(m)}
             className={clsx('flex-1 rounded-lg py-1 text-xs font-medium', mod === m ? 'bg-white text-brand-700 shadow-sm' : 'text-gray-500')}>
-            {m === 'hafta' ? 'Hafta' : 'Ay'}
+            {m === 'hafta' ? 'Hafta' : m === 'ay' ? 'Ay' : 'Gerçekleşen'}
           </button>
         ))}
       </div>
 
+      {mod === 'gerceklesen' ? (
+        <div className="h-[calc(100dvh-20rem)] min-h-[420px] flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white">
+          <CompletedVisitsView
+            tasks={filtreli.filter(g => g.date.slice(0, 7) === isoGun(ayBasi).slice(0, 7))}
+            team={team} filterPid={null} />
+        </div>
+      ) : (
+      <>
       {mod === 'ay' && (
         <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-gray-400">
           {GUNLER.map(g => <span key={g}>{g}</span>)}
@@ -614,6 +625,8 @@ export function AjandaView({ kisiler, oturum, benRol, gorunum }: Props) {
           </button>
         ))}
       </div>
+      </>
+      )}
 
       {/* Görev ekle */}
       <button onClick={() => setModal({ gorev: null })}

@@ -25,6 +25,9 @@ import { V2Veri, V2_ROL_ADI } from '@/components/v2/types'
 
 type Sekme = 'hesabim' | 'subelerim' | 'ajanda' | 'prim' | 'raporlar' | 'yonetim'
 
+// v1'den taşınan geniş tablolar bu sekmelerde; içerik genişliği büyük
+const GENIS: Sekme[] = ['prim', 'raporlar', 'yonetim']
+
 const SEKMELER: { key: Sekme; label: string; icon: typeof Wallet }[] = [
   { key: 'hesabim',   label: 'Hesabım',   icon: Wallet },
   { key: 'subelerim', label: 'Şubelerim', icon: Store },
@@ -36,7 +39,7 @@ const SEKMELER: { key: Sekme; label: string; icon: typeof Wallet }[] = [
 export default function V2Page() {
   const router = useRouter()
   const { user, profile, loading, signOut } = useAuth()
-  const { team, bsyLinks } = useTeam(profile)
+  const { team, bsyLinks, visibleIds } = useTeam(profile)
   const [sekme, setSekme] = useState<Sekme>('hesabim')
   const [gorunum, setGorunum] = useState<string>('')
   const [veri, setVeri] = useState<V2Veri | null>(null)
@@ -96,6 +99,14 @@ export default function V2Page() {
     return [{ id: k.id, ad: k.ad, rol: k.rol }, ...k.altlar]
   }, [veri, team])
 
+  // v1'den taşınan ekranlar için oturum bilgisi (her zaman gerçek kullanıcı)
+  const ids = visibleIds()
+  const idsKey = ids.join(',')
+  const oturum = useMemo(
+    () => (profile ? { profile, team, bsyLinks, visibleIds: idsKey ? idsKey.split(',') : [] } : null),
+    [profile, team, bsyLinks, idsKey],
+  )
+
   // Yönetim sekmesi: oturumdaki kullanıcının rolüne göre (v1 yetkileriyle aynı)
   const sekmeler = useMemo(() => {
     const yon = profile && yonetimBolumleri(profile.role).length > 0
@@ -126,7 +137,7 @@ export default function V2Page() {
     <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
       {/* Üst bar */}
       <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-gray-200">
-        <div className={clsx('mx-auto px-4 h-14 flex items-center gap-3', sekme === 'yonetim' ? 'max-w-7xl' : 'max-w-3xl')}>
+        <div className={clsx('mx-auto px-4 h-14 flex items-center gap-3', GENIS.includes(sekme) ? 'max-w-7xl' : 'max-w-3xl')}>
           <span className="font-semibold text-brand-700">Çetinler Ajanda</span>
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-brand-100 text-brand-700">v2</span>
           <nav className="hidden md:flex items-center gap-1 ml-4">
@@ -155,10 +166,10 @@ export default function V2Page() {
         </div>
       </header>
 
-      <main className={clsx('mx-auto px-4 py-4 space-y-4', sekme === 'yonetim' ? 'max-w-7xl' : 'max-w-3xl')}>
+      <main className={clsx('mx-auto px-4 py-4 space-y-4', GENIS.includes(sekme) ? 'max-w-7xl' : 'max-w-3xl')}>
         {/* Yönetici: kullanıcının gözünden bak */}
         {profile.role === 'admin' && (
-        <label className="flex items-center gap-2 rounded-xl border border-dashed border-gray-300 bg-white px-3 py-2 text-sm">
+        <label className="flex items-center gap-2 rounded-xl border border-dashed border-gray-300 bg-white px-3 py-2 text-sm max-w-3xl mx-auto">
           <Eye size={15} className="text-gray-400 shrink-0" />
           <span className="text-gray-500 shrink-0">Görünüm:</span>
           <select value={gorunum} onChange={e => setGorunum(e.target.value)}
@@ -181,16 +192,16 @@ export default function V2Page() {
 
         {veri && sekme === 'hesabim' && <HesabimView veri={veri} gorunum={gorunum} onSubelerim={() => setSekme('subelerim')} />}
         {veri && sekme === 'subelerim' && <SubelerimView veri={veri} gorunum={gorunum} />}
-        {veri && sekme === 'prim' && <PrimView key={gorunum} rol={veri.kullanici.rol} gorunum={gorunum} />}
+        {veri && sekme === 'prim' && <PrimView key={gorunum} rol={veri.kullanici.rol} gorunum={gorunum} oturum={oturum!} />}
         {veri && sekme === 'ajanda' && (
           <AjandaView key={gorunum} kisiler={ajandaKisileri} oturum={{ id: profile.id, rol: profile.role }}
-            benRol={veri.kullanici.rol} gorunum={gorunum} />
+            benRol={veri.kullanici.rol} gorunum={gorunum} team={team} />
         )}
         {sekme === 'yonetim' && (
           <YonetimView profile={profile} team={team} bsyLinks={bsyLinks} gorunumVar={!!gorunum} />
         )}
         {veri && sekme === 'raporlar' && (
-          <RaporlarView key={gorunum} rol={veri.kullanici.rol} gorunum={gorunum} kisiler={ajandaKisileri} />
+          <RaporlarView key={gorunum} rol={veri.kullanici.rol} gorunum={gorunum} kisiler={ajandaKisileri} oturum={oturum!} />
         )}
       </main>
 

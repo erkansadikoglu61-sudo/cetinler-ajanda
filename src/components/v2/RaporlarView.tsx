@@ -1,14 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, Search, ChevronDown, ChevronRight, Check } from 'lucide-react'
+import { Download, Search, ChevronDown, ChevronRight, Check, FileText } from 'lucide-react'
 import clsx from 'clsx'
-import { supabase, type Task } from '@/lib/supabase'
+import { supabase, type Task, type Profile } from '@/lib/supabase'
+import { generateVisitReport } from '@/lib/pdf'
 import { donemOptions, donemLabel, donemdeAktif } from '@/lib/sellout'
 import { ziyaretHedefi } from '@/lib/ziyaretHedef'
 import { sadeAd } from '@/lib/v2/nokta'
 import { tl } from './types'
 import type { AjandaKisi } from './AjandaView'
+import { RAPOR_V1_BOLUMLERI, V1Cerceve, type Oturum } from './V1Ekranlar'
 
 // v2 Raporlar — Ziyaret, Sellout, Tahsilat. Dashboard sekmesi v2'de yok;
 // raporlar tek görünürlük kuralıyla (Şubelerim / hiyerarşi) burada.
@@ -47,7 +49,7 @@ const ExcelDugme = ({ onClick, disabled }: { onClick: () => void; disabled?: boo
 )
 
 // ─── Ziyaret raporu ───────────────────────────────────────────
-function ZiyaretRaporu({ kisiler }: { kisiler: AjandaKisi[] }) {
+function ZiyaretRaporu({ kisiler, team }: { kisiler: AjandaKisi[]; team: Profile[] }) {
   const [donem, setDonem] = useState(donemOptions().slice(-1)[0])
   const [gorevler, setGorevler] = useState<Task[] | null>(null)
   const [hata, setHata] = useState('')
@@ -99,12 +101,23 @@ function ZiyaretRaporu({ kisiler }: { kisiler: AjandaKisi[] }) {
       'Adres': t.checkin_address ?? '',
     })))
 
+  // v1 ile aynı PDF ziyaret raporu
+  const pdf = () => {
+    const [y, m] = donem.split('-').map(Number)
+    const idler = new Set(kisiler.map(k => k.id))
+    generateVisitReport(gorevler ?? [], team.filter(p => idler.has(p.id)), y, m - 1)
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <h2 className="flex-1 text-base font-semibold text-gray-800">Ziyaret raporu</h2>
         <DonemSecici donem={donem} onChange={setDonem} />
         <ExcelDugme onClick={indir} disabled={!gorevler?.some(t => t.checkin_ts)} />
+        <button onClick={pdf} disabled={!gorevler?.length}
+          className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-600 disabled:opacity-40">
+          <FileText size={13} /> PDF
+        </button>
       </div>
       {hata && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{hata}</p>}
       {!gorevler && !hata && <div className="h-24 rounded-xl bg-gray-100 animate-pulse" />}
@@ -342,26 +355,35 @@ function TahsilatRaporu({ gorunum }: { gorunum: string }) {
 }
 
 // ─── Raporlar sekmesi ─────────────────────────────────────────
-export function RaporlarView({ rol, gorunum, kisiler }: { rol: string; gorunum: string; kisiler: AjandaKisi[] }) {
-  const bolumler = useMemo(() => BOLUMLER.filter(b => b.roller.includes(rol)), [rol])
-  const [bolum, setBolum] = useState<Bolum>(bolumler[0]?.key ?? 'sellout')
+export function RaporlarView({ rol, gorunum, kisiler, oturum }: {
+  rol: string; gorunum: string; kisiler: AjandaKisi[]; oturum: Oturum
+}) {
+  const bolumler = useMemo(() => [
+    ...BOLUMLER.filter(b => b.roller.includes(rol)).map(b => ({ key: b.key as string, label: b.label })),
+    ...RAPOR_V1_BOLUMLERI.filter(b => b.roller.includes(oturum.profile.role)).map(b => ({ key: b.key, label: b.label })),
+  ], [rol, oturum.profile.role])
+  const [bolum, setBolum] = useState<string>(bolumler[0]?.key ?? 'sellout')
+  const v1 = RAPOR_V1_BOLUMLERI.find(b => b.key === bolum)
 
   return (
     <div className="space-y-4">
       {bolumler.length > 1 && (
-        <div className="flex gap-1 rounded-xl bg-gray-100 p-1">
+        <div className="flex gap-1 overflow-x-auto rounded-xl bg-gray-100 p-1 max-w-3xl mx-auto">
           {bolumler.map(b => (
             <button key={b.key} onClick={() => setBolum(b.key)}
-              className={clsx('flex-1 rounded-lg px-2 py-1.5 text-xs font-medium',
+              className={clsx('shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap',
                 bolum === b.key ? 'bg-white text-brand-700 shadow-sm' : 'text-gray-500')}>
               {b.label}
             </button>
           ))}
         </div>
       )}
-      {bolum === 'ziyaret' && <ZiyaretRaporu kisiler={kisiler} />}
-      {bolum === 'sellout' && <SelloutRaporu gorunum={gorunum} />}
-      {bolum === 'tahsilat' && <TahsilatRaporu gorunum={gorunum} />}
+      <div className="max-w-3xl mx-auto">
+        {bolum === 'ziyaret' && <ZiyaretRaporu kisiler={kisiler} team={oturum.team} />}
+        {bolum === 'sellout' && <SelloutRaporu gorunum={gorunum} />}
+        {bolum === 'tahsilat' && <TahsilatRaporu gorunum={gorunum} />}
+      </div>
+      {v1 && <V1Cerceve>{v1.render(oturum)}</V1Cerceve>}
     </div>
   )
 }

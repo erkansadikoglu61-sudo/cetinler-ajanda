@@ -237,3 +237,9 @@ Hepsinin sistemde kaydı var.
   Destek hakediş girişi, Nihai Prim / Prim Ödeme Listesi ve Diğer prim v2'de olmalı →
   v2 "Yönetim" sekmesi (v1 bileşenleri, aynı yetkiler). v2, kullanıcının tüm istekleri
   son halini almadan kimseye gösterilmeyecek (erişim yalnızca admin).
+- 2026-11-14: Dashboard hariç TÜM v1 ekranları v2'ye taşındı (aynı bileşenler, aynı yetkiler):
+  Prim → Ciro ve Tahsilat, Adet Prim Tablosu, Prim Analiz; Raporlar → Sellout Detay, Özel
+  Hedefler, Genel Raporlar, Tahsilat Planım, Tahsilat Takvimi, Sell-in/Sell-out, Satış Analizi,
+  Personelli Nokta Analiz, Ziyaret PDF; Ajanda → Gerçekleşen Ziyaretler (harita);
+  Yönetim → Nihai Prim, Prim Ödeme, Destek Hakediş, Diğer Prim, Noktalarımız, Kullanıcılar.
+  Gerçekleşen Ziyaretler bileşeni ortak dosyaya alındı (`src/components/ZiyaretlerView.tsx`).
