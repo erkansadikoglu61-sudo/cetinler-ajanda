@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ChevronLeft, ChevronRight, Plus, X, MapPin, Search, Check, Trash2, Pencil, Store, Clock, AlertCircle,
+  MessageSquare, Send, Target,
 } from 'lucide-react'
 import clsx from 'clsx'
-import { supabase, type Task } from '@/lib/supabase'
+import { supabase, type Task, type TaskNote } from '@/lib/supabase'
 import { TASK_TYPES } from '@/lib/constants'
 import { checkinKonumu } from '@/lib/checkin'
 import { sadeAd } from '@/lib/v2/nokta'
+import { donemdeAktif } from '@/lib/sellout'
+import { ziyaretHedefi } from '@/lib/ziyaretHedef'
 import { TalepModal } from './Talepler'
 
 // v2 Ajanda — haftalık görünüm + görev penceresi.
@@ -30,6 +33,7 @@ interface Props {
 
 const GUNLER = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
 const AYLAR = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara']
+const AYLAR_UZUN = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
 
 function isoGun(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -262,6 +266,56 @@ function GorevModal({ gorev, varsayilanTarih, kisiler, oturum, benRol, gorunum, 
   )
 }
 
+// ─── Görev notları ─────────────────────────────────────────────
+function GorevNotlari({ gorevId, oturumId }: { gorevId: string; oturumId: string }) {
+  const [notlar, setNotlar] = useState<TaskNote[] | null>(null)
+  const [metin, setMetin] = useState('')
+  const [gonderiliyor, setGonderiliyor] = useState(false)
+
+  const yukle = useCallback(async () => {
+    const { data } = await supabase
+      .from('task_notes')
+      .select('*, profiles(full_name)')
+      .eq('task_id', gorevId)
+      .order('created_at', { ascending: true })
+    setNotlar((data ?? []) as TaskNote[])
+  }, [gorevId])
+
+  useEffect(() => { yukle() }, [yukle])
+
+  const ekle = async () => {
+    if (!metin.trim()) return
+    setGonderiliyor(true)
+    const { error } = await supabase.from('task_notes').insert({ task_id: gorevId, author_id: oturumId, text: metin.trim() })
+    setGonderiliyor(false)
+    if (!error) { setMetin(''); yukle() }
+  }
+
+  return (
+    <div className="space-y-2 border-t border-gray-100 pt-3">
+      <p className="flex items-center gap-1.5 text-xs font-medium text-gray-500"><MessageSquare size={13} /> Notlar</p>
+      {notlar === null && <div className="h-4 rounded bg-gray-100 animate-pulse" />}
+      {notlar && notlar.length === 0 && <p className="text-xs text-gray-400">Henüz not yok.</p>}
+      <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+        {(notlar ?? []).map(n => (
+          <li key={n.id} className="rounded-lg bg-gray-50 px-3 py-1.5">
+            <p className="text-[11px] text-gray-400">
+              {n.profiles?.full_name ?? ''} · {new Date(n.created_at).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </p>
+            <p className="text-sm text-gray-700 whitespace-pre-line">{n.text}</p>
+          </li>
+        ))}
+      </ul>
+      <div className="flex gap-2">
+        <input value={metin} onChange={e => setMetin(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') ekle() }}
+          placeholder="Not ekle…" className="flex-1 min-w-0 rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+        <button onClick={ekle} disabled={gonderiliyor || !metin.trim()}
+          className="rounded-xl bg-brand-500 px-3 text-white disabled:opacity-50"><Send size={15} /></button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Görev detayı ──────────────────────────────────────────────
 function GorevDetay({ gorev, kisiAdi, oturum, onClose, onDuzenle, onDegisti }: {
   gorev: Task
@@ -302,7 +356,7 @@ function GorevDetay({ gorev, kisiAdi, oturum, onClose, onDuzenle, onDegisti }: {
 
   return (
     <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl p-5 space-y-3" onClick={e => e.stopPropagation()}>
+      <div className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto bg-white rounded-t-2xl sm:rounded-2xl p-5 space-y-3" onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs text-gray-500">{trTarih(gorev.date)}{gorev.time ? ` · ${gorev.time.slice(0, 5)}` : ''} · {kisiAdi}</p>
@@ -340,15 +394,72 @@ function GorevDetay({ gorev, kisiAdi, oturum, onClose, onDuzenle, onDegisti }: {
             </button>
           </div>
         )}
+
+        <GorevNotlari gorevId={gorev.id} oturumId={oturum.id} />
       </div>
     </div>
   )
 }
 
+// ─── Aylık ziyaret hedefi ──────────────────────────────────────
+function ZiyaretHedefi({ kisiler, yil, ay, yenile }: { kisiler: AjandaKisi[]; yil: number; ay: number; yenile: number }) {
+  const donem = `${yil}-${String(ay + 1).padStart(2, '0')}`
+  const hedefliler = useMemo(
+    () => kisiler.filter(k => ['sup', 'jr'].includes(k.rol) && ziyaretHedefi(k.ad) !== null && donemdeAktif(k.ad, donem)),
+    [kisiler, donem],
+  )
+  const [sayilar, setSayilar] = useState<Record<string, number> | null>(null)
+
+  useEffect(() => {
+    if (hedefliler.length === 0) return
+    let iptal = false
+    const son = new Date(yil, ay + 1, 0).getDate()
+    supabase.from('tasks').select('pid')
+      .in('pid', hedefliler.map(k => k.id))
+      .gte('date', `${donem}-01`).lte('date', `${donem}-${String(son).padStart(2, '0')}`)
+      .not('checkin_ts', 'is', null)
+      .then(({ data }) => {
+        if (iptal) return
+        const m: Record<string, number> = {}
+        for (const r of data ?? []) m[r.pid] = (m[r.pid] ?? 0) + 1
+        setSayilar(m)
+      })
+    return () => { iptal = true }
+  }, [hedefliler, yil, ay, donem, yenile])
+
+  if (hedefliler.length === 0) return null
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-2">
+      <p className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+        <Target size={13} /> {AYLAR_UZUN[ay]} ziyaret hedefi (check-in)
+      </p>
+      {hedefliler.map(k => {
+        const hedef = ziyaretHedefi(k.ad)!
+        const g = sayilar?.[k.id] ?? 0
+        const oran = Math.min(g / hedef, 1)
+        return (
+          <div key={k.id} className="space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-700 truncate">{k.ad}</span>
+              <span className="tabular-nums text-gray-500">{sayilar ? g : '…'} / {hedef}</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+              <div className={clsx('h-full rounded-full', oran >= 1 ? 'bg-green-500' : 'bg-brand-500')} style={{ width: `${oran * 100}%` }} />
+            </div>
+          </div>
+        )
+      })}
+    </section>
+  )
+}
+
 // ─── Ana görünüm ───────────────────────────────────────────────
 export function AjandaView({ kisiler, oturum, benRol, gorunum }: Props) {
+  const [mod, setMod] = useState<'hafta' | 'ay'>('hafta')
   const [hafta, setHafta] = useState(() => haftaBasi(new Date()))
+  const [ayBasi, setAyBasi] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })
   const [secili, setSecili] = useState(() => isoGun(new Date()))
+  const [yenileSayac, setYenileSayac] = useState(0)
   const [kisiFiltre, setKisiFiltre] = useState('')
   const [gorevler, setGorevler] = useState<Task[]>([])
   const [yukleniyor, setYukleniyor] = useState(false)
@@ -357,7 +468,13 @@ export function AjandaView({ kisiler, oturum, benRol, gorunum }: Props) {
   const [detay, setDetay] = useState<Task | null>(null)
   const istekNo = useRef(0)
 
-  const gunler = useMemo(() => Array.from({ length: 7 }, (_, i) => gunEkle(hafta, i)), [hafta])
+  const gunler = useMemo(() => {
+    if (mod === 'hafta') return Array.from({ length: 7 }, (_, i) => gunEkle(hafta, i))
+    const bas = haftaBasi(ayBasi)
+    const sonGun = new Date(ayBasi.getFullYear(), ayBasi.getMonth() + 1, 0)
+    const adet = Math.ceil(((sonGun.getTime() - bas.getTime()) / 86400000 + 1) / 7) * 7
+    return Array.from({ length: adet }, (_, i) => gunEkle(bas, i))
+  }, [mod, hafta, ayBasi])
   const idler = useMemo(() => kisiler.map(k => k.id), [kisiler])
   const kisiAdi = useCallback((id: string) => kisiler.find(k => k.id === id)?.ad ?? '', [kisiler])
 
@@ -371,13 +488,14 @@ export function AjandaView({ kisiler, oturum, benRol, gorunum }: Props) {
       .select('*')
       .in('pid', idler)
       .gte('date', isoGun(gunler[0]))
-      .lte('date', isoGun(gunler[6]))
+      .lte('date', isoGun(gunler[gunler.length - 1]))
       .order('date', { ascending: true })
       .order('time', { ascending: true, nullsFirst: true })
     if (no !== istekNo.current) return
     setYukleniyor(false)
     if (error) { setHata(error.message); return }
     setGorevler((data ?? []) as Task[])
+    setYenileSayac(n => n + 1)
   }, [idler, gunler])
 
   useEffect(() => { yukle() }, [yukle])
@@ -385,7 +503,7 @@ export function AjandaView({ kisiler, oturum, benRol, gorunum }: Props) {
   const filtreli = gorevler.filter(g => !kisiFiltre || g.pid === kisiFiltre)
   const gunGorevleri = filtreli.filter(g => g.date === secili)
   const bugun = isoGun(new Date())
-  const ayBaslik = (() => {
+  const ayBaslik = mod === 'ay' ? `${AYLAR_UZUN[ayBasi.getMonth()]} ${ayBasi.getFullYear()}` : (() => {
     const a = gunler[0], b = gunler[6]
     return a.getMonth() === b.getMonth()
       ? `${a.getDate()}–${b.getDate()} ${AYLAR[a.getMonth()]} ${a.getFullYear()}`
@@ -393,10 +511,29 @@ export function AjandaView({ kisiler, oturum, benRol, gorunum }: Props) {
   })()
 
   const haftaDegistir = (n: number) => {
+    if (mod === 'ay') {
+      const y = new Date(ayBasi.getFullYear(), ayBasi.getMonth() + n, 1)
+      setAyBasi(y)
+      setSecili(isoGun(y))
+      return
+    }
     const y = gunEkle(hafta, n * 7)
     setHafta(y)
     setSecili(isoGun(y))
   }
+  const bugunGit = () => {
+    const d = new Date()
+    setHafta(haftaBasi(d))
+    setAyBasi(new Date(d.getFullYear(), d.getMonth(), 1))
+    setSecili(bugun)
+  }
+  const modDegistir = (m: 'hafta' | 'ay') => {
+    const s = new Date(secili + 'T12:00:00')
+    setHafta(haftaBasi(s))
+    setAyBasi(new Date(s.getFullYear(), s.getMonth(), 1))
+    setMod(m)
+  }
+  const hedefAy = mod === 'ay' ? ayBasi : new Date(secili + 'T12:00:00')
 
   return (
     <div className="space-y-3">
@@ -405,29 +542,48 @@ export function AjandaView({ kisiler, oturum, benRol, gorunum }: Props) {
         <button onClick={() => haftaDegistir(-1)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><ChevronLeft size={18} /></button>
         <span className="flex-1 text-center text-sm font-medium text-gray-700">{ayBaslik}</span>
         <button onClick={() => haftaDegistir(1)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"><ChevronRight size={18} /></button>
-        <button onClick={() => { const h = haftaBasi(new Date()); setHafta(h); setSecili(bugun) }}
+        <button onClick={bugunGit}
           className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600">Bugün</button>
       </div>
 
+      <div className="flex gap-1 rounded-xl bg-gray-100 p-1">
+        {(['hafta', 'ay'] as const).map(m => (
+          <button key={m} onClick={() => modDegistir(m)}
+            className={clsx('flex-1 rounded-lg py-1 text-xs font-medium', mod === m ? 'bg-white text-brand-700 shadow-sm' : 'text-gray-500')}>
+            {m === 'hafta' ? 'Hafta' : 'Ay'}
+          </button>
+        ))}
+      </div>
+
+      {mod === 'ay' && (
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-gray-400">
+          {GUNLER.map(g => <span key={g}>{g}</span>)}
+        </div>
+      )}
       <div className="grid grid-cols-7 gap-1">
         {gunler.map((d, i) => {
           const iso = isoGun(d)
           const adet = filtreli.filter(g => g.date === iso).length
           const checkin = filtreli.filter(g => g.date === iso && g.checkin_ts).length
+          const disarida = mod === 'ay' && d.getMonth() !== ayBasi.getMonth()
           return (
             <button key={iso} onClick={() => setSecili(iso)}
-              className={clsx('rounded-xl py-2 flex flex-col items-center gap-0.5 border',
+              className={clsx('rounded-xl flex flex-col items-center gap-0.5 border',
+                mod === 'hafta' ? 'py-2' : 'py-1',
                 secili === iso ? 'bg-brand-500 border-brand-500 text-white' : 'bg-white border-gray-200 text-gray-700',
-                iso === bugun && secili !== iso && 'border-brand-500')}>
-              <span className={clsx('text-[10px]', secili === iso ? 'text-white/80' : 'text-gray-400')}>{GUNLER[i]}</span>
+                iso === bugun && secili !== iso && 'border-brand-500',
+                disarida && secili !== iso && 'opacity-40')}>
+              {mod === 'hafta' && <span className={clsx('text-[10px]', secili === iso ? 'text-white/80' : 'text-gray-400')}>{GUNLER[i]}</span>}
               <span className="text-sm font-semibold">{d.getDate()}</span>
-              <span className={clsx('text-[10px] h-3', secili === iso ? 'text-white/90' : 'text-gray-400')}>
+              <span className={clsx('text-[10px] h-3 tabular-nums', secili === iso ? 'text-white/90' : 'text-gray-400')}>
                 {adet > 0 ? `${checkin}/${adet}` : ''}
               </span>
             </button>
           )
         })}
       </div>
+
+      <ZiyaretHedefi kisiler={kisiler} yil={hedefAy.getFullYear()} ay={hedefAy.getMonth()} yenile={yenileSayac} />
 
       {kisiler.length > 1 && (
         <select value={kisiFiltre} onChange={e => setKisiFiltre(e.target.value)}

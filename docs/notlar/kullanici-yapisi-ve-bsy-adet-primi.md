@@ -52,7 +52,11 @@
     çalıştırılmalı), `/api/v2/talepler`. Eksik şube bildir (görev penceresi + Şubelerim),
     hatalı bilgi bildir (Hesabım). Talebi admin ya da açanın üstü "Çözüldü/Reddet" ile kapatır.
   - Check-in konumu ortak modülde: `src/lib/checkin.ts` (v1 useTasks da kullanıyor).
-  - Sırada: görev notları, aylık görünüm, ziyaret hedefi takibi, talep bildirimi (push).
+  - Devamı (2026-11-14): görev notları (task_notes, v1 ile ortak), Hafta/Ay görünümü,
+    aylık ziyaret hedefi kartı (check-in sayısı; hedefler `src/lib/ziyaretHedef.ts`,
+    v1 ile ortak), bekleyen talepler için Şubelerim sekmesinde rozet.
+  - Açık: telefona anlık bildirim (web push) — VAPID anahtarı + service worker kurulumu
+    gerekiyor; şimdilik uygulama içi rozet.
 - **Faz 4 — Raporlar + geçiş:** Sellout/tahsilat/ziyaret raporları v2 kuralıyla;
   tüm kullanıcılara açılış ve v1'den geçiş.
 
@@ -217,3 +221,4 @@ Hepsinin sistemde kaydı var.
 - 2026-11-13: Aşama 2 başlatıldı (BSY adet primi + Hesabım hakediş/geçmiş).
 - 2026-11-13: Aşama 2 devamı: Sup/Jr/Merch prim + hedef girişi, Bayi Merch · Destek hakedişleri v2'de.
 - 2026-11-14: Aşama 3 başlatıldı (v2 Ajanda, Şubelerim kaynaklı görev penceresi, talepler).
+- 2026-11-14: Aşama 3 devamı: görev notları, aylık görünüm, ziyaret hedefi, talep rozeti.

@@ -75,6 +75,23 @@ export default function V2Page() {
 
   useEffect(() => { yukle() }, [yukle])
 
+  // Bekleyen talepler (kapatma yetkisi olduğu açık talepler) → Şubelerim rozeti
+  const [bekleyenTalep, setBekleyenTalep] = useState(0)
+  useEffect(() => {
+    if (!veri) return
+    let iptal = false
+    const qs = gorunum ? `?gorunum=${encodeURIComponent(gorunum)}` : ''
+    fetch(`/api/v2/talepler${qs}`)
+      .then(r => (r.ok ? r.json() : { talepler: [] }))
+      .then(j => {
+        if (iptal) return
+        const l = (j.talepler ?? []) as { durum: string; kapatabilir: boolean }[]
+        setBekleyenTalep(l.filter(t => t.durum === 'acik' && t.kapatabilir).length)
+      })
+      .catch(() => {})
+    return () => { iptal = true }
+  }, [veri, gorunum, sekme])
+
   // Ajanda: bakılan kullanıcı + alt kullanıcıları; yönetici kendisine bakarken tüm ekip
   const ajandaKisileri = useMemo<AjandaKisi[]>(() => {
     if (!veri) return []
@@ -119,6 +136,9 @@ export default function V2Page() {
                 className={clsx('px-3 py-1.5 rounded-lg text-sm',
                   sekme === s.key ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100')}>
                 {s.label}
+                {s.key === 'subelerim' && bekleyenTalep > 0 && (
+                  <span className="ml-1 rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">{bekleyenTalep}</span>
+                )}
               </button>
             ))}
           </nav>
@@ -181,9 +201,12 @@ export default function V2Page() {
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-white border-t border-gray-200 grid grid-cols-5">
         {SEKMELER.map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setSekme(key)}
-            className={clsx('flex flex-col items-center gap-0.5 py-2 text-[11px]',
+            className={clsx('relative flex flex-col items-center gap-0.5 py-2 text-[11px]',
               sekme === key ? 'text-brand-600' : 'text-gray-400')}>
             <Icon size={20} />
+            {key === 'subelerim' && bekleyenTalep > 0 && (
+              <span className="absolute top-1 left-1/2 ml-1.5 rounded-full bg-amber-500 px-1 text-[9px] font-semibold leading-4 text-white">{bekleyenTalep}</span>
+            )}
             {label}
           </button>
         ))}

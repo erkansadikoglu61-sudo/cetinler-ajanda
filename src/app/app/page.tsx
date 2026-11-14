@@ -23,6 +23,7 @@ import { BsyView } from '@/components/BsyView'
 import { TahsilatPlanimView } from '@/components/TahsilatPlanimView'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
 import { namesMatch, normalizeName, donemdeAktif } from '@/lib/sellout'
+import { VISIT_TARGETS } from '@/lib/ziyaretHedef'
 import { GenelRaporlarView } from '@/components/GenelRaporlarView'
 import { KpiView } from '@/components/KpiView'
 import { NoktalarimizView } from '@/components/NoktalarimizView'
@@ -1751,19 +1752,6 @@ function ReportView({
 // İSTATİSTİK SHEET
 // ─────────────────────────────────────────────────────
 // Hedef ziyaret noktaları (isim → hedef)
-const VISIT_TARGETS: Record<string, number> = {
-  'Nagihan Erdönmez': 60,
-  'Duygu Duman':      60,
-  'Tuğba Ayata':      60,
-  'Merve İnci':       60,
-  'Burçin Acar':      60,
-  'Atilla YILMAZ':    40,
-  'Burak Alagöz':     60,
-  'Gülcan Bayer':     60,
-  'Songül Durukan':   60,
-  'Sinem Bektaş':     60,
-  'Pınar Güler':      60,
-}
 
 function StatsSheet({ team, visibleIds, initialYear, initialMonth, onClose }: {
   team: Profile[]; visibleIds: string[]; initialYear: number; initialMonth: number; onClose: () => void;
