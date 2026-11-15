@@ -57,6 +57,13 @@ function trTarih(iso: string): string {
   return `${d}.${m}.${y}`
 }
 
+/** Telefona bildirim olayı (sessizce; bildirim kurulu değilse etkisiz) */
+function olayBildir(tip: 'gorev' | 'not', gorevId: string) {
+  fetch('/api/v2/bildirim/olay', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tip, gorevId }),
+  }).catch(() => {})
+}
+
 // ─── Şube seçici ───────────────────────────────────────────────
 interface SubeGrup { cariAdi: string; subeler: { key: string; subeAdi: string; subeKod: string }[] }
 const subeCache = new Map<string, SubeGrup[]>()
@@ -183,12 +190,18 @@ function GorevModal({ gorev, varsayilanTarih, kisiler, oturum, benRol, gorunum, 
     let desc = aciklama
     if (izin && bitis && bitis !== tarih) desc = `${trTarih(tarih)} - ${trTarih(bitis)}${aciklama ? '\n' + aciklama : ''}`
     const ortak = { pid, date: tarih, time: izin ? null : (saat || null), type: tur, customer: musteri || null, description: desc || null }
-    const { error } = yeni
-      ? await supabase.from('tasks').insert({
-          ...ortak, checkin_ts: null, checkin_lat: null, checkin_lng: null, checkin_by: null, checkin_address: null,
-          created_by: oturum.id,
-        })
-      : await supabase.from('tasks').update(ortak).eq('id', gorev!.id)
+    let error: { message: string } | null = null
+    if (yeni) {
+      const r = await supabase.from('tasks').insert({
+        ...ortak, checkin_ts: null, checkin_lat: null, checkin_lng: null, checkin_by: null, checkin_address: null,
+        created_by: oturum.id,
+      }).select('id').single()
+      error = r.error
+      // Başkasına açılan görev → sahibine telefona bildirim
+      if (!r.error && r.data && pid !== oturum.id) olayBildir('gorev', r.data.id)
+    } else {
+      error = (await supabase.from('tasks').update(ortak).eq('id', gorev!.id)).error
+    }
     setKaydediliyor(false)
     if (error) { setHata(error.message); return }
     onKaydet()
@@ -291,7 +304,7 @@ function GorevNotlari({ gorevId, oturumId }: { gorevId: string; oturumId: string
     setGonderiliyor(true)
     const { error } = await supabase.from('task_notes').insert({ task_id: gorevId, author_id: oturumId, text: metin.trim() })
     setGonderiliyor(false)
-    if (!error) { setMetin(''); yukle() }
+    if (!error) { setMetin(''); yukle(); olayBildir('not', gorevId) }
   }
 
   return (

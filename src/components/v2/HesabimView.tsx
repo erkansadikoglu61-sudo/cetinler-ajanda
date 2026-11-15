@@ -6,6 +6,7 @@ import clsx from 'clsx'
 import { MONTHS_TR } from '@/lib/constants'
 import { V2Veri, V2Hesabim, V2_ROL_ADI, ibanBicimle, tl } from './types'
 import { TalepModal } from './Talepler'
+import { BildirimKarti } from './BildirimKarti'
 
 interface Props {
   veri: V2Veri
@@ -155,6 +156,8 @@ export function HesabimView({ veri, gorunum, onSubelerim }: Props) {
           </ul>
         </section>
       )}
+
+      <BildirimKarti />
 
       {/* Şubelerim özeti */}
       <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">

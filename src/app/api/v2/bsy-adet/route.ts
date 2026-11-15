@@ -1,17 +1,18 @@
 import { NextResponse } from 'next/server'
 import { BSY_NAME_TO_KOD, PRIM_EXCLUDED_BSYS, bsyDonemdeGorunur } from '@/lib/bsy'
-import { GRUP_NORMALIZE, namesMatch } from '@/lib/sellout'
+import { namesMatch } from '@/lib/sellout'
+import { bsyExcelAdetleri } from '@/lib/v2/bsyExcelAdet'
 import {
   BSY_ADET_KATEGORILER, BSY_ADET_PARAMS, bsyAdetDurum, bsyAdetHesapla,
 } from '@/lib/v2/bsyAdetPrim'
-import { v2Istek, donemSatirlari, donemGecerli, buDonem } from '@/lib/v2/sunucu'
+import { v2Istek, donemGecerli, buDonem, servisIstemcisi } from '@/lib/v2/sunucu'
 import type { V2Profil } from '@/lib/v2/nokta'
 
 // v2 — BSY adet primi.
 // GET  ?donem=YYYY-MM[&gorunum=<profil id>]
 //      Yönetici / İK / Yönetim: tüm BSY'ler; BSY: yalnızca kendisi.
 // POST { donem, hedefler: [{ profile_id, grup, hedef }] } — yalnızca yönetici.
-// Hedefler sellout_targets_profile tablosunda (BSY profil id'siyle) tutulur;
+// Gerçekleşme: SAHA.xlsx (lib/v2/bsyExcelAdet). Hedefler sellout_targets_profile tablosunda (BSY profil id'siyle) tutulur;
 // Süpervizör/Jr hedefleriyle aynı yapı, ayrı tablo gerekmez.
 
 export const maxDuration = 300
@@ -39,25 +40,14 @@ export async function GET(req: Request) {
   const bsylar = herkesi ? tumBsylar : tumBsylar.filter(b => b.id === ctx.ben.id)
 
   try {
-    const [hedefRes, satirlar] = await Promise.all([
+    const [hedefRes, gercByKod] = await Promise.all([
       bsylar.length
         ? ctx.sb.from('sellout_targets_profile').select('profile_id, grup, hedef')
             .eq('donem', donem).in('profile_id', bsylar.map(b => b.id))
         : Promise.resolve({ data: [] as { profile_id: string; grup: string; hedef: number }[] }),
-      bsylar.length ? donemSatirlari(donem) : Promise.resolve([]),
+      // Gerçekleşme: SAHA.xlsx satış adetleri (iade düşülür; Evkur dönem kuralı dahil)
+      bsylar.length ? bsyExcelAdetleri(servisIstemcisi(), donem) : Promise.resolve(new Map<string, Record<string, number>>()),
     ])
-
-    // Gerçekleşme: satırın BSY kodu (oluştuğu andaki BSY; Evkur dönem kuralı dahil)
-    const gercByKod = new Map<string, Record<string, number>>()
-    for (const r of satirlar) {
-      const grup = GRUP_NORMALIZE[r.grup_aciklama]
-      if (!grup || !KATEGORI_SET.has(grup)) continue
-      const kod = (r.bsy ?? '').trim().toUpperCase()
-      if (!kod) continue
-      let g = gercByKod.get(kod)
-      if (!g) { g = {}; gercByKod.set(kod, g) }
-      g[grup] = (g[grup] ?? 0) + r.satilan_adet
-    }
 
     const hedefler = (hedefRes.data ?? []) as { profile_id: string; grup: string; hedef: number }[]
     const sonuc = bsylar.map(b => {

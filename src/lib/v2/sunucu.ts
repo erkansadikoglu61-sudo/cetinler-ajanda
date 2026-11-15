@@ -86,3 +86,12 @@ export async function merchDetay(): Promise<NPMerchDetay[]> {
 }
 
 export const HERKESI_GOREN = ['admin', 'ik', 'manager']
+
+/** Storage / servis okumaları için istemci (v1 uçlarıyla aynı: service role, yoksa anon) */
+export function servisIstemcisi(): SupabaseClient {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false } },
+  )
+}

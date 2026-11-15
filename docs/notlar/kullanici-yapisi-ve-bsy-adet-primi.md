@@ -243,3 +243,14 @@ Hepsinin sistemde kaydı var.
   Personelli Nokta Analiz, Ziyaret PDF; Ajanda → Gerçekleşen Ziyaretler (harita);
   Yönetim → Nihai Prim, Prim Ödeme, Destek Hakediş, Diğer Prim, Noktalarımız, Kullanıcılar.
   Gerçekleşen Ziyaretler bileşeni ortak dosyaya alındı (`src/components/ZiyaretlerView.tsx`).
+- 2026-11-15: Kararlar —
+  - 2027 Süpervizör / Jr / Çetinler Merch kategori ve prim kuralları şimdilik 2026 ile aynı
+    (7 kategori, PRIM_SUP/JR/MERCH, %80 barem) → değişiklik yok.
+  - BSY adet gerçekleşmesinin kaynağı **SAHA.xlsx** (Data sayfası: plasiyer kodu, stok, adet,
+    G/Ç; iade eksi; Evkur dönem kuralı) → `src/lib/v2/bsyExcelAdet.ts`. Kategori: "Adet
+    Primleri" sayfası + adet_prim_override; yoksa B2B satış raporundaki grup.
+  - Telefona bildirim (web push) istendi → `public/sw.js`, `src/lib/v2/bildirim.ts`,
+    `/api/v2/bildirim/abone`, `/api/v2/bildirim/olay`, tablo `v2_push_abonelik`
+    (`v2_push_migration.sql`). Gizli anahtar Vercel'de `VAPID_PRIVATE_KEY`.
+    Bildirilen olaylar: yeni talep (üst + yöneticiler), talep sonucu (açan), başkasına
+    açılan görev (görev sahibi), görev notu (görev sahibi + açan). Hesabım'da aç/kapat + deneme.

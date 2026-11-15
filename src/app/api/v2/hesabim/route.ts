@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
-import { GRUP_NORMALIZE, namesMatch } from '@/lib/sellout'
+import { namesMatch } from '@/lib/sellout'
 import { computeSelloutPrimForMonth, type PrimTip } from '@/lib/nihaiPrim'
 import type { Profile } from '@/lib/supabase'
 import { bsyAdetDurum, bsyAdetHesapla } from '@/lib/v2/bsyAdetPrim'
-import { v2Istek, donemSatirlari, merchDetay } from '@/lib/v2/sunucu'
+import { v2Istek, donemSatirlari, merchDetay, servisIstemcisi } from '@/lib/v2/sunucu'
+import { bsyExcelAdetleri } from '@/lib/v2/bsyExcelAdet'
 import { GET as nihaiBsyGet } from '@/app/api/nihai-prim-bsy/route'
 
 // v2 — Hesabım: bu ayın anlık hakedişi + son 3 ay (ödendi / bekliyor).
@@ -74,24 +75,18 @@ export async function GET(req: Request) {
           for (const a of aylar) if (a.yil === y && r) primByDonem.set(a.donem, Number(r.aylar[a.ay]) || 0)
         } catch { /* ciro primi alınamadı */ }
       }
-      // Adet primi (simülasyon / canlı)
+      // Adet primi (simülasyon / canlı) — gerçekleşme SAHA.xlsx
       const kod = (BSY_NAME_TO_KOD[ctx.ben.full_name.toLocaleLowerCase('tr')] ?? '').toUpperCase()
       for (const a of aylar) {
         const durum = bsyAdetDurum(a.donem)
         if (durum === 'yok' || !kod) continue
-        const [hRes, satirlar] = await Promise.all([
+        const [hRes, gercler] = await Promise.all([
           ctx.sb.from('sellout_targets_profile').select('grup, hedef').eq('donem', a.donem).eq('profile_id', ctx.ben.id),
-          donemSatirlari(a.donem),
+          bsyExcelAdetleri(servisIstemcisi(), a.donem),
         ])
         const h: Record<string, number> = {}
         for (const t of hRes.data ?? []) h[t.grup] = Number(t.hedef) || 0
-        const g: Record<string, number> = {}
-        for (const r of satirlar) {
-          if ((r.bsy ?? '').trim().toUpperCase() !== kod) continue
-          const grup = GRUP_NORMALIZE[r.grup_aciklama]
-          if (grup) g[grup] = (g[grup] ?? 0) + r.satilan_adet
-        }
-        const prim = bsyAdetHesapla(h, g).toplamPrim
+        const prim = bsyAdetHesapla(h, gercler.get(kod) ?? {}).toplamPrim
         if (durum === 'canli') primByDonem.set(a.donem, prim)
         else adetSimByDonem.set(a.donem, prim)
       }

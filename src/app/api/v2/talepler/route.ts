@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { altKullanicilar } from '@/lib/v2/nokta'
 import { v2Istek, HERKESI_GOREN, type V2Istek } from '@/lib/v2/sunucu'
+import { bildirimGonder } from '@/lib/v2/bildirim'
 
 // v2 — Talepler: eksik şube talebi ve hatalı bilgi bildirimi.
 // GET    → yönetici/İK/yönetim: tümü; diğerleri: kendi talepleri + alt kullanıcılarının talepleri
@@ -69,6 +70,22 @@ export async function POST(req: Request) {
     aciklama,
   })
   if (error) return tabloYok(error.message, error.code) ? tabloHatasi() : NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Bildirim: ilgili kişinin üstü + yöneticiler (talebi açan hariç)
+  const ilgiliP = ctx.profiller.find(p => p.id === ilgili)
+  const ustId = ilgiliP?.role === 'sup'
+    ? ctx.links.find(l => l.sup_id === ilgiliP.id)?.bsy_id
+    : ilgiliP?.manager_id ?? undefined
+  const alicilar = [
+    ...(ustId ? [ustId] : []),
+    ...ctx.profiller.filter(p => p.role === 'admin').map(p => p.id),
+  ].filter(id => id !== ctx.kullaniciId)
+  const acan = ctx.profiller.find(p => p.id === ctx.kullaniciId)?.full_name ?? ''
+  await bildirimGonder(ctx.sb, alicilar, {
+    baslik: b.tip === 'eksik_sube' ? 'Eksik şube talebi' : 'Hatalı bilgi bildirimi',
+    govde: `${acan}: ${[b.cari_adi, b.sube_adi].filter(Boolean).join(' / ') || aciklama.slice(0, 120)}`,
+    url: '/v2',
+  }).catch(() => 0)
   return NextResponse.json({ ok: true })
 }
 
@@ -91,5 +108,14 @@ export async function PATCH(req: Request) {
     updated_at: new Date().toISOString(),
   }).eq('id', b.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Bildirim: talebi açana sonucu
+  if (b.durum !== 'acik' && t.olusturan_id !== ctx.kullaniciId) {
+    await bildirimGonder(ctx.sb, [t.olusturan_id], {
+      baslik: b.durum === 'cozuldu' ? 'Talebiniz çözüldü' : 'Talebiniz reddedildi',
+      govde: (b.cevap ?? '').trim().slice(0, 140) || 'Ayrıntılar Şubelerim ▸ Talepler\'de.',
+      url: '/v2',
+    }).catch(() => 0)
+  }
   return NextResponse.json({ ok: true })
 }

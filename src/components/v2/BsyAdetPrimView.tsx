@@ -154,7 +154,7 @@ export function BsyAdetPrimView({ gorunum }: { gorunum: string }) {
       {veri && (
         <p className="text-xs text-gray-500">
           Barem: %{Math.round(veri.params.altEsik * 100)} altı 0 ₺ · %{Math.round(veri.params.altEsik * 100)}–{Math.round(veri.params.tamEsik * 100)} arası (ana prim / 2) × oran · %{Math.round(veri.params.tamEsik * 100)} ve üstü ana prim.
-          Gerçekleşme: BSY&apos;nin carilerine bağlı şubelerin satış adedi.
+          Gerçekleşme: SAHA.xlsx satış adetleri (iadeler düşülür).
         </p>
       )}
 
