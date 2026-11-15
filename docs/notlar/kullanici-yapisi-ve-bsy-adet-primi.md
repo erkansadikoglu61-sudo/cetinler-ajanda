@@ -254,3 +254,4 @@ Hepsinin sistemde kaydı var.
     (`v2_push_migration.sql`). Gizli anahtar Vercel'de `VAPID_PRIVATE_KEY`.
     Bildirilen olaylar: yeni talep (üst + yöneticiler), talep sonucu (açan), başkasına
     açılan görev (görev sahibi), görev notu (görev sahibi + açan). Hesabım'da aç/kapat + deneme.
+- 2026-11-15: VAPID_PRIVATE_KEY Vercel'e (Production) eklendi; yeni yayınla devreye alındı.
