@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { Wallet, Store, CalendarDays, Award, BarChart2, RefreshCw, LogOut, Eye, Settings } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/hooks/useAuth'
+import { supabase } from '@/lib/supabase'
 import { useTeam } from '@/hooks/useTeam'
 import { HesabimView } from '@/components/v2/HesabimView'
 import { SubelerimView } from '@/components/v2/SubelerimView'
@@ -45,9 +46,10 @@ export default function V2Page() {
   const [veri, setVeri] = useState<V2Veri | null>(null)
   const [yukleniyor, setYukleniyor] = useState(false)
   const [hata, setHata] = useState('')
+  const [oturumBitti, setOturumBitti] = useState(false)
 
   useEffect(() => {
-    if (!loading && !user) router.replace('/login')
+    if (!loading && !user) router.replace('/login?sonra=/v2')
   }, [loading, user, router])
 
   const yukle = useCallback(async (yenile = false) => {
@@ -58,9 +60,16 @@ export default function V2Page() {
       const qs = new URLSearchParams()
       if (gorunum) qs.set('gorunum', gorunum)
       if (yenile) qs.set('yenile', '1')
-      const res = await fetch(`/api/v2/noktalar?${qs}`)
+      let res = await fetch(`/api/v2/noktalar?${qs}`)
+      // Oturum süresi dolmuşsa bir kez yenileyip tekrar dene
+      if (res.status === 401) {
+        const { error } = await supabase.auth.refreshSession()
+        if (!error) res = await fetch(`/api/v2/noktalar?${qs}`)
+      }
+      if (res.status === 401) { setOturumBitti(true); return }
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Veri alınamadı')
+      setOturumBitti(false)
       setVeri(json as V2Veri)
     } catch (e) {
       setHata(e instanceof Error ? e.message : String(e))
@@ -158,7 +167,7 @@ export default function V2Page() {
               <RefreshCw size={16} className={clsx(yukleniyor && 'animate-spin')} />
             </button>
             <Link href="/app" className="px-2 py-1.5 rounded-lg text-xs text-gray-500 hover:bg-gray-100">v1</Link>
-            <button onClick={async () => { await signOut(); router.replace('/login') }} title="Çıkış"
+            <button onClick={async () => { await signOut(); router.replace('/login?sonra=/v2') }} title="Çıkış"
               className="p-2 rounded-lg text-gray-500 hover:bg-gray-100">
               <LogOut size={16} />
             </button>
@@ -182,7 +191,14 @@ export default function V2Page() {
         </label>
         )}
 
-        {hata && <p className="rounded-xl bg-red-50 text-red-700 text-sm px-4 py-3">{hata}</p>}
+        {oturumBitti && (
+          <div className="max-w-3xl mx-auto rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-center gap-3">
+            <span className="flex-1">Oturumunuzun süresi dolmuş. Devam etmek için yeniden giriş yapın.</span>
+            <button onClick={async () => { await signOut(); router.replace('/login?sonra=/v2') }}
+              className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white">Yeniden giriş yap</button>
+          </div>
+        )}
+        {hata && <p className="max-w-3xl mx-auto rounded-xl bg-red-50 text-red-700 text-sm px-4 py-3">{hata}</p>}
 
         {!veri && yukleniyor && (
           <div className="flex items-center justify-center py-16">

@@ -29,7 +29,9 @@ export default function LoginPage() {
     if (err) {
       setError(err)
     } else {
-      router.replace('/app')
+      // ?sonra=/v2 → girişten sonra v2'ye dön (yalnızca /v2 adreslerine izin verilir)
+      const sonra = new URLSearchParams(window.location.search).get('sonra') ?? ''
+      router.replace(/^\/v2(\/|$|\?)/.test(sonra) ? sonra : '/app')
     }
   }
 
