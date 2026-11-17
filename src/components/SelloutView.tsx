@@ -2,7 +2,9 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { authFetch } from '@/lib/authFetch'
-import { RefreshCw, X, Save, Target, ChevronDown, FileDown } from 'lucide-react'
+import { RefreshCw, X, Save, Target, ChevronDown, ChevronRight, FileDown, Upload, Truck } from 'lucide-react'
+import { SubeStokYukle, type SevkYukleme } from '@/components/SubeStokYukle'
+import { isoTarih } from '@/lib/subeStok'
 import * as XLSX from 'xlsx'
 import clsx from 'clsx'
 
@@ -628,7 +630,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   // kalan (adet 0) şubeler bulunur. Role göre kolonlanır:
   //   admin → her süpervizör bir kolon · sup/jr → kendi şubeleri ·
   //   bsy → kendine bağlı carilerin şubeleri (cari başına kolon).
-  interface SgColumn { title: string; subeler: { subeAdi: string; cariAdi: string; adet: number }[] }
+  interface SgColumn { title: string; subeler: { subeKod: string; subeAdi: string; cariAdi: string; adet: number }[] }
   const satisGirmeyenBase = useMemo<SgColumn[]>(() => {
     // Dönemde şube başına toplam satış adedi
     const adetBySube = new Map<string, number>()
@@ -681,12 +683,12 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
     // Atanmış tüm şubeler + dönem satış adedi (satışsız = 0)
     const assigned = [...subeMap.entries()]
-      .map(([sk, v]) => ({ ...v, adet: adetBySube.get(sk) ?? 0 }))
+      .map(([sk, v]) => ({ ...v, subeKod: sk, adet: adetBySube.get(sk) ?? 0 }))
 
     // Satış adedine göre AZALAN (en çok satan üstte, satış girmeyenler = 0 en altta), sonra cari/şube
     const bySales = (a: { adet: number; cariAdi: string; subeAdi: string }, b: { adet: number; cariAdi: string; subeAdi: string }) =>
       b.adet - a.adet || a.cariAdi.localeCompare(b.cariAdi, 'tr') || a.subeAdi.localeCompare(b.subeAdi, 'tr')
-    const strip = (arr: typeof assigned) => arr.map(s => ({ subeAdi: s.subeAdi, cariAdi: s.cariAdi, adet: s.adet })).sort(bySales)
+    const strip = (arr: typeof assigned) => arr.map(s => ({ subeKod: s.subeKod, subeAdi: s.subeAdi, cariAdi: s.cariAdi, adet: s.adet })).sort(bySales)
     const cols: SgColumn[] = []
 
     if (isBsy) {
@@ -730,6 +732,102 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     // Çok kolonlu görünümde (admin/BSY) carinin şubesi olmayan kolonlar gizlenir
     return cols.length > 1 ? cols.filter(c => c.subeler.length > 0) : cols
   }, [satisGirmeyenBase, sgCari])
+
+  // ── Şube stok (milat) + sevk → Bekleyen / Kalan ─────────────
+  // Kalan = milat stoğu + milattan SONRAKİ sevkler − milattan SONRAKİ satışlar.
+  // Bekleyen: yüklenen stok raporundaki değer (bir sonraki yüklemeye kadar sabit).
+  interface StokKaydi { sube_key: string; stok_kodu: string; stok_adi: string | null; kalan: number; bekleyen: number; milat: string }
+  interface SevkKaydi { sube_key: string; stok_kodu: string; stok_adi: string | null; adet: number; tarih: string }
+  const [stokVeri, setStokVeri] = useState<{ stok: StokKaydi[]; sevk: SevkKaydi[]; yuklemeler: SevkYukleme[] } | null>(null)
+  const [stokHata, setStokHata] = useState('')
+  const [stokYukle, setStokYukle] = useState<'stok' | 'sevk' | null>(null)
+  const [sgAcik, setSgAcik] = useState<Set<string>>(new Set())
+  const stokYenile = useCallback(async () => {
+    try {
+      const r = await authFetch('/api/sube-stok')
+      const j = await r.json()
+      if (!r.ok) { setStokHata(j.tabloYok ? 'Stok tabloları henüz oluşturulmadı.' : (j.error || 'Stok alınamadı')); setStokVeri(null); return }
+      setStokHata('')
+      setStokVeri(j)
+    } catch (e) { setStokHata(String(e)) }
+  }, [])
+  useEffect(() => { if (subTab === 'satisgirmeyen' && !stokVeri && !stokHata) stokYenile() }, [subTab, stokVeri, stokHata, stokYenile])
+
+  const sgStok = useMemo(() => {
+    const kod = (s: string | null | undefined) => (s ?? '').trim().toUpperCase()
+    type Urun = { stokKodu: string; stokAdi: string; satis: number; bekleyen: number; kalan: number; stokVar: boolean }
+    const stokBySube = new Map<string, { milat: string; urunler: Map<string, Urun> }>()
+    for (const r of stokVeri?.stok ?? []) {
+      const sk = kod(r.sube_key)
+      let e = stokBySube.get(sk)
+      if (!e) { e = { milat: r.milat, urunler: new Map() }; stokBySube.set(sk, e) }
+      if (r.milat > e.milat) e.milat = r.milat
+      e.urunler.set(kod(r.stok_kodu), { stokKodu: kod(r.stok_kodu), stokAdi: r.stok_adi ?? '', satis: 0, bekleyen: r.bekleyen, kalan: r.kalan, stokVar: true })
+    }
+    const urunAl = (sk: string, stokKodu: string, stokAdi: string) => {
+      const e = stokBySube.get(sk)!
+      let u = e.urunler.get(stokKodu)
+      if (!u) { u = { stokKodu, stokAdi, satis: 0, bekleyen: 0, kalan: 0, stokVar: false }; e.urunler.set(stokKodu, u) }
+      if (!u.stokAdi && stokAdi) u.stokAdi = stokAdi
+      return u
+    }
+    // Sevkler (milattan sonra) → Kalan'a eklenir
+    for (const r of stokVeri?.sevk ?? []) {
+      const sk = kod(r.sube_key)
+      const e = stokBySube.get(sk)
+      if (!e || r.tarih <= e.milat) continue
+      urunAl(sk, kod(r.stok_kodu), r.stok_adi ?? '').kalan += r.adet
+    }
+    // Satışlar (milattan sonra) → Kalan'dan düşer
+    for (const r of allRows) {
+      const sk = kod(r.sube_kod)
+      const e = stokBySube.get(sk)
+      if (!e) continue
+      const t = isoTarih(r.tarih)
+      if (!t || t <= e.milat) continue
+      urunAl(sk, kod(r.stok_kodu), r.stok_adi).kalan -= r.satilan_adet
+    }
+    // Dönem satışları (Satış kolonu) ürün bazında
+    const donemBySube = new Map<string, Map<string, { stokAdi: string; adet: number }>>()
+    for (const r of periodRows) {
+      const sk = kod(r.sube_kod)
+      if (!sk) continue
+      let m = donemBySube.get(sk)
+      if (!m) { m = new Map(); donemBySube.set(sk, m) }
+      const k = kod(r.stok_kodu)
+      const c = m.get(k) ?? { stokAdi: r.stok_adi, adet: 0 }
+      c.adet += r.satilan_adet
+      m.set(k, c)
+    }
+    const milatlar = [...new Set([...stokBySube.values()].map(e => e.milat))].sort()
+    return {
+      milatlar,
+      subeSayisi: stokBySube.size,
+      detay: (subeKod: string) => {
+        const sk = kod(subeKod)
+        const e = stokBySube.get(sk)
+        const donem = donemBySube.get(sk) ?? new Map<string, { stokAdi: string; adet: number }>()
+        const urunler = new Map<string, Urun>()
+        for (const [k, u] of e?.urunler ?? []) urunler.set(k, { ...u, satis: 0 })
+        for (const [k, d] of donem) {
+          const u = urunler.get(k) ?? { stokKodu: k, stokAdi: d.stokAdi, satis: 0, bekleyen: 0, kalan: 0, stokVar: false }
+          u.satis = d.adet
+          if (!u.stokAdi) u.stokAdi = d.stokAdi
+          urunler.set(k, u)
+        }
+        const liste = [...urunler.values()]
+          .filter(u => u.satis !== 0 || u.bekleyen !== 0 || u.kalan !== 0)
+          .sort((a, b) => b.satis - a.satis || b.kalan - a.kalan || a.stokKodu.localeCompare(b.stokKodu))
+        return {
+          stokVar: !!e,
+          milat: e?.milat ?? '',
+          bekleyen: e ? liste.reduce((t, u) => t + u.bekleyen, 0) : null,
+          kalan: e ? liste.reduce((t, u) => t + u.kalan, 0) : null,
+          urunler: liste,
+        }
+      },
+    }
+  }, [stokVeri, allRows, periodRows])
 
   // ── Gerç aggregation ────────────────────────────────────────
   const getGerc = useCallback(
@@ -1870,73 +1968,130 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 </select>
               </div>
             )}
+            {/* Stok bilgisi + yönetici yükleme düğmeleri */}
+            <div className="mb-2 px-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+              {stokHata ? (
+                <span className="text-amber-700">{stokHata}</span>
+              ) : sgStok.subeSayisi > 0 ? (
+                <span>
+                  Stok milatı: <b>{sgStok.milatlar.map(m => m.split('-').reverse().join('.')).join(', ')}</b> · {sgStok.subeSayisi} şube
+                  {' '}· Kalan = milat stoğu + sonraki sevkler − sonraki satışlar
+                </span>
+              ) : stokVeri ? (
+                <span>Henüz stok yüklenmedi.</span>
+              ) : null}
+              {isAdmin && (
+                <span className="ml-auto flex gap-2">
+                  <button onClick={() => setStokYukle('stok')}
+                    className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50">
+                    <Upload size={12} /> Stok yükle
+                  </button>
+                  <button onClick={() => setStokYukle('sevk')}
+                    className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50">
+                    <Truck size={12} /> Sevk yükle
+                  </button>
+                </span>
+              )}
+            </div>
+            {stokYukle && (
+              <SubeStokYukle
+                tip={stokYukle}
+                cariler={sgCariOptions}
+                varsayilanCari={sgCari}
+                yuklemeler={stokVeri?.yuklemeler ?? []}
+                onClose={() => setStokYukle(null)}
+                onKaydedildi={stokYenile}
+              />
+            )}
             {satisGirmeyenColumns.every(c => c.subeler.length === 0) ? (
               <div className="text-center py-10 text-xs text-gray-400">
                 Gösterilecek şube bulunamadı.
               </div>
             ) : (
               <div className="overflow-auto">
-                <table className="border-collapse text-xs">
-                  <thead>
-                    <tr>
-                      <th className="border border-gray-200 bg-gray-50 px-2 py-1 w-8" />
-                      {satisGirmeyenColumns.map((c, i) => (
-                        <th
-                          key={i}
-                          colSpan={2}
-                          className="border border-gray-200 bg-brand-700 text-white px-3 py-1.5 text-center font-semibold whitespace-nowrap"
-                        >
-                          <div>{c.title}</div>
-                          <div className="opacity-80 font-normal text-[10px]">
-                            {c.subeler.length} şube · {c.subeler.filter(s => s.adet > 0).length} satışlı · {c.subeler.filter(s => s.adet <= 0).length} girmeyen
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                    <tr>
-                      <th className="border border-gray-200 bg-gray-50 px-2 py-1 text-center text-gray-400">#</th>
-                      {satisGirmeyenColumns.map((c, i) => (
-                        <React.Fragment key={i}>
-                          <th className="border border-gray-200 bg-gray-100 px-3 py-1 text-left font-medium text-gray-600 min-w-[220px]">Cari / Şube</th>
-                          <th className="border border-gray-200 bg-gray-100 px-2 py-1 text-right font-medium text-gray-600 w-20">Satış Adedi</th>
-                        </React.Fragment>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Array.from({ length: Math.max(1, ...satisGirmeyenColumns.map(c => c.subeler.length)) }).map((_, ri) => (
-                      <tr key={ri} className={ri % 2 ? 'bg-gray-50/60' : ''}>
-                        <td className="border border-gray-200 px-2 py-1 text-center text-gray-400 tabular-nums">{ri + 1}</td>
-                        {satisGirmeyenColumns.map((c, ci) => {
-                          const s = c.subeler[ri]
-                          return (
-                            <React.Fragment key={ci}>
-                              <td className="border border-gray-200 px-3 py-1 whitespace-nowrap">
-                                {s ? [s.cariAdi.trim().split(/\s+/)[0], s.subeAdi].filter(Boolean).join(' ') : ''}
-                              </td>
-                              <td className="border border-gray-200 px-2 py-1 text-right tabular-nums text-gray-500">{s ? s.adet : ''}</td>
-                            </React.Fragment>
-                          )
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-brand-50 font-semibold text-gray-800">
-                      <td className="border border-gray-200 px-2 py-1.5 text-center text-gray-500">Σ</td>
-                      {satisGirmeyenColumns.map((c, ci) => (
-                        <React.Fragment key={ci}>
-                          <td className="border border-gray-200 px-3 py-1.5 whitespace-nowrap">
-                            Toplam <span className="font-normal text-gray-500">({c.subeler.length} şube)</span>
-                          </td>
-                          <td className="border border-gray-200 px-2 py-1.5 text-right tabular-nums">
-                            {c.subeler.reduce((t, s) => t + s.adet, 0).toLocaleString('tr-TR')}
-                          </td>
-                        </React.Fragment>
-                      ))}
-                    </tr>
-                  </tfoot>
-                </table>
+                <div className="flex items-start gap-3">
+                  {satisGirmeyenColumns.map((c, ci) => {
+                    const detaylar = c.subeler.map(s => sgStok.detay(s.subeKod))
+                    const topSatis = c.subeler.reduce((t, s) => t + s.adet, 0)
+                    const topBekleyen = detaylar.reduce((t, d) => t + (d.bekleyen ?? 0), 0)
+                    const topKalan = detaylar.reduce((t, d) => t + (d.kalan ?? 0), 0)
+                    const stokluSube = detaylar.filter(d => d.stokVar).length
+                    const sayi = (n: number | null) => (n === null ? '—' : n.toLocaleString('tr-TR'))
+                    return (
+                      <table key={ci} className="border-collapse text-xs shrink-0">
+                        <thead>
+                          <tr>
+                            <th colSpan={5} className="border border-gray-200 bg-brand-700 text-white px-3 py-1.5 text-center font-semibold whitespace-nowrap">
+                              <div>{c.title}</div>
+                              <div className="opacity-80 font-normal text-[10px]">
+                                {c.subeler.length} şube · {c.subeler.filter(s => s.adet > 0).length} satışlı · {c.subeler.filter(s => s.adet <= 0).length} girmeyen
+                              </div>
+                            </th>
+                          </tr>
+                          <tr>
+                            <th className="border border-gray-200 bg-gray-50 px-2 py-1 text-center text-gray-400 w-8">#</th>
+                            <th className="border border-gray-200 bg-gray-100 px-3 py-1 text-left font-medium text-gray-600 min-w-[200px]">Cari / Şube</th>
+                            <th className="border border-gray-200 bg-gray-100 px-2 py-1 text-right font-medium text-gray-600 w-16">Satış</th>
+                            <th className="border border-gray-200 bg-gray-100 px-2 py-1 text-right font-medium text-gray-600 w-16">Bekleyen</th>
+                            <th className="border border-gray-200 bg-gray-100 px-2 py-1 text-right font-medium text-gray-600 w-16">Kalan</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {c.subeler.map((s, ri) => {
+                            const d = detaylar[ri]
+                            const key = `${ci}|${s.subeKod}`
+                            const acik = sgAcik.has(key)
+                            const acilir = d.urunler.length > 0
+                            return (
+                              <React.Fragment key={key}>
+                                <tr className={clsx(ri % 2 ? 'bg-gray-50/60' : '', acilir && 'cursor-pointer hover:bg-brand-50/50')}
+                                  onClick={() => acilir && setSgAcik(prev => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n })}>
+                                  <td className="border border-gray-200 px-2 py-1 text-center text-gray-400 tabular-nums">{ri + 1}</td>
+                                  <td className="border border-gray-200 px-2 py-1 whitespace-nowrap">
+                                    <span className="inline-flex items-center gap-1">
+                                      {acilir
+                                        ? (acik ? <ChevronDown size={12} className="text-gray-400" /> : <ChevronRight size={12} className="text-gray-400" />)
+                                        : <span className="w-3" />}
+                                      {[s.cariAdi.trim().split(/\s+/)[0], s.subeAdi].filter(Boolean).join(' ')}
+                                    </span>
+                                  </td>
+                                  <td className="border border-gray-200 px-2 py-1 text-right tabular-nums text-gray-600">{s.adet}</td>
+                                  <td className="border border-gray-200 px-2 py-1 text-right tabular-nums text-gray-600">{sayi(d.bekleyen)}</td>
+                                  <td className={clsx('border border-gray-200 px-2 py-1 text-right tabular-nums font-medium',
+                                    d.kalan !== null && d.kalan < 0 ? 'text-red-600' : 'text-gray-800')}>{sayi(d.kalan)}</td>
+                                </tr>
+                                {acik && d.urunler.map(u => (
+                                  <tr key={`${key}|${u.stokKodu}`} className="bg-amber-50/40 text-[11px]">
+                                    <td className="border border-gray-200" />
+                                    <td className="border border-gray-200 pl-7 pr-2 py-0.5 max-w-[260px]">
+                                      <span className="font-mono text-gray-700">{u.stokKodu}</span>
+                                      {u.stokAdi && <span className="ml-1 text-gray-400 truncate">{u.stokAdi}</span>}
+                                    </td>
+                                    <td className="border border-gray-200 px-2 py-0.5 text-right tabular-nums text-gray-600">{u.satis || ''}</td>
+                                    <td className="border border-gray-200 px-2 py-0.5 text-right tabular-nums text-gray-600">{d.stokVar ? u.bekleyen : '—'}</td>
+                                    <td className={clsx('border border-gray-200 px-2 py-0.5 text-right tabular-nums',
+                                      d.stokVar && u.kalan < 0 ? 'text-red-600' : 'text-gray-700')}>{d.stokVar ? u.kalan : '—'}</td>
+                                  </tr>
+                                ))}
+                              </React.Fragment>
+                            )
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-brand-50 font-semibold text-gray-800">
+                            <td className="border border-gray-200 px-2 py-1.5 text-center text-gray-500">Σ</td>
+                            <td className="border border-gray-200 px-3 py-1.5 whitespace-nowrap">
+                              Toplam <span className="font-normal text-gray-500">({c.subeler.length} şube{stokluSube > 0 ? `, ${stokluSube} stoklu` : ''})</span>
+                            </td>
+                            <td className="border border-gray-200 px-2 py-1.5 text-right tabular-nums">{topSatis.toLocaleString('tr-TR')}</td>
+                            <td className="border border-gray-200 px-2 py-1.5 text-right tabular-nums">{stokluSube > 0 ? topBekleyen.toLocaleString('tr-TR') : '—'}</td>
+                            <td className="border border-gray-200 px-2 py-1.5 text-right tabular-nums">{stokluSube > 0 ? topKalan.toLocaleString('tr-TR') : '—'}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    )
+                  })}
+                </div>
               </div>
             )}
             <SayfaParametreleri
@@ -1946,7 +2101,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
               parametreler={[
                 { label: 'Dönem', value: `Üstteki "Dönem" seçimi (şu an: ${donemLabel(donem)}). Satışsızlık bu döneme göre hesaplanır.` },
                 { label: 'Atanmış şube evreni', value: '/api/merch-detay (export_merch_detay.php) — her şubenin sup/jr/bsy/cari ataması buradan gelir.' },
-                { label: 'Satış verisi', value: '/api/sellout (export_merch_satis.php) — seçili dönemde her şubenin satılan_adet toplamı. Satış Adedi sütununda gösterilir.' },
+                { label: 'Satış verisi', value: '/api/sellout (export_merch_satis.php) — seçili dönemde her şubenin satılan_adet toplamı. Satış sütununda gösterilir.' },
+                { label: 'Stok (Bekleyen / Kalan)', value: 'Yönetici "Stok yükle" ile şube + ürün bazında stok raporu yükler (milat tarihiyle). Bekleyen: rapordaki değer aynen. Kalan = milat stoğu + milattan sonraki sevkler ("Sevk yükle") − milattan sonraki satışlar. Şube adına tıklayınca ürün satırları açılır.' },
                 { label: 'Sıralama', value: 'Sorumlu kişinin TÜM şubeleri listelenir, satış adedine göre büyükten küçüğe (satış girmeyenler = 0 en altta), eşitlikte cari/şube adına göre.' },
                 { label: 'Başlık sayıları', value: 'Her kolon başlığında: toplam şube · kaçı satışlı (adet>0) · kaçı girmeyen (adet 0).' },
                 { label: 'Görünürlük', value: 'Admin: tüm süpervizörler (her biri bir kolon). Süpervizör: kendi şubeleri. Jr. Süpervizör: kendi şubeleri. BSY: kendine bağlı carilerin şubeleri (cari başına kolon).' },
