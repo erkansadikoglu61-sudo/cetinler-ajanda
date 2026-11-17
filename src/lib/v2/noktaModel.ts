@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { parseHtmlTableByHeader, fetchPhpHtml } from '@/lib/merchSatis'
 import { V2Nokta, V2Kisi, noktaAnahtari, sadeAd } from '@/lib/v2/nokta'
 import { namesMatch } from '@/lib/sellout'
+import { subeYetkileri } from '@/lib/subeYetki'
 
 const CARI_SUBE_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_bsy_cari_sube.php'
 const MERCH_URL     = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_detay.php'
@@ -96,6 +97,16 @@ export async function noktaModeli(yenile = false): Promise<NoktaModel> {
     else ekleKisi(n.bayiMerch, kisi)
     merchKayitlari.push({ ad, merchId: kisi.merchId ?? '', tip, cariAdi, subeAdi, iban: (r['IBAN'] ?? '').trim() })
   }
+
+  // Merch personeli olmayan şubelerin sorumluları (B2B cari-şube kolonları + elle atamalar)
+  try {
+    for (const y of await subeYetkileri(csRows)) {
+      const n = byKey.get(noktaAnahtari(y.sube_kod, y.cari_adi, y.sube_adi))
+      if (!n) continue
+      ekleAd(n.sups, y.sup_adi)
+      ekleAd(n.jrs, y.jr_adi)
+    }
+  } catch { /* ek yetkiler olmadan devam et */ }
 
   // Destek Personeli (Supabase field_personnel) — cari + şube adıyla eşleşir
   const eslesmeyenDestek: NoktaModel['eslesmeyenDestek'] = []

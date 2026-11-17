@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { parseHtmlTableByHeader, fetchPhpHtml } from '@/lib/merchSatis'
+import { subeYetkileri } from '@/lib/subeYetki'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,6 +8,7 @@ const CARI_SUBE_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_bsy_cari_s
 const MERCH_URL     = 'https://b2b.cetinlerltd.com.tr/phprapor/export_merch_detay.php'
 
 interface CariSube {
+  sube_kod: string   // ilk şube kodu (aynı ad birden çok kodla gelebilir)
   cari_adi: string
   sube_adi: string
   bsy_adi:  string
@@ -46,6 +48,16 @@ export async function GET() {
       }
     } catch { /* sup/jr olmadan devam et */ }
 
+    // Merch personeli olmayan şubeler: B2B cari-şube süpervizör kolonları + elle atamalar
+    try {
+      for (const y of await subeYetkileri(csRows)) {
+        let e = supJrMap.get(y.sube_kod)
+        if (!e) { e = { sups: new Set(), jrs: new Set() }; supJrMap.set(y.sube_kod, e) }
+        if (y.sup_adi) e.sups.add(y.sup_adi)
+        if (y.jr_adi) e.jrs.add(y.jr_adi)
+      }
+    } catch { /* ek yetkiler olmadan devam et */ }
+
     // 3. Birleştir — aynı cari + şube adına sahip farklı şube kodları
     //    (ör. HEDEFİM KÖRFEZ iki kodla) tek seçenek olur, ama sup/jr'ları birleşir.
     const byKey = new Map<string, CariSube>()
@@ -60,6 +72,7 @@ export async function GET() {
       let row = byKey.get(key)
       if (!row) {
         row = {
+          sube_kod,
           cari_adi,
           sube_adi,
           bsy_adi: (r['BSY_ADI'] ?? '').trim(),

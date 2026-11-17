@@ -693,6 +693,10 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
           subeAdi: a.sube_adi || sk, sup: a.sup_adi || '', jr: a.jr_adi || '',
           bsyKod: (a.bsy_kod || '').toUpperCase(), bsyAdi: a.bsy_adi || '', cariAdi: a.cari_adi || '', supMerch: false,
         })
+      } else if (a.kaynak === 'elle') {
+        // Yöneticinin elle ataması B2B'deki (ör. ayrılan) sorumlunun yerine geçer
+        if (a.sup_adi) cur.sup = a.sup_adi
+        if (a.jr_adi || a.sup_adi) cur.jr = a.jr_adi || ''
       } else if (!cur.sup && a.sup_adi) {
         cur.sup = a.sup_adi
         if (!cur.jr && a.jr_adi) cur.jr = a.jr_adi
@@ -738,7 +742,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     const sahipsiz = isAdmin
       ? assigned
           .filter(s => !visibleSups.some(sup => s.sup && namesMatch(s.sup, sup.full_name)))
-          .map(s => ({ cariAdi: s.cariAdi, subeAdi: s.subeAdi, sup: s.sup, jr: s.jr }))
+          .map(s => ({ subeKod: s.subeKod, cariAdi: s.cariAdi, subeAdi: s.subeAdi, sup: s.sup, jr: s.jr }))
       : []
     const adlar = new Set(assigned.map(s => `${normalizeName(s.cariAdi)}||${subeKompakt(s.subeAdi, s.cariAdi)}`))
     return { cols, sahipsiz, adlar }
@@ -746,7 +750,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const satisGirmeyenBase: SgColumn[] = satisGirmeyenHesap.cols
 
   // Yönetici: B2B cari-şube listesinde olup Şube Takibi'nde hiç kaydı olmayan şubeler
-  const [b2bSubeler, setB2bSubeler] = useState<{ cari_adi: string; sube_adi: string }[] | null>(null)
+  const [b2bSubeler, setB2bSubeler] = useState<{ sube_kod?: string; cari_adi: string; sube_adi: string }[] | null>(null)
   useEffect(() => {
     if (!isAdmin || subTab !== 'satisgirmeyen' || b2bSubeler) return
     fetch('/api/bsy-cari-sube').then(r => r.json()).then(j => setB2bSubeler(j.data ?? [])).catch(() => setB2bSubeler([]))
@@ -768,18 +772,59 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
 
   const sgGorunmeyen = useMemo(() => {
     if (!isAdmin) return []
-    const liste: { cariAdi: string; subeAdi: string; neden: string }[] = satisGirmeyenHesap.sahipsiz.map(s => ({
-      cariAdi: s.cariAdi, subeAdi: s.subeAdi,
+    const liste: { subeKod: string; cariAdi: string; subeAdi: string; neden: string }[] = satisGirmeyenHesap.sahipsiz.map(s => ({
+      subeKod: s.subeKod, cariAdi: s.cariAdi, subeAdi: s.subeAdi,
       neden: s.sup ? `B2B sorumlusu: ${s.sup} — uygulamada aktif süpervizör değil` : (s.jr ? `Yalnızca Jr tanımlı: ${s.jr}` : 'B2B\'de süpervizör tanımlı değil'),
     }))
     for (const r of b2bSubeler ?? []) {
       const k = `${normalizeName(r.cari_adi)}||${subeKompakt(r.sube_adi, r.cari_adi)}`
-      if (!satisGirmeyenHesap.adlar.has(k)) liste.push({ cariAdi: r.cari_adi, subeAdi: r.sube_adi, neden: 'B2B\'de bu şubede merch / sorumlu kaydı yok' })
+      if (!satisGirmeyenHesap.adlar.has(k)) liste.push({ subeKod: r.sube_kod ?? '', cariAdi: r.cari_adi, subeAdi: r.sube_adi, neden: 'B2B\'de bu şubede merch personeli yok' })
     }
     return liste
       .filter(x => !sgCari || x.cariAdi === sgCari)
       .sort((a, b) => a.cariAdi.localeCompare(b.cariAdi, 'tr') || a.subeAdi.localeCompare(b.subeAdi, 'tr'))
   }, [isAdmin, satisGirmeyenHesap, b2bSubeler, sgCari])
+
+  // ── Elle şube yetkisi (merch personeli olmayan şubeler) — yalnızca yönetici ──
+  const [elleAtamalar, setElleAtamalar] = useState<{ sube_kod: string; cari_adi: string | null; sube_adi: string | null; sup_adi: string | null; jr_adi: string | null }[]>([])
+  const [atamaSecim, setAtamaSecim] = useState<Record<string, { sup: string; jr: string }>>({})
+  const [atamaHata, setAtamaHata] = useState('')
+  const atamaYenile = useCallback(async () => {
+    try {
+      const r = await authFetch('/api/sube-yetki')
+      const j = await r.json()
+      if (!r.ok) { setAtamaHata(j.tabloYok ? 'Şube yetki tablosu henüz oluşturulmadı (SQL çalıştırılmalı).' : (j.error || '')); return }
+      setAtamaHata('')
+      setElleAtamalar(j.atamalar ?? [])
+    } catch { /* yoksay */ }
+  }, [])
+  useEffect(() => { if (isAdmin && subTab === 'satisgirmeyen') atamaYenile() }, [isAdmin, subTab, atamaYenile])
+  const atamaSonrasi = useCallback(async () => {
+    await atamaYenile()
+    try {
+      const d = await (await fetch('/api/merch-detay')).json()
+      setMerchDetayData(d.data || [])
+      setSubeAtamalari(d.subeAtamalari || [])
+    } catch { /* yoksay */ }
+  }, [atamaYenile])
+  const subeAta = async (x: { subeKod: string; cariAdi: string; subeAdi: string }) => {
+    const sec = atamaSecim[x.subeKod]
+    if (!sec?.sup && !sec?.jr) return
+    const r = await authFetch('/api/sube-yetki', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sube_kod: x.subeKod, cari_adi: x.cariAdi, sube_adi: x.subeAdi, sup_adi: sec.sup, jr_adi: sec.jr }),
+    })
+    if (!r.ok) { setAtamaHata((await r.json()).error || 'Atanamadı'); return }
+    await atamaSonrasi()
+  }
+  const atamaKaldir = async (subeKod: string) => {
+    if (!confirm('Bu şube ataması kaldırılsın mı?')) return
+    const r = await authFetch('/api/sube-yetki', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sube_kod: subeKod }),
+    })
+    if (!r.ok) { setAtamaHata((await r.json()).error || 'Kaldırılamadı'); return }
+    await atamaSonrasi()
+  }
 
   // ── Şube stok (milat) + sevk → Bekleyen / Kalan ─────────────
   // Kalan = milat stoğu + teslim edilmemiş (sayıma girmemiş) sevkler − milattan SONRAKİ satışlar.
@@ -2142,25 +2187,63 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 </div>
               </div>
             )}
-            {isAdmin && sgGorunmeyen.length > 0 && (
+            {isAdmin && (sgGorunmeyen.length > 0 || elleAtamalar.length > 0 || atamaHata) && (
               <details className="mt-3 mx-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
                 <summary className="cursor-pointer font-medium">
-                  Tabloda görünmeyen şubeler ({sgGorunmeyen.length}) — yalnızca yönetici
+                  Tabloda görünmeyen şubeler ({sgGorunmeyen.length}){elleAtamalar.length > 0 ? ` · elle atanan ${elleAtamalar.length}` : ''} — yalnızca yönetici
                 </summary>
                 <p className="mt-1 text-amber-800/80">
-                  Şubeler B2B&apos;deki merch / süpervizör atamasıyla kolonlara yerleşir. Aşağıdakilerin sorumlusu bulunamadı;
-                  B2B&apos;de şubeye süpervizör (ya da merch) atanınca kendiliğinden ilgili kolona gelir.
+                  Şubeler B2B&apos;deki merch kayıtlarındaki süpervizör / Jr ile kolonlara yerleşir; merch personeli olmayan şubeler
+                  B2B raporlarına düşmediği için görünmez. Buradan süpervizör (ve istenirse Jr) atayın — Şube Takibi,
+                  görev penceresi ve v2 Şubelerim&apos;de geçerli olur.
                 </p>
+                {atamaHata && <p className="mt-1 text-red-700">{atamaHata}</p>}
                 <table className="mt-1 w-full">
                   <tbody>
-                    {sgGorunmeyen.map((x, i) => (
-                      <tr key={i} className="border-t border-amber-100">
-                        <td className="py-0.5 pr-3 whitespace-nowrap">{x.cariAdi.trim().split(/\s+/)[0]} {x.subeAdi}</td>
-                        <td className="py-0.5 text-amber-800/80">{x.neden}</td>
-                      </tr>
-                    ))}
+                    {sgGorunmeyen.map((x, i) => {
+                      const sec = atamaSecim[x.subeKod] ?? { sup: '', jr: '' }
+                      const supP = visibleSups.find(p => p.full_name === sec.sup)
+                      const jrSecenek = supP ? jrsOf(supP.id) : visibleJrs
+                      return (
+                        <tr key={i} className="border-t border-amber-100 align-middle">
+                          <td className="py-1 pr-3 whitespace-nowrap">{x.cariAdi.trim().split(/\s+/)[0]} {x.subeAdi}</td>
+                          <td className="py-1 pr-3 text-amber-800/80">{x.neden}</td>
+                          <td className="py-1 whitespace-nowrap">
+                            {x.subeKod ? (
+                              <span className="inline-flex items-center gap-1">
+                                <select value={sec.sup} onChange={e => setAtamaSecim(m => ({ ...m, [x.subeKod]: { sup: e.target.value, jr: '' } }))}
+                                  className="rounded border border-amber-300 bg-white px-1 py-0.5 text-[11px]">
+                                  <option value="">Süpervizör…</option>
+                                  {visibleSups.map(p => <option key={p.id} value={p.full_name}>{p.full_name}</option>)}
+                                </select>
+                                <select value={sec.jr} onChange={e => setAtamaSecim(m => ({ ...m, [x.subeKod]: { ...sec, jr: e.target.value } }))}
+                                  className="rounded border border-amber-300 bg-white px-1 py-0.5 text-[11px]">
+                                  <option value="">Jr (yok)</option>
+                                  {jrSecenek.map(p => <option key={p.id} value={p.full_name}>{p.full_name}</option>)}
+                                </select>
+                                <button onClick={() => subeAta(x)} disabled={!sec.sup && !sec.jr}
+                                  className="rounded bg-brand-500 px-2 py-0.5 text-[11px] font-medium text-white disabled:opacity-40">Ata</button>
+                              </span>
+                            ) : <span className="text-amber-800/60">şube kodu yok</span>}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
+                {elleAtamalar.length > 0 && (
+                  <div className="mt-2 border-t border-amber-200 pt-1">
+                    <p className="font-medium">Elle atanan şubeler</p>
+                    <ul>
+                      {elleAtamalar.map(a => (
+                        <li key={a.sube_kod} className="flex items-center gap-2 py-0.5">
+                          <span className="flex-1">{(a.cari_adi ?? '').trim().split(/\s+/)[0]} {a.sube_adi} → {[a.sup_adi, a.jr_adi].filter(Boolean).join(' / ')}</span>
+                          <button onClick={() => atamaKaldir(a.sube_kod)} className="text-red-600 hover:underline">kaldır</button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </details>
             )}
             <SayfaParametreleri

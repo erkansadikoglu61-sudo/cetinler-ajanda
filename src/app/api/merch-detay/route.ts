@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { parseHtmlTableByHeader, fetchPhpHtml } from '@/lib/merchSatis'
 import { subeleriEsle } from '@/lib/subeStok'
+import { subeYetkileri } from '@/lib/subeYetki'
 
 // Merch personeli olmayan ama sorumlusu tanımlı şubeler (Şube Takibi evreni için)
 interface SubeAtama {
   cari_adi: string; sube_kod: string; sube_adi: string
   sup_adi: string; jr_adi: string; bsy_kod: string; bsy_adi: string
-  kaynak: 'b2b' | 'destek'
+  kaynak: 'b2b' | 'destek' | 'elle'
 }
 
 const CARI_SUBE_URL = 'https://b2b.cetinlerltd.com.tr/phprapor/export_bsy_cari_sube.php'
@@ -121,30 +122,33 @@ export async function GET(req: Request) {
         })
       }
 
-      // Destek personeli kayıtlarının şubesini B2B şube koduna eşle (Şube Takibi'nde
-      // yalnızca destek personeliyle bağlı şubeler de sorumlusunun altında görünsün)
-      try {
-        const destekler = (destekData ?? []).filter(d => d.sube_adi && (d.sup_adi))
-        if (destekler.length) {
-          const { rows: csRows } = parseHtmlTableByHeader(await fetchPhpHtml(CARI_SUBE_URL))
-          const adaylar = csRows
-            .map(r => ({ subeKod: (r['SUBE_KOD'] ?? '').trim(), cariAdi: (r['CARI_ADI'] ?? '').trim(), subeAdi: (r['SUBE_ADI'] ?? '').trim(), bsyKod: (r['BSY_KODU'] ?? '').trim(), bsyAdi: (r['BSY_ADI'] ?? '').trim() }))
-            .filter(a => a.subeKod)
-          const eslesme = subeleriEsle(destekler.map(d => ({ cariAdi: d.cari_adi || '', subeAdi: d.sube_adi || '' })), adaylar)
-          destekler.forEach((d, i) => {
-            const a = eslesme[i] as (typeof adaylar)[number] | null
-            if (!a) return
-            subeAtamalari.push({
-              cari_adi: a.cariAdi, sube_kod: a.subeKod, sube_adi: a.subeAdi,
-              sup_adi: d.sup_adi || '', jr_adi: '', bsy_kod: a.bsyKod, bsy_adi: a.bsyAdi || d.bsy_adi || '', kaynak: 'destek',
-            })
-          })
-        }
-      } catch (e) {
-        console.warn('Destek şube eşleşmesi yapılamadı:', e)
-      }
     } catch (dbError) {
       console.warn('Destek Personeli fetch hatası:', dbError)
+    }
+
+    // Merch personeli olmayan şubelerin sorumluları:
+    //  - B2B cari-şube raporundaki süpervizör kolonları (eklenirse) ve elle atamalar (sube_yetki)
+    //  - Supabase destek personeli kayıtları (şube adı B2B şube koduna eşlenir)
+    try {
+      const { rows: csRows } = parseHtmlTableByHeader(await fetchPhpHtml(CARI_SUBE_URL))
+      for (const y of await subeYetkileri(csRows)) subeAtamalari.push({ ...y })
+      const destekler = [...merchMap.values()].filter(m => m.merch_grubu === 'Destek Personeli' && !m.sube_kod && m.sube_adi && m.sup_adi)
+      if (destekler.length) {
+        const adaylar = csRows
+          .map(r => ({ subeKod: (r['SUBE_KOD'] ?? '').trim(), cariAdi: (r['CARI_ADI'] ?? '').trim(), subeAdi: (r['SUBE_ADI'] ?? '').trim(), bsyKod: (r['BSY_KODU'] ?? '').trim(), bsyAdi: (r['BSY_ADI'] ?? '').trim() }))
+          .filter(a => a.subeKod)
+        const eslesme = subeleriEsle(destekler.map(d => ({ cariAdi: d.cari_adi, subeAdi: d.sube_adi })), adaylar)
+        destekler.forEach((d, i) => {
+          const a = eslesme[i] as (typeof adaylar)[number] | null
+          if (!a) return
+          subeAtamalari.push({
+            cari_adi: a.cariAdi, sube_kod: a.subeKod, sube_adi: a.subeAdi,
+            sup_adi: d.sup_adi, jr_adi: '', bsy_kod: a.bsyKod, bsy_adi: a.bsyAdi || d.bsy_adi, kaynak: 'destek',
+          })
+        })
+      }
+    } catch (e) {
+      console.warn('Şube yetkileri alınamadı:', e)
     }
 
     const merchList = Array.from(merchMap.values())
