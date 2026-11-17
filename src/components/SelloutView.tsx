@@ -4,7 +4,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { authFetch } from '@/lib/authFetch'
 import { RefreshCw, X, Save, Target, ChevronDown, ChevronRight, FileDown, Upload, Truck } from 'lucide-react'
 import { SubeStokYukle, type SevkYukleme } from '@/components/SubeStokYukle'
-import { isoTarih } from '@/lib/subeStok'
+import { isoTarih, subeKompakt } from '@/lib/subeStok'
 import * as XLSX from 'xlsx'
 import clsx from 'clsx'
 
@@ -374,6 +374,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const [adetPrimData, setAdetPrimData] = useState<{ stokKodu: string; bayiMerch: number | null; kosulluDestek: number | null; kategori: string | null }[]>([])
   const [ozelPrimData, setOzelPrimData] = useState<{ stok_kodu: string[] | null; grup_kodu: string[] | null; cari_adi: string[] | null; sube_adi: string[] | null; bayi_merch: number | null; kosullu_destek: number | null; prim_carpan: number | null; tarih_baslangic: string | null; tarih_bitis: string | null }[]>([])
   const [merchHedefData, setMerchHedefData] = useState<{ merch_name: string; grup: string; hedef: number }[]>([])
+  // Merch personeli olmayan ama sorumlusu tanımlı şubeler (B2B şube satırı ya da destek personeli)
+  const [subeAtamalari, setSubeAtamalari] = useState<{ cari_adi: string; sube_kod: string; sube_adi: string; sup_adi: string; jr_adi: string; bsy_kod: string; bsy_adi: string; kaynak: string }[]>([])
   const [merchDetayData, setMerchDetayData] = useState<{ merch_adi: string; merch_grubu: string; sup_adi: string; jr_adi: string; cari_adi: string; cari_kod: string; sube_adi: string; sube_kod: string; bsy_kod: string; bsy_adi: string }[]>([])
   const [destekFlags, setDestekFlags] = useState<Record<string, boolean>>({})
   const [gizleFlags,  setGizleFlags]  = useState<Record<string, boolean>>({})
@@ -422,7 +424,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     if (!active) return
     fetch('/api/merch-detay')
       .then(r => r.json())
-      .then(d => setMerchDetayData(d.data || []))
+      .then(d => { setMerchDetayData(d.data || []); setSubeAtamalari(d.subeAtamalari || []) })
       .catch(() => setMerchDetayData([]))
   }, [active])
 
@@ -631,7 +633,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   //   admin → her süpervizör bir kolon · sup/jr → kendi şubeleri ·
   //   bsy → kendine bağlı carilerin şubeleri (cari başına kolon).
   interface SgColumn { title: string; subeler: { subeKod: string; subeAdi: string; cariAdi: string; adet: number }[] }
-  const satisGirmeyenBase = useMemo<SgColumn[]>(() => {
+  const satisGirmeyenHesap = useMemo(() => {
     // Dönemde şube başına toplam satış adedi
     const adetBySube = new Map<string, number>()
     periodRows.forEach(r => {
@@ -681,6 +683,22 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       }
     })
 
+    // Merch personeli olmayan şubeler: merch satırı yoksa ya da sorumlusu boşsa atamadan doldur
+    subeAtamalari.forEach(a => {
+      const sk = (a.sube_kod || '').trim()
+      if (!sk) return
+      const cur = subeMap.get(sk)
+      if (!cur) {
+        subeMap.set(sk, {
+          subeAdi: a.sube_adi || sk, sup: a.sup_adi || '', jr: a.jr_adi || '',
+          bsyKod: (a.bsy_kod || '').toUpperCase(), bsyAdi: a.bsy_adi || '', cariAdi: a.cari_adi || '', supMerch: false,
+        })
+      } else if (!cur.sup && a.sup_adi) {
+        cur.sup = a.sup_adi
+        if (!cur.jr && a.jr_adi) cur.jr = a.jr_adi
+      }
+    })
+
     // Atanmış tüm şubeler + dönem satış adedi (satışsız = 0)
     const assigned = [...subeMap.entries()]
       .map(([sk, v]) => ({ ...v, subeKod: sk, adet: adetBySube.get(sk) ?? 0 }))
@@ -716,8 +734,23 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
         if (subeler.length > 0) cols.push({ title: sup.full_name, subeler })
       })
     }
-    return cols
-  }, [periodRows, merchDetayData, visibleSups, isBsy, isJr, isSup, currentProfile.full_name])
+    // Yönetici kontrolü: hiçbir kolona girmeyen şubeler (sorumlusu yok / aktif süpervizör değil)
+    const sahipsiz = isAdmin
+      ? assigned
+          .filter(s => !visibleSups.some(sup => s.sup && namesMatch(s.sup, sup.full_name)))
+          .map(s => ({ cariAdi: s.cariAdi, subeAdi: s.subeAdi, sup: s.sup, jr: s.jr }))
+      : []
+    const adlar = new Set(assigned.map(s => `${normalizeName(s.cariAdi)}||${subeKompakt(s.subeAdi, s.cariAdi)}`))
+    return { cols, sahipsiz, adlar }
+  }, [periodRows, merchDetayData, subeAtamalari, visibleSups, isBsy, isJr, isSup, isAdmin, currentProfile.full_name])
+  const satisGirmeyenBase: SgColumn[] = satisGirmeyenHesap.cols
+
+  // Yönetici: B2B cari-şube listesinde olup Şube Takibi'nde hiç kaydı olmayan şubeler
+  const [b2bSubeler, setB2bSubeler] = useState<{ cari_adi: string; sube_adi: string }[] | null>(null)
+  useEffect(() => {
+    if (!isAdmin || subTab !== 'satisgirmeyen' || b2bSubeler) return
+    fetch('/api/bsy-cari-sube').then(r => r.json()).then(j => setB2bSubeler(j.data ?? [])).catch(() => setB2bSubeler([]))
+  }, [isAdmin, subTab, b2bSubeler])
 
   // Şube Takibi cari filtresi — seçenekler kullanıcının gördüğü şubelerden
   const [sgCari, setSgCari] = useState('')
@@ -732,6 +765,21 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     // Çok kolonlu görünümde (admin/BSY) carinin şubesi olmayan kolonlar gizlenir
     return cols.length > 1 ? cols.filter(c => c.subeler.length > 0) : cols
   }, [satisGirmeyenBase, sgCari])
+
+  const sgGorunmeyen = useMemo(() => {
+    if (!isAdmin) return []
+    const liste: { cariAdi: string; subeAdi: string; neden: string }[] = satisGirmeyenHesap.sahipsiz.map(s => ({
+      cariAdi: s.cariAdi, subeAdi: s.subeAdi,
+      neden: s.sup ? `B2B sorumlusu: ${s.sup} — uygulamada aktif süpervizör değil` : (s.jr ? `Yalnızca Jr tanımlı: ${s.jr}` : 'B2B\'de süpervizör tanımlı değil'),
+    }))
+    for (const r of b2bSubeler ?? []) {
+      const k = `${normalizeName(r.cari_adi)}||${subeKompakt(r.sube_adi, r.cari_adi)}`
+      if (!satisGirmeyenHesap.adlar.has(k)) liste.push({ cariAdi: r.cari_adi, subeAdi: r.sube_adi, neden: 'B2B\'de bu şubede merch / sorumlu kaydı yok' })
+    }
+    return liste
+      .filter(x => !sgCari || x.cariAdi === sgCari)
+      .sort((a, b) => a.cariAdi.localeCompare(b.cariAdi, 'tr') || a.subeAdi.localeCompare(b.subeAdi, 'tr'))
+  }, [isAdmin, satisGirmeyenHesap, b2bSubeler, sgCari])
 
   // ── Şube stok (milat) + sevk → Bekleyen / Kalan ─────────────
   // Kalan = milat stoğu + teslim edilmemiş (sayıma girmemiş) sevkler − milattan SONRAKİ satışlar.
@@ -2093,6 +2141,27 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                   })}
                 </div>
               </div>
+            )}
+            {isAdmin && sgGorunmeyen.length > 0 && (
+              <details className="mt-3 mx-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                <summary className="cursor-pointer font-medium">
+                  Tabloda görünmeyen şubeler ({sgGorunmeyen.length}) — yalnızca yönetici
+                </summary>
+                <p className="mt-1 text-amber-800/80">
+                  Şubeler B2B&apos;deki merch / süpervizör atamasıyla kolonlara yerleşir. Aşağıdakilerin sorumlusu bulunamadı;
+                  B2B&apos;de şubeye süpervizör (ya da merch) atanınca kendiliğinden ilgili kolona gelir.
+                </p>
+                <table className="mt-1 w-full">
+                  <tbody>
+                    {sgGorunmeyen.map((x, i) => (
+                      <tr key={i} className="border-t border-amber-100">
+                        <td className="py-0.5 pr-3 whitespace-nowrap">{x.cariAdi.trim().split(/\s+/)[0]} {x.subeAdi}</td>
+                        <td className="py-0.5 text-amber-800/80">{x.neden}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
             )}
             <SayfaParametreleri
               visible={isAdmin}
