@@ -7,7 +7,8 @@ import { subeleriEsle, type StokSatir } from '@/lib/subeStok'
 // Sellout ▸ Şube Takibi — şube stok (milat) ve sevk kayıtları.
 // GET    → { stok, sevk, yuklemeler }  (giriş yapmış herkes; ekran kendi şubelerini süzer)
 // POST   { tip: 'stok' | 'sevk', satirlar, milat?, tarih?, cari?, onizleme? }  (yalnızca yönetici)
-//        stok: dosyadaki şubelerin eski stok kayıtları silinir, yenileri yazılır (milat = seçilen tarih)
+//        stok: dosyadaki şubelerin eski stok kayıtları silinir, yenileri yazılır (milat = seçilen tarih);
+//              önizleme bu şubelerin açık sevklerini döner, sayimdaSevkler ile teslim edilenler işaretlenir
 //        sevk: yeni yükleme olarak eklenir (tarih kolonu yoksa seçilen tarih)
 //        onizleme: true → yazmadan eşleşme özeti döner
 // DELETE { yukleme_id } → bir sevk yüklemesini geri al (yalnızca yönetici)
@@ -47,7 +48,14 @@ export async function GET(req: Request) {
   const sb = istemci(req)
   const [stok, sevk] = await Promise.all([
     hepsi(( b, s) => sb.from('sube_stok').select('sube_key, stok_kodu, stok_adi, kalan, bekleyen, milat').range(b, s)),
-    hepsi((b, s) => sb.from('sube_sevk').select('yukleme_id, sube_key, stok_kodu, stok_adi, adet, tarih, created_at').range(b, s)),
+    (async () => {
+      // sayimda kolonu henüz eklenmemişse onsuz oku (tüm sevkler açık sayılır)
+      const r = await hepsi((b, s) => sb.from('sube_sevk').select('yukleme_id, sube_key, stok_kodu, stok_adi, adet, tarih, created_at, sayimda').range(b, s))
+      if (r.error && /sayimda/.test(r.error.message)) {
+        return hepsi((b, s) => sb.from('sube_sevk').select('yukleme_id, sube_key, stok_kodu, stok_adi, adet, tarih, created_at').range(b, s))
+      }
+      return r
+    })(),
   ])
   if (stok.error) return tabloYok(stok.error.code) ? tabloHatasi() : NextResponse.json({ error: stok.error.message }, { status: 500 })
   if (sevk.error) return tabloYok(sevk.error.code) ? tabloHatasi() : NextResponse.json({ error: sevk.error.message }, { status: 500 })
@@ -72,6 +80,7 @@ export async function POST(req: Request) {
   if (user instanceof NextResponse) return user
   const b = await req.json().catch(() => null) as {
     tip?: 'stok' | 'sevk'; satirlar?: StokSatir[]; milat?: string; tarih?: string; cari?: string; onizleme?: boolean
+    sayimdaSevkler?: { yukleme_id: string; sube_key: string }[]
   } | null
   const tarihOk = (t?: string) => !!t && /^\d{4}-\d{2}-\d{2}$/.test(t)
   if (!b || (b.tip !== 'stok' && b.tip !== 'sevk') || !Array.isArray(b.satirlar) || b.satirlar.length === 0) {
@@ -123,9 +132,32 @@ export async function POST(req: Request) {
     oncekiBelgeler,
     eslesmeyen: [...eslesmeyen.entries()].map(([sube, satir]) => ({ sube, satir })).sort((x, y) => y.satir - x.satir),
   }
-  if (b.onizleme || eslesen.length === 0) return NextResponse.json({ ok: true, onizleme: true, ...ozet })
-
   const sb = istemci(req)
+
+  // Stok yüklemesi: bu şubelerin açık (sayıma girmemiş) sevkleri — kullanıcı teslim edilenleri işaretler
+  let acikSevkler: { yukleme_id: string; sube_key: string; sube_adi: string; belge_no: string | null; tarih: string; adet: number }[] = []
+  if (b.tip === 'stok' && eslesen.length) {
+    const subeler = [...new Set(eslesen.map(e => e.sube_key))]
+    const grup = new Map<string, (typeof acikSevkler)[number]>()
+    for (let i = 0; i < subeler.length; i += 200) {
+      let r = await sb.from('sube_sevk').select('yukleme_id, sube_key, sube_adi, belge_no, tarih, adet, sayimda')
+        .in('sube_key', subeler.slice(i, i + 200)).eq('sayimda', false)
+      if (r.error && /sayimda|belge_no/.test(r.error.message)) {
+        r = await sb.from('sube_sevk').select('yukleme_id, sube_key, sube_adi, tarih, adet').in('sube_key', subeler.slice(i, i + 200)) as typeof r
+      }
+      for (const x of (r.data ?? []) as { yukleme_id: string; sube_key: string; sube_adi: string; belge_no?: string | null; tarih: string; adet: number }[]) {
+        const k = `${x.yukleme_id}|${x.sube_key}`
+        const g = grup.get(k) ?? { yukleme_id: x.yukleme_id, sube_key: x.sube_key, sube_adi: x.sube_adi, belge_no: x.belge_no ?? null, tarih: x.tarih, adet: 0 }
+        g.adet += x.adet
+        if (x.tarih < g.tarih) g.tarih = x.tarih
+        grup.set(k, g)
+      }
+    }
+    acikSevkler = [...grup.values()].sort((a, c) => a.sube_adi.localeCompare(c.sube_adi, 'tr') || a.tarih.localeCompare(c.tarih))
+  }
+
+  if (b.onizleme || eslesen.length === 0) return NextResponse.json({ ok: true, onizleme: true, ...ozet, acikSevkler })
+
   if (b.tip === 'stok') {
     // Aynı şube + ürün dosyada birden çok satırsa toplanır
     const birlesik = new Map<string, { sube_key: string; cari_adi: string; sube_adi: string; stok_kodu: string; stok_adi: string | null; kalan: number; bekleyen: number }>()
@@ -145,6 +177,12 @@ export async function POST(req: Request) {
     for (let i = 0; i < satirlar.length; i += 1000) {
       const { error } = await sb.from('sube_stok').insert(satirlar.slice(i, i + 1000))
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    // Teslim edilip sayıma giren sevkler artık stoğa ayrıca eklenmez
+    for (const x of b.sayimdaSevkler ?? []) {
+      if (!x?.yukleme_id || !subeler.includes(x.sube_key)) continue
+      const { error } = await sb.from('sube_sevk').update({ sayimda: true }).eq('yukleme_id', x.yukleme_id).eq('sube_key', x.sube_key)
+      if (error) return NextResponse.json({ error: 'Sevk işaretlenemedi: ' + error.message }, { status: 500 })
     }
   } else {
     const yukleme_id = crypto.randomUUID()
@@ -166,7 +204,7 @@ export async function POST(req: Request) {
       if (error) return tabloYok(error.code) ? tabloHatasi() : NextResponse.json({ error: error.message }, { status: 500 })
     }
   }
-  return NextResponse.json({ ok: true, onizleme: false, ...ozet })
+  return NextResponse.json({ ok: true, onizleme: false, ...ozet, acikSevkler: [] })
 }
 
 export async function DELETE(req: Request) {

@@ -18,6 +18,7 @@ interface Ozet {
   toplamAdet: number
   tarihsiz: number
   oncekiBelgeler?: string[]
+  acikSevkler?: { yukleme_id: string; sube_key: string; sube_adi: string; belge_no: string | null; tarih: string; adet: number }[]
   eslesmeyen: { sube: string; satir: number }[]
   onizleme: boolean
 }
@@ -63,6 +64,7 @@ export function SubeStokYukle({ tip, cariler, varsayilanCari, yuklemeler, onClos
   const [ozet, setOzet] = useState<Ozet | null>(null)
   const [hata, setHata] = useState('')
   const [islem, setIslem] = useState(false)
+  const [teslimEdilen, setTeslimEdilen] = useState<Set<string>>(new Set())
   const ocrRef = useRef<Promise<OcrWorker> | null>(null)
 
   useEffect(() => () => { ocrRef.current?.then(w => w.terminate()).catch(() => {}) }, [])
@@ -146,6 +148,9 @@ export function SubeStokYukle({ tip, cariler, varsayilanCari, yuklemeler, onClos
         body: JSON.stringify({
           tip, satirlar, cari: cari || undefined, onizleme,
           ...(tip === 'stok' ? { milat: tarih } : { tarih }),
+          ...(tip === 'stok' && !onizleme ? {
+            sayimdaSevkler: [...teslimEdilen].map(k => { const [yukleme_id, sube_key] = k.split('|'); return { yukleme_id, sube_key } }),
+          } : {}),
         }),
       })
       const j = await r.json()
@@ -215,7 +220,7 @@ export function SubeStokYukle({ tip, cariler, varsayilanCari, yuklemeler, onClos
 
         <p className="text-xs text-gray-500">
           {tip === 'stok'
-            ? 'Excel: şube (veya şube kodu), stok/ürün kodu, kalan ve bekleyen kolonları. Dosyadaki şubelerin önceki stok kayıtları bu dosyayla değiştirilir; seçtiğiniz tarih milat olur (o günden SONRAKİ satış ve sevkler hesaba katılır).'
+            ? 'Excel: şube (veya şube kodu), stok/ürün kodu, kalan ve bekleyen kolonları. Dosyadaki şubelerin önceki stok kayıtları bu dosyayla değiştirilir; seçtiğiniz tarih milat olur (o günden SONRAKİ satışlar düşülür). Teslim edilmemiş sevkler stoğa eklenir; bu sayıma girmiş olanları önizlemede işaretleyin.'
             : mod === 'gorsel'
               ? 'Sipariş onay e-postasının ekran görüntüsünü seçin, sürükleyin ya da Ctrl+V ile yapıştırın (birden çok olabilir). Cari, şube, onay tarihi, stok kodu ve adetler okunur; kaydetmeden önce düzeltebilirsiniz. Aynı sipariş no ikinci kez sayılmaz.'
               : 'Excel: şube (veya şube kodu), stok/ürün kodu ve adet kolonları; tarih kolonu yoksa aşağıdaki tarih kullanılır.'}
@@ -347,6 +352,28 @@ export function SubeStokYukle({ tip, cariler, varsayilanCari, yuklemeler, onClos
                 </ul>
                 <p className="mt-1 text-gray-500">Şube adını B2B&apos;deki gibi düzeltin (ör. &quot;ADANA&quot; → cari seçiliyse yeterli) ya da üstten cariyi seçip tekrar eşleştirin.</p>
               </details>
+            )}
+            {tip === 'stok' && ozet.onizleme && (ozet.acikSevkler?.length ?? 0) > 0 && (
+              <div className="mt-1 rounded-lg border border-amber-200 bg-white p-2 space-y-1">
+                <p className="font-medium text-gray-700">Bu şubelerin teslim edilmemiş sevkleri ({ozet.acikSevkler!.length})</p>
+                <p className="text-gray-500">İşaretlemedikleriniz sayımda yok kabul edilir ve stoğa eklenmeye devam eder. Teslim edilip bu sayıma girenleri işaretleyin.</p>
+                <ul className="max-h-40 overflow-y-auto divide-y divide-gray-50">
+                  {ozet.acikSevkler!.map(a => {
+                    const k = `${a.yukleme_id}|${a.sube_key}`
+                    return (
+                      <li key={k} className="py-1">
+                        <label className="flex items-center gap-2">
+                          <input type="checkbox" checked={teslimEdilen.has(k)}
+                            onChange={e => setTeslimEdilen(prev => { const n = new Set(prev); if (e.target.checked) n.add(k); else n.delete(k); return n })} />
+                          <span className="flex-1 text-gray-700">{a.sube_adi} · {trTarih(a.tarih)}{a.belge_no ? ` · ${a.belge_no}` : ''}</span>
+                          <span className="tabular-nums text-gray-500">{a.adet} adet</span>
+                          <span className="text-[10px] text-gray-400">teslim edildi</span>
+                        </label>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
             )}
             {!ozet.onizleme && <p className="font-medium text-green-700">Kaydedildi ✓</p>}
           </div>

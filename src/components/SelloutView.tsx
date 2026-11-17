@@ -734,10 +734,11 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   }, [satisGirmeyenBase, sgCari])
 
   // ── Şube stok (milat) + sevk → Bekleyen / Kalan ─────────────
-  // Kalan = milat stoğu + milattan SONRAKİ sevkler − milattan SONRAKİ satışlar.
+  // Kalan = milat stoğu + teslim edilmemiş (sayıma girmemiş) sevkler − milattan SONRAKİ satışlar.
+  // Sevk tarihine bakılmaz: yüklenen sevk, yeni stok sayımında "teslim edildi" işaretlenene kadar eklenir.
   // Bekleyen: yüklenen stok raporundaki değer (bir sonraki yüklemeye kadar sabit).
   interface StokKaydi { sube_key: string; stok_kodu: string; stok_adi: string | null; kalan: number; bekleyen: number; milat: string }
-  interface SevkKaydi { sube_key: string; stok_kodu: string; stok_adi: string | null; adet: number; tarih: string }
+  interface SevkKaydi { sube_key: string; stok_kodu: string; stok_adi: string | null; adet: number; tarih: string; sayimda?: boolean }
   const [stokVeri, setStokVeri] = useState<{ stok: StokKaydi[]; sevk: SevkKaydi[]; yuklemeler: SevkYukleme[] } | null>(null)
   const [stokHata, setStokHata] = useState('')
   const [stokYukle, setStokYukle] = useState<'stok' | 'sevk' | null>(null)
@@ -771,11 +772,11 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       if (!u.stokAdi && stokAdi) u.stokAdi = stokAdi
       return u
     }
-    // Sevkler (milattan sonra) → Kalan'a eklenir
+    // Teslim edilmemiş sevkler → Kalan'a eklenir
     for (const r of stokVeri?.sevk ?? []) {
       const sk = kod(r.sube_key)
       const e = stokBySube.get(sk)
-      if (!e || r.tarih <= e.milat) continue
+      if (!e || r.sayimda) continue
       urunAl(sk, kod(r.stok_kodu), r.stok_adi ?? '').kalan += r.adet
     }
     // Satışlar (milattan sonra) → Kalan'dan düşer
@@ -1975,7 +1976,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
               ) : sgStok.subeSayisi > 0 ? (
                 <span>
                   Stok milatı: <b>{sgStok.milatlar.map(m => m.split('-').reverse().join('.')).join(', ')}</b> · {sgStok.subeSayisi} şube
-                  {' '}· Kalan = milat stoğu + sonraki sevkler − sonraki satışlar
+                  {' '}· Kalan = stok + teslim edilmemiş sevkler − milattan sonraki satışlar
                 </span>
               ) : stokVeri ? (
                 <span>Henüz stok yüklenmedi.</span>
@@ -2101,7 +2102,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                 { label: 'Dönem', value: `Üstteki "Dönem" seçimi (şu an: ${donemLabel(donem)}). Satışsızlık bu döneme göre hesaplanır.` },
                 { label: 'Atanmış şube evreni', value: '/api/merch-detay (export_merch_detay.php) — her şubenin sup/jr/bsy/cari ataması buradan gelir.' },
                 { label: 'Satış verisi', value: '/api/sellout (export_merch_satis.php) — seçili dönemde her şubenin satılan_adet toplamı. Satış sütununda gösterilir.' },
-                { label: 'Stok (Bekleyen / Kalan)', value: 'Yönetici "Stok yükle" ile şube + ürün bazında stok raporu yükler (milat tarihiyle). Bekleyen: rapordaki değer aynen. Kalan = milat stoğu + milattan sonraki sevkler ("Sevk yükle") − milattan sonraki satışlar. Şube adına tıklayınca ürün satırları açılır.' },
+                { label: 'Stok (Bekleyen / Kalan)', value: 'Yönetici "Stok yükle" ile şube + ürün bazında stok raporu yükler (milat tarihiyle). Bekleyen: rapordaki değer aynen. Kalan = milat stoğu + teslim edilmemiş sevkler ("Sevk yükle"; yeni sayımda "teslim edildi" işaretlenene kadar) − milattan sonraki satışlar. Şube adına tıklayınca ürün satırları açılır.' },
                 { label: 'Sıralama', value: 'Sorumlu kişinin TÜM şubeleri listelenir, satış adedine göre büyükten küçüğe (satış girmeyenler = 0 en altta), eşitlikte cari/şube adına göre.' },
                 { label: 'Başlık sayıları', value: 'Her kolon başlığında: toplam şube · kaçı satışlı (adet>0) · kaçı girmeyen (adet 0).' },
                 { label: 'Görünürlük', value: 'Admin: tüm süpervizörler (her biri bir kolon). Süpervizör: kendi şubeleri. Jr. Süpervizör: kendi şubeleri. BSY: kendine bağlı carilerin şubeleri (cari başına kolon).' },

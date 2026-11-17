@@ -45,3 +45,6 @@ create policy "sube_sevk_auth" on public.sube_sevk for all to authenticated usin
 -- Sevk belge no (sipariş / irsaliye no): aynı belge iki kez yüklenmesin
 alter table public.sube_sevk add column if not exists belge_no text;
 create index if not exists idx_sube_sevk_belge on public.sube_sevk (belge_no);
+
+-- Sevkin stok sayımına girip girmediği (teslim edildi). false = teslim edilmemiş → Kalan'a eklenir
+alter table public.sube_sevk add column if not exists sayimda boolean not null default false;
