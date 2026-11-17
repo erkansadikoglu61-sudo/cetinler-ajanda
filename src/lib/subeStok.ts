@@ -121,32 +121,93 @@ export function satirlariOku(raw: unknown[][], tip: 'stok' | 'sevk'): OkumaSonuc
 // ── Şube eşleştirme (sunucu) ──────────────────────────────────
 export interface SubeAday { subeKod: string; cariAdi: string; subeAdi: string }
 
-/** Dosyadaki şubeyi B2B şubesine eşler: önce şube kodu, sonra (cari içinde) şube adı. */
-export function subeEslestirici(adaylar: SubeAday[]) {
+// Mağaza raporlarında şube adlarına eklenen ve karşılaştırmada yok sayılan kelimeler
+const DURAK = new Set(['avm', 'sube', 'subesi', 'sb', 'magaza', 'magazasi'])
+// Bu kelimeleri içeren kayıtlar (depo, teslimat, mobilya…) yalnızca birebir eşleşir
+const ONEKSIZ = ['depo', 'teslimat', 'transfer', 'tamir', 'ofis', 'internet', 'mobilya']
+// Kısaltmalar (iki taraf da aynı biçime çevrilir)
+const TAKMA: Record<string, string> = { gop: 'gaziosmanpasa' }
+
+function ilkKelime(s: string): string {
+  return sade(s).split(' ')[0] ?? ''
+}
+
+/** "EVKUR ÇORLU 2 AVM ŞUBE" → "corlu2" (cari öneki, ekler, boşluk ve tireler atılır) */
+export function subeKompakt(sube: string, cari: string): string {
+  const t = sade(sube).split(' ').filter(Boolean)
+  const k = ilkKelime(cari)
+  if (k && t[0] === k && t.length > 1) t.shift()
+  const ana = t.filter(x => !DURAK.has(x)).join('')
+  return TAKMA[ana] ?? ana
+}
+
+/**
+ * Dosya satırlarını B2B şubelerine eşler (toplu). Sıra:
+ *  1. Şube kodu
+ *  2. Aynı cari içinde birebir ad / kompakt ad (ekler, boşluk, tire, kısaltma farkı yok sayılır)
+ *  3. Kalanlar için tek adaylı ön ek eşleşmesi ("AFYON KARAHISAR" → "AFYON", "BOZYAKA" → "BOZYAKA-İZMİR");
+ *     2. adımda başka bir dosya şubesine verilmiş B2B şubeleri ve depo/teslimat kayıtları hariç.
+ */
+export function subeleriEsle(
+  satirlar: { subeKod?: string; cariAdi?: string; subeAdi?: string }[],
+  adaylar: SubeAday[],
+  varsayilanCari?: string,
+): (SubeAday | null)[] {
   const byKod = new Map<string, SubeAday>()
   for (const a of adaylar) if (a.subeKod) byKod.set(a.subeKod.trim().toUpperCase(), a)
-  const ilkKelime = (s: string) => sade(s).split(' ')[0] ?? ''
-  const govde = (sube: string, cari: string) => {
-    const s = sade(sube)
-    const k = ilkKelime(cari)
-    return k && s.startsWith(k + ' ') ? s.slice(k.length + 1) : s
+
+  // Dosyadaki farklı (cari, şube) ikilileri
+  const anahtar = (s: { cariAdi?: string; subeAdi?: string }) => `${ilkKelime(s.cariAdi || varsayilanCari || '')}||${sade(s.subeAdi)}`
+  const grup = new Map<string, { cari: string; sube: string }>()
+  for (const s of satirlar) {
+    if (s.subeKod && byKod.has(s.subeKod.trim().toUpperCase())) continue
+    if (!s.subeAdi) continue
+    const k = anahtar(s)
+    if (!grup.has(k)) grup.set(k, { cari: s.cariAdi || varsayilanCari || '', sube: s.subeAdi })
   }
-  return (satir: { subeKod?: string; cariAdi?: string; subeAdi?: string }, varsayilanCari?: string): SubeAday | null => {
-    if (satir.subeKod) {
-      const a = byKod.get(satir.subeKod.trim().toUpperCase())
+
+  const havuz = (cari: string) => {
+    const k = ilkKelime(cari)
+    return k ? adaylar.filter(a => ilkKelime(a.cariAdi) === k) : adaylar
+  }
+  const sonuc = new Map<string, SubeAday>()
+  const kullanilan = new Set<string>()
+  // 2. birebir / kompakt
+  for (const [k, g] of grup) {
+    const h = havuz(g.cari)
+    const tam = h.filter(a => sade(a.subeAdi) === sade(g.sube))
+    const kk = subeKompakt(g.sube, g.cari)
+    const aday = tam.length === 1 ? tam : h.filter(a => kk && subeKompakt(a.subeAdi, a.cariAdi) === kk)
+    if (aday.length === 1) { sonuc.set(k, aday[0]); kullanilan.add(aday[0].subeKod || aday[0].subeAdi) }
+  }
+  // 3. ön ek (tek aday)
+  for (const [k, g] of grup) {
+    if (sonuc.has(k)) continue
+    const ham = sade(g.sube)
+    if (ONEKSIZ.some(w => ham.includes(w))) continue
+    const kk = subeKompakt(g.sube, g.cari)
+    if (kk.length < 4) continue
+    const aday = havuz(g.cari).filter(a => {
+      if (kullanilan.has(a.subeKod || a.subeAdi)) return false
+      const ak = subeKompakt(a.subeAdi, a.cariAdi)
+      return ak.length >= 4 && (ak.startsWith(kk) || kk.startsWith(ak))
+    })
+    if (aday.length === 1) { sonuc.set(k, aday[0]); kullanilan.add(aday[0].subeKod || aday[0].subeAdi) }
+  }
+
+  return satirlar.map(s => {
+    if (s.subeKod) {
+      const a = byKod.get(s.subeKod.trim().toUpperCase())
       if (a) return a
     }
-    if (!satir.subeAdi) return null
-    const cari = satir.cariAdi || varsayilanCari || ''
-    const cariK = ilkKelime(cari)
-    const havuz = cariK ? adaylar.filter(a => ilkKelime(a.cariAdi) === cariK) : adaylar
-    const hedefTam = sade(satir.subeAdi)
-    const tam = havuz.filter(a => sade(a.subeAdi) === hedefTam)
-    if (tam.length === 1) return tam[0]
-    const hedefGovde = govde(satir.subeAdi, cari)
-    const g = havuz.filter(a => govde(a.subeAdi, a.cariAdi) === hedefGovde)
-    return g.length === 1 ? g[0] : null
-  }
+    return s.subeAdi ? sonuc.get(anahtar(s)) ?? null : null
+  })
+}
+
+/** Tek satırlık eşleştirici (geriye uyum) */
+export function subeEslestirici(adaylar: SubeAday[]) {
+  return (satir: { subeKod?: string; cariAdi?: string; subeAdi?: string }, varsayilanCari?: string): SubeAday | null =>
+    subeleriEsle([satir], adaylar, varsayilanCari)[0]
 }
 
 // ── Sipariş onay e-postası / görseli (OCR metni) → sevk satırları ──

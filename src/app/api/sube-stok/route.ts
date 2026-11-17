@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireRole } from '@/lib/apiAuth'
 import { noktaModeli } from '@/lib/v2/noktaModel'
-import { subeEslestirici, type StokSatir } from '@/lib/subeStok'
+import { subeleriEsle, type StokSatir } from '@/lib/subeStok'
 
 // Sellout ▸ Şube Takibi — şube stok (milat) ve sevk kayıtları.
 // GET    → { stok, sevk, yuklemeler }  (giriş yapmış herkes; ekran kendi şubelerini süzer)
@@ -81,13 +81,18 @@ export async function POST(req: Request) {
   if (b.satirlar.length > 50000) return NextResponse.json({ error: 'Dosya çok büyük (en fazla 50.000 satır)' }, { status: 400 })
 
   const model = await noktaModeli()
-  const esle = subeEslestirici(model.noktalar.map(n => ({ subeKod: n.subeKod, cariAdi: n.cariAdi, subeAdi: n.subeAdi })))
+  const eslesme = subeleriEsle(
+    b.satirlar,
+    model.noktalar.map(n => ({ subeKod: n.subeKod, cariAdi: n.cariAdi, subeAdi: n.subeAdi })),
+    b.cari,
+  )
 
   const eslesen: { sube_key: string; cari_adi: string; sube_adi: string; s: StokSatir }[] = []
   const eslesmeyen = new Map<string, number>()
   let tarihsiz = 0
-  for (const s of b.satirlar) {
-    const a = esle(s, b.cari)
+  for (let i = 0; i < b.satirlar.length; i++) {
+    const s = b.satirlar[i]
+    const a = eslesme[i]
     if (!a || !a.subeKod) {
       const k = [s.cariAdi, s.subeKod, s.subeAdi].filter(Boolean).join(' / ')
       eslesmeyen.set(k, (eslesmeyen.get(k) ?? 0) + 1)
