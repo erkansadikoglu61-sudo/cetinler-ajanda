@@ -14,6 +14,7 @@ export interface StokSatir {
   bekleyen?: number
   adet?: number
   tarih?: string      // YYYY-MM-DD
+  belgeNo?: string    // sevk: sipariş / irsaliye no (aynı belge iki kez yüklenmesin)
 }
 
 export function sade(s: string | null | undefined): string {
@@ -146,4 +147,73 @@ export function subeEslestirici(adaylar: SubeAday[]) {
     const g = havuz.filter(a => govde(a.subeAdi, a.cariAdi) === hedefGovde)
     return g.length === 1 ? g[0] : null
   }
+}
+
+// ── Sipariş onay e-postası / görseli (OCR metni) → sevk satırları ──
+export interface SiparisOkuma {
+  siparisNo: string
+  cariAdi: string
+  subeAdi: string
+  tarih: string          // YYYY-MM-DD (onay tarihi, yoksa sipariş tarihi)
+  satirlar: { stokKodu: string; stokAdi: string; adet: number }[]
+  toplam: number | null  // belgedeki "Toplam" (kontrol için)
+}
+
+const KOD = /^[A-Z0-9][A-Z0-9\-./]{2,}$/
+function kodMu(s: string): boolean {
+  return KOD.test(s) && /\d/.test(s) && /[A-Z]/.test(s) && !/^\d{1,2}[./]\d{1,2}[./]\d{4}/.test(s)
+}
+
+function alanDegeri(metin: string, re: RegExp): string {
+  const m = metin.match(re)
+  return m ? m[1].replace(/\s+/g, ' ').trim() : ''
+}
+
+/** Tek sipariş metnini çözer (OCR ya da e-postadan kopyalanan metin). */
+function tekSiparis(metin: string): SiparisOkuma | null {
+  const t = metin.replace(/\r/g, '')
+  const siparisNo = alanDegeri(t, /Sipari[sşŞ]\s*no\s*[:;]\s*([A-Z0-9-]+)/i)
+  const cariAdi = alanDegeri(t, /Cari\s*[:;]\s*([^\n]+)/i)
+  const subeAdi = alanDegeri(t, /(?:Ş|S|\$)ube\s*[:;]\s*([^\n]+)/i)
+  const tarihHam = alanDegeri(t, /Onay\s*tarihi\s*[:;]\s*(\d{1,2}[./]\d{1,2}[./]\d{4})/i)
+    || alanDegeri(t, /Sipari[sşŞ]\s*tarihi\s*[:;]\s*(\d{1,2}[./]\d{1,2}[./]\d{4})/i)
+  const toplamHam = alanDegeri(t, /Toplam\s*[:|]?\s*(\d[\d.]*)\s*$/im)
+
+  const satirlar: SiparisOkuma['satirlar'] = []
+  const lines = t.split('\n').map(l => l.replace(/[|¦]/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean)
+  for (let i = 0; i < lines.length; i++) {
+    const parcalar = lines[i].split(' ')
+    const kod = parcalar[0].toUpperCase()
+    if (!kodMu(kod)) continue
+    let geri = parcalar.slice(1)
+    let adet: number | null = null
+    if (geri.length && /^\d{1,5}$/.test(geri[geri.length - 1])) {
+      adet = parseInt(geri[geri.length - 1])
+      geri = geri.slice(0, -1)
+    } else {
+      // Ad iki satıra taşmış olabilir: sonraki 2 satırda (kod olmayan) sondaki sayıyı ara
+      for (let j = i + 1; j <= i + 2 && j < lines.length; j++) {
+        const p = lines[j].split(' ')
+        if (kodMu(p[0].toUpperCase()) || /^toplam/i.test(lines[j])) break
+        if (/^\d{1,5}$/.test(p[p.length - 1])) { adet = parseInt(p[p.length - 1]); break }
+      }
+    }
+    if (adet === null || adet <= 0) continue
+    satirlar.push({ stokKodu: kod, stokAdi: geri.join(' '), adet })
+  }
+  if (satirlar.length === 0) return null
+  return {
+    siparisNo,
+    cariAdi,
+    subeAdi,
+    tarih: isoTarih(tarihHam),
+    satirlar,
+    toplam: toplamHam ? parseInt(toplamHam.replace(/\./g, '')) : null,
+  }
+}
+
+/** Metinde bir ya da birden çok sipariş olabilir ("Sipariş no" ile ayrılır). */
+export function siparisMetniOku(metin: string): SiparisOkuma[] {
+  const parcalar = metin.split(/(?=Sipari[sşŞ]\s*no\s*[:;])/i).filter(p => p.trim())
+  return parcalar.map(tekSiparis).filter((x): x is SiparisOkuma => !!x)
 }

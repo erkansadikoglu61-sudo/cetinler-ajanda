@@ -96,6 +96,18 @@ export async function POST(req: Request) {
     if (b.tip === 'sevk' && !tarihOk(s.tarih) && !tarihOk(b.tarih)) { tarihsiz++; continue }
     eslesen.push({ sube_key: a.subeKod, cari_adi: a.cariAdi, sube_adi: a.subeAdi, s })
   }
+  // Daha önce yüklenmiş belgeler (sipariş no) tekrar sayılmaz
+  const belgeler = [...new Set(b.satirlar.map(s => s.belgeNo?.trim()).filter((x): x is string => !!x))]
+  const oncekiBelgeler: string[] = []
+  if (b.tip === 'sevk' && belgeler.length) {
+    const { data, error } = await istemci(req).from('sube_sevk').select('belge_no').in('belge_no', belgeler)
+    if (!error) for (const r of data ?? []) if (r.belge_no && !oncekiBelgeler.includes(r.belge_no)) oncekiBelgeler.push(r.belge_no)
+  }
+  if (oncekiBelgeler.length) {
+    for (let i = eslesen.length - 1; i >= 0; i--) {
+      if (eslesen[i].s.belgeNo && oncekiBelgeler.includes(eslesen[i].s.belgeNo!.trim())) eslesen.splice(i, 1)
+    }
+  }
   const subeSayisi = new Set(eslesen.map(e => e.sube_key)).size
   const ozet = {
     toplamSatir: b.satirlar.length,
@@ -103,6 +115,7 @@ export async function POST(req: Request) {
     subeSayisi,
     toplamAdet: eslesen.reduce((t, e) => t + (b.tip === 'stok' ? (e.s.kalan ?? 0) : (e.s.adet ?? 0)), 0),
     tarihsiz,
+    oncekiBelgeler,
     eslesmeyen: [...eslesmeyen.entries()].map(([sube, satir]) => ({ sube, satir })).sort((x, y) => y.satir - x.satir),
   }
   if (b.onizleme || eslesen.length === 0) return NextResponse.json({ ok: true, onizleme: true, ...ozet })
@@ -130,13 +143,21 @@ export async function POST(req: Request) {
     }
   } else {
     const yukleme_id = crypto.randomUUID()
-    const satirlar = eslesen.map(e => ({
+    let satirlar: Record<string, unknown>[] = eslesen.map(e => ({
       yukleme_id, sube_key: e.sube_key, cari_adi: e.cari_adi, sube_adi: e.sube_adi,
       stok_kodu: e.s.stokKodu.toUpperCase(), stok_adi: e.s.stokAdi ?? null,
       adet: e.s.adet ?? 0, tarih: tarihOk(e.s.tarih) ? e.s.tarih : b.tarih, yukleyen: user.id,
+      belge_no: e.s.belgeNo?.trim() || null,
     }))
+    let belgeKolonu = true
     for (let i = 0; i < satirlar.length; i += 1000) {
-      const { error } = await sb.from('sube_sevk').insert(satirlar.slice(i, i + 1000))
+      let { error } = await sb.from('sube_sevk').insert(satirlar.slice(i, i + 1000))
+      if (error && belgeKolonu && /belge_no/.test(error.message)) {
+        // belge_no kolonu henüz eklenmemiş → onsuz kaydet
+        belgeKolonu = false
+        satirlar = satirlar.map(({ belge_no: _b, ...r }) => r)
+        ;({ error } = await sb.from('sube_sevk').insert(satirlar.slice(i, i + 1000)))
+      }
       if (error) return tabloYok(error.code) ? tabloHatasi() : NextResponse.json({ error: error.message }, { status: 500 })
     }
   }
