@@ -2063,9 +2063,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                                 {acik && d.urunler.map(u => (
                                   <tr key={`${key}|${u.stokKodu}`} className="bg-amber-50/40 text-[11px]">
                                     <td className="border border-gray-200" />
-                                    <td className="border border-gray-200 pl-7 pr-2 py-0.5 max-w-[260px]">
+                                    <td className="border border-gray-200 pl-7 pr-2 py-0.5 whitespace-nowrap" title={u.stokAdi || undefined}>
                                       <span className="font-mono text-gray-700">{u.stokKodu}</span>
-                                      {u.stokAdi && <span className="ml-1 text-gray-400 truncate">{u.stokAdi}</span>}
                                     </td>
                                     <td className="border border-gray-200 px-2 py-0.5 text-right tabular-nums text-gray-600">{u.satis || ''}</td>
                                     <td className="border border-gray-200 px-2 py-0.5 text-right tabular-nums text-gray-600">{d.stokVar ? u.bekleyen : '—'}</td>
