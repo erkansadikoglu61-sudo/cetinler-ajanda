@@ -632,7 +632,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   // kalan (adet 0) şubeler bulunur. Role göre kolonlanır:
   //   admin → her süpervizör bir kolon · sup/jr → kendi şubeleri ·
   //   bsy → kendine bağlı carilerin şubeleri (cari başına kolon).
-  interface SgColumn { title: string; subeler: { subeKod: string; subeAdi: string; cariAdi: string; adet: number }[] }
+  interface SgColumn { title: string; subeler: { subeKod: string; subeAdi: string; cariAdi: string; adet: number; kayit: string }[] }
   const satisGirmeyenHesap = useMemo(() => {
     // Dönemde şube başına toplam satış adedi
     const adetBySube = new Map<string, number>()
@@ -703,14 +703,31 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       }
     })
 
+    // Şubenin hangi kayıtlarla geldiği (üzerine gelince gösterilir)
+    const kayitBySube = new Map<string, string[]>()
+    const kayitEkle = (sk: string, t: string) => {
+      const l = kayitBySube.get(sk) ?? []
+      if (!l.includes(t)) l.push(t)
+      kayitBySube.set(sk, l)
+    }
+    merchDetayData.forEach(m => {
+      const sk = (m.sube_kod || '').trim()
+      if (sk) kayitEkle(sk, `${m.merch_adi} (${m.merch_grubu || 'merch'}) → ${[m.sup_adi, m.jr_adi].filter(Boolean).join(' / ') || 'sorumlu yok'}`)
+    })
+    subeAtamalari.forEach(a => {
+      const sk = (a.sube_kod || '').trim()
+      const ad = a.kaynak === 'elle' ? 'Elle atama' : a.kaynak === 'destek' ? 'Destek personeli kaydı' : 'B2B şube satırı'
+      if (sk) kayitEkle(sk, `${ad} → ${[a.sup_adi, a.jr_adi].filter(Boolean).join(' / ')}`)
+    })
+
     // Atanmış tüm şubeler + dönem satış adedi (satışsız = 0)
     const assigned = [...subeMap.entries()]
-      .map(([sk, v]) => ({ ...v, subeKod: sk, adet: adetBySube.get(sk) ?? 0 }))
+      .map(([sk, v]) => ({ ...v, subeKod: sk, adet: adetBySube.get(sk) ?? 0, kayit: (kayitBySube.get(sk) ?? []).join('\n') }))
 
     // Satış adedine göre AZALAN (en çok satan üstte, satış girmeyenler = 0 en altta), sonra cari/şube
     const bySales = (a: { adet: number; cariAdi: string; subeAdi: string }, b: { adet: number; cariAdi: string; subeAdi: string }) =>
       b.adet - a.adet || a.cariAdi.localeCompare(b.cariAdi, 'tr') || a.subeAdi.localeCompare(b.subeAdi, 'tr')
-    const strip = (arr: typeof assigned) => arr.map(s => ({ subeKod: s.subeKod, subeAdi: s.subeAdi, cariAdi: s.cariAdi, adet: s.adet })).sort(bySales)
+    const strip = (arr: typeof assigned) => arr.map(s => ({ subeKod: s.subeKod, subeAdi: s.subeAdi, cariAdi: s.cariAdi, adet: s.adet, kayit: s.kayit })).sort(bySales)
     const cols: SgColumn[] = []
 
     if (isBsy) {
@@ -2141,7 +2158,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                                 <tr className={clsx(ri % 2 ? 'bg-gray-50/60' : '', acilir && 'cursor-pointer hover:bg-brand-50/50')}
                                   onClick={() => acilir && setSgAcik(prev => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n })}>
                                   <td className="border border-gray-200 px-2 py-1 text-center text-gray-400 tabular-nums">{ri + 1}</td>
-                                  <td className="border border-gray-200 px-2 py-1 whitespace-nowrap">
+                                  <td className="border border-gray-200 px-2 py-1 whitespace-nowrap"
+                                    title={s.kayit ? `B2B kaydı (şube kodu ${s.subeKod}):\n${s.kayit}` : undefined}>
                                     <span className="inline-flex items-center gap-1">
                                       {acilir
                                         ? (acik ? <ChevronDown size={12} className="text-gray-400" /> : <ChevronRight size={12} className="text-gray-400" />)
