@@ -816,10 +816,11 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     } catch { /* yoksay */ }
   }, [])
   useEffect(() => { if (isAdmin && subTab === 'satisgirmeyen') atamaYenile() }, [isAdmin, subTab, atamaYenile])
-  const atamaSonrasi = useCallback(async () => {
+  const [b2bYenileniyor, setB2bYenileniyor] = useState(false)
+  const atamaSonrasi = useCallback(async (taze = false) => {
     await atamaYenile()
     try {
-      const d = await (await fetch('/api/merch-detay')).json()
+      const d = await (await fetch(`/api/merch-detay${taze ? '?yenile=1' : ''}`)).json()
       setMerchDetayData(d.data || [])
       setSubeAtamalari(d.subeAtamalari || [])
     } catch { /* yoksay */ }
@@ -2093,6 +2094,13 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
               ) : null}
               {isAdmin && (
                 <span className="ml-auto flex gap-2">
+                  <button
+                    onClick={async () => { setB2bYenileniyor(true); await atamaSonrasi(true); setB2bYenileniyor(false) }}
+                    disabled={b2bYenileniyor}
+                    title="B2B merch / süpervizör kayıtlarını önbelleği atlayarak yeniden çeker"
+                    className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                    <RefreshCw size={12} className={b2bYenileniyor ? 'animate-spin' : ''} /> B2B&apos;den yenile
+                  </button>
                   <button onClick={() => setStokYukle('stok')}
                     className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50">
                     <Upload size={12} /> Stok yükle
