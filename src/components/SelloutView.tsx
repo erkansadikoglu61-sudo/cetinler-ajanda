@@ -721,9 +721,23 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       if (!l.includes(t)) l.push(t)
       kayitBySube.set(sk, l)
     }
+    // Çetinler Merch: yalnızca seçili ayda o şubeye satış girdiyse (adediyle) gösterilir
+    const cetinlerDonem = new Map<string, Map<string, number>>()
+    periodRows.forEach(r => {
+      const sk = (r.sube_kod || '').trim()
+      if (!sk || r.merch_tipi !== 'Çetinler Merch' || !r.merch_personel || !(r.satilan_adet > 0)) return
+      let m = cetinlerDonem.get(sk)
+      if (!m) { m = new Map(); cetinlerDonem.set(sk, m) }
+      m.set(r.merch_personel, (m.get(r.merch_personel) ?? 0) + r.satilan_adet)
+    })
+    cetinlerDonem.forEach((m, sk) => {
+      ;[...m.entries()].sort((a, b) => b[1] - a[1])
+        .forEach(([ad, adet]) => kayitEkle(sk, `Çetinler Merch: ${ad} — ${adet} adet satış (${donemLabel(donem)})`))
+    })
     merchDetayData.forEach(m => {
       const sk = (m.sube_kod || '').trim()
-      if (sk) kayitEkle(sk, `${m.merch_adi} (${m.merch_grubu || 'merch'}) → ${[m.sup_adi, m.jr_adi].filter(Boolean).join(' / ') || 'sorumlu yok'}`)
+      if (!sk || m.merch_grubu === 'Çetinler Merch') return
+      kayitEkle(sk, `${m.merch_adi} (${m.merch_grubu || 'merch'}) → ${[m.sup_adi, m.jr_adi].filter(Boolean).join(' / ') || 'sorumlu yok'}`)
     })
     subeAtamalari.forEach(a => {
       const sk = (a.sube_kod || '').trim()
@@ -731,12 +745,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       if (sk) kayitEkle(sk, `${ad} → ${[a.sup_adi, a.jr_adi].filter(Boolean).join(' / ')}`)
     })
 
-    // Çetinler Merch'i olan şubeler (B2B ataması) — tabloda mavi kalın yazılır
-    const cetinlerSube = new Set(
-      merchDetayData
-        .filter(m => m.merch_grubu === 'Çetinler Merch' && m.merch_adi && (m.sube_kod || '').trim())
-        .map(m => m.sube_kod.trim()),
-    )
+    // Seçili ayda Çetinler Merch'in satış girdiği şubeler — tabloda mavi kalın yazılır
+    const cetinlerSube = new Set(cetinlerDonem.keys())
 
     // Atanmış tüm şubeler + dönem satış adedi (satışsız = 0)
     const assigned = [...subeMap.entries()]
@@ -781,7 +791,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       : []
     const adlar = new Set(assigned.map(s => `${normalizeName(s.cariAdi)}||${subeKompakt(s.subeAdi, s.cariAdi)}`))
     return { cols, sahipsiz, adlar }
-  }, [periodRows, merchDetayData, subeAtamalari, visibleSups, isBsy, isJr, isSup, isAdmin, currentProfile.full_name])
+  }, [periodRows, donem, merchDetayData, subeAtamalari, visibleSups, isBsy, isJr, isSup, isAdmin, currentProfile.full_name])
   const satisGirmeyenBase: SgColumn[] = satisGirmeyenHesap.cols
 
   // Yönetici: B2B cari-şube listesinde olup Şube Takibi'nde hiç kaydı olmayan şubeler
@@ -2087,7 +2097,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
               Atanmış şubeler /api/merch-detay’den, satışlar /api/sellout (export_merch_satis.php)’den otomatik hesaplanır — elle giriş yoktur.
             </p>
             <p className="mb-2 px-1 text-[11px] text-gray-500">
-              <span className="font-bold text-blue-700">Mavi kalın</span> şubelerde Çetinler Merch var.
+              <span className="font-bold text-blue-700">Mavi kalın</span> şubelerde seçili ayda Çetinler Merch satış girişi var (üzerine gelince kim, kaç adet).
             </p>
             {sgCariOptions.length > 1 && (
               <div className="mb-2 px-1">
