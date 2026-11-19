@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { authFetch } from '@/lib/authFetch'
-import { RefreshCw, X, Save, Target, ChevronDown, ChevronRight, FileDown, Upload, Truck } from 'lucide-react'
+import { RefreshCw, X, Save, Target, ChevronDown, ChevronRight, FileDown, Upload, Truck, MapPin } from 'lucide-react'
 import { SubeStokYukle, type SevkYukleme } from '@/components/SubeStokYukle'
 import { isoTarih, subeKompakt } from '@/lib/subeStok'
 import * as XLSX from 'xlsx'
@@ -16,7 +16,7 @@ import {
   calcPrim, namesMatch, normalizeName, donemdeAktif,
   fmtCur, currentDonem, donemOptions, donemLabel,
 } from '@/lib/sellout'
-import { Profile } from '@/lib/supabase'
+import { Profile, supabase } from '@/lib/supabase'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
 import { SayfaParametreleri } from '@/components/SayfaParametreleri'
 import { SelloutAciklama } from '@/components/SelloutAciklama'
@@ -369,6 +369,16 @@ function cariSubeKisa(cari: string, sube: string): string {
   if (!kisa) return sb
   if (sb.toLocaleUpperCase('tr').startsWith(kisa.toLocaleUpperCase('tr') + ' ')) return sb
   return [kisa, sb].filter(Boolean).join(' ')
+}
+
+/** Şube eşleştirme anahtarı (görev "Cari / Şube" metni ↔ Şube Takibi şubesi) */
+function subeZiyaretAnahtari(cari: string, sube: string): string {
+  const sade = (x: string) => normalizeName(x).replace(/[^a-z0-9 ]/g, ' ').split(' ').filter(Boolean)
+  const ct = sade(cari)
+  let st = sade(sube)
+  // Şube adının başındaki cari kelimelerini at ("ÖZ ŞANAL BAYRAKLI" → "BAYRAKLI")
+  for (let i = 0; i < ct.length && st.length > 1 && st[0] === ct[i]; i++) st = st.slice(1)
+  return `${ct[0] ?? ''}||${subeKompakt(st.join(' '), '')}`
 }
 
 export function SelloutView({ currentProfile, team, visibleIds, active }: Props) {
@@ -882,6 +892,43 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   const [stokHata, setStokHata] = useState('')
   const [stokYukle, setStokYukle] = useState<'stok' | 'sevk' | null>(null)
   const [sgAcik, setSgAcik] = useState<Set<string>>(new Set())
+
+  // ── Ziyaretler: seçili ayda check-in yapılmış görevler (Ajanda) → şube yanında işaret ──
+  const [ziyaretler, setZiyaretler] = useState<{ pid: string; date: string; customer: string | null }[]>([])
+  useEffect(() => {
+    if (subTab !== 'satisgirmeyen') return
+    let iptal = false
+    const [y, m] = donem.split('-').map(Number)
+    const son = new Date(y, m, 0).getDate()
+    ;(async () => {
+      const tum: { pid: string; date: string; customer: string | null }[] = []
+      for (let bas = 0; ; bas += 1000) {
+        const { data, error } = await supabase.from('tasks')
+          .select('pid, date, customer')
+          .gte('date', `${donem}-01`).lte('date', `${donem}-${String(son).padStart(2, '0')}`)
+          .not('checkin_ts', 'is', null).not('customer', 'is', null)
+          .order('date').range(bas, bas + 999)
+        if (error || !data) break
+        tum.push(...(data as typeof tum))
+        if (data.length < 1000) break
+      }
+      if (!iptal) setZiyaretler(tum)
+    })()
+    return () => { iptal = true }
+  }, [subTab, donem])
+  const ziyaretBySube = useMemo(() => {
+    const ad = new Map(team.map(p => [p.id, p.full_name]))
+    const m = new Map<string, { tarih: string; kisi: string }[]>()
+    for (const z of ziyaretler) {
+      const parca = (z.customer || '').split(' / ')
+      if (parca.length < 2) continue
+      const k = subeZiyaretAnahtari(parca[0], parca.slice(1).join(' / '))
+      const l = m.get(k) ?? []
+      l.push({ tarih: z.date, kisi: ad.get(z.pid) ?? '' })
+      m.set(k, l)
+    }
+    return m
+  }, [ziyaretler, team])
   const stokYenile = useCallback(async () => {
     try {
       const r = await authFetch('/api/sube-stok')
@@ -2098,6 +2145,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             </p>
             <p className="mb-2 px-1 text-[11px] text-gray-500">
               <span className="font-bold text-blue-700">Mavi kalın</span> şubelerde seçili ayda Çetinler Merch satış girişi var (üzerine gelince kim, kaç adet).
+              {' '}<MapPin size={11} className="inline text-orange-500 -mt-0.5" /> seçili ayda ziyaret (check-in) edilen şube (üzerine gelince tarih ve kişi).
             </p>
             {sgCariOptions.length > 1 && (
               <div className="mb-2 px-1">
@@ -2206,6 +2254,17 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                                       <span className={s.cetinler ? 'font-bold text-blue-700' : undefined}>
                                         {cariSubeKisa(s.cariAdi, s.subeAdi)}
                                       </span>
+                                      {(() => {
+                                        const zl = ziyaretBySube.get(subeZiyaretAnahtari(s.cariAdi, s.subeAdi))
+                                        if (!zl?.length) return null
+                                        const metin = zl.map(z => `${z.tarih.slice(8, 10)}.${z.tarih.slice(5, 7)} ${z.kisi}`.trim()).join('\n')
+                                        return (
+                                          <span className="inline-flex items-center text-orange-500" title={`Ziyaret (${donemLabel(donem)}):\n${metin}`}>
+                                            <MapPin size={11} />
+                                            {zl.length > 1 && <span className="text-[9px] font-semibold leading-none">{zl.length}</span>}
+                                          </span>
+                                        )
+                                      })()}
                                     </span>
                                   </td>
                                   <td className="border border-gray-200 px-2 py-1 text-right tabular-nums text-gray-600">{s.adet}</td>
