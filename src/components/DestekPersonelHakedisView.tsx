@@ -400,6 +400,13 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
           Yenile
         </button>
 
+        {/* Listeleme kuralı — süpervizör destek personelinin neden listede olduğunu / olmadığını görsün */}
+        <div className="text-[11px] leading-snug text-brand-700">
+          <span className="font-semibold">Destek personeli listede görünür, eğer:</span>
+          {' '}1. O ay şubede bir Çetinler Merch var (o ay satış girmiş ya da B2B&apos;de atanmış).
+          {' '}2. O merch için &quot;Destek Personeli var mı?&quot; seçeneği işaretli.
+        </div>
+
         {saveError && (
           <span className="text-xs text-red-500">{saveError}</span>
         )}
