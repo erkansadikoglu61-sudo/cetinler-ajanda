@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { parseHtmlTableByHeader, fetchPhpHtml } from '@/lib/merchSatis'
 import { donemdeAktif } from '@/lib/sellout'
+import { subeleriEsle, type SubeAday } from '@/lib/subeStok'
+import { subeYetkileri, CARI_SUBE_URL } from '@/lib/subeYetki'
 
 function getAdmin() {
   return createClient(
@@ -86,6 +88,8 @@ export async function GET(req: Request) {
     //   shortMap: normalize(sube)||shortCari(cari)         — kısaltma fallback
     const fullMap  = new Map<string, PhpEntry>()
     const shortMap = new Map<string, PhpEntry>()
+    const kodMap   = new Map<string, PhpEntry>()   // B2B şube kodu → en iyi girdi
+    const adaylar  = new Map<string, SubeAday>()   // esnek ad eşleştirmesi için B2B şubeleri
 
     const { rows: mdRows } = parseHtmlTableByHeader(html)
     for (const r of mdRows) {
@@ -117,7 +121,38 @@ export async function GET(req: Request) {
 
       put(fullMap, fullKey, entry)
       put(shortMap, shortKey, entry)
+      if (subeKodu) {
+        put(kodMap, subeKodu, entry)
+        if (!adaylar.has(subeKodu)) adaylar.set(subeKodu, { subeKod: subeKodu, cariAdi, subeAdi })
+      }
     }
+
+    // B2B cari-şube listesi + şube yetkileri (merch personeli olmayan şubeler, elle atamalar)
+    try {
+      const { rows: csRows } = parseHtmlTableByHeader(await fetchPhpHtml(CARI_SUBE_URL))
+      for (const r of csRows) {
+        const kod = (r['SUBE_KOD'] ?? '').trim()
+        if (kod && !adaylar.has(kod)) adaylar.set(kod, { subeKod: kod, cariAdi: (r['CARI_ADI'] ?? '').trim(), subeAdi: (r['SUBE_ADI'] ?? '').trim() })
+      }
+      for (const y of await subeYetkileri(csRows)) {
+        const mevcut = kodMap.get(y.sube_kod)
+        if (mevcut && mevcut.sup && y.kaynak !== 'elle') continue
+        kodMap.set(y.sube_kod, {
+          cari_adi: y.cari_adi || mevcut?.cari_adi || '', sube_adi: y.sube_adi || mevcut?.sube_adi || '',
+          merch: mevcut?.merch ?? '', bsy: y.bsy_kod || mevcut?.bsy || '',
+          sup: y.sup_adi, jr: y.jr_adi, kod: y.sube_kod, hasKod: true,
+          aktif: !y.sup_adi || donemdeAktif(y.sup_adi, bugun),
+        })
+      }
+    } catch { /* cari-şube listesi olmadan devam */ }
+
+    // Destek personelinin şubesi B2B'de farklı yazılmış olabilir (ör. "ADANA" ↔
+    // "EVKUR ADANA AVM SB"): birebir eşleşme yoksa esnek eşleştirmeyle B2B şube koduna bağla
+    const esnek = subeleriEsle(
+      destekPersonel.map(d => ({ cariAdi: d.cari_adi ?? '', subeAdi: d.sube_adi ?? '' })),
+      [...adaylar.values()],
+    )
+    const donem = `${yil}-${String(ay).padStart(2, '0')}`
 
     // Verilen subeKey için PHP girdisini döndür (tam key → kısa key fallback)
     function phpEntry(normSube: string, normCari: string, origCari: string): PhpEntry | undefined {
@@ -129,17 +164,27 @@ export async function GET(req: Request) {
     // 3. Her destek personeli → satır oluştur
     const rows: DestekPersonelRow[] = []
 
-    for (const dp of destekPersonel) {
+    for (let di = 0; di < destekPersonel.length; di++) {
+      const dp = destekPersonel[di]
       const ns = normalize(dp.sube_adi)
       const nc = normalize(dp.cari_adi)
-      const php = phpEntry(ns, nc, dp.cari_adi)
+      const esnekKod = esnek[di]?.subeKod
+      // Birebir ad eşleşmesi kodsuz/eski bir B2B satırına (ör. ayrılan süpervizörlü) düşebiliyor:
+      // o durumda şube koduyla bulunan güncel kayıt tercih edilir
+      const tam = phpEntry(ns, nc, dp.cari_adi)
+      const kodlu = esnekKod ? kodMap.get(esnekKod) : undefined
+      const php = tam && tam.hasKod && tam.aktif ? tam : (kodlu ?? tam)
+      // Personel listesindeki süpervizör seçili dönemde görevde değilse (ör. Ekim'de Atilla) kullanılmaz
+      const dpSup = dp.sup_adi && donemdeAktif(dp.sup_adi, donem) ? dp.sup_adi : ''
+      const dpJr  = dp.jr_adi && donemdeAktif(dp.jr_adi, donem) ? dp.jr_adi : ''
 
       // Süpervizör/Jr: önce merch-detay enrichment, yoksa field_personnel'ın
       // KENDİ sup_adi/jr_adi alanları. Bazı destek personellerinin şubesi
       // (ör. HÜSEYİNGAZİ) merch-detay'da yok → enrichment boş → Süpervizör "-"
       // görünüp Sup filtresine takılıyor, o Süpervizör kişiyi göremiyordu.
-      const supAdiRaw = (php?.sup || dp.sup_adi || '').trim()
-      const jrAdiRaw  = (php?.jr  || dp.jr_adi  || '').trim()
+      const gorevde = (ad?: string) => (ad && donemdeAktif(ad, donem) ? ad : '')
+      const supAdiRaw = (gorevde(php?.sup) || dpSup || '').trim()
+      const jrAdiRaw  = (gorevde(php?.jr) || dpJr || '').trim()
 
       if (bsyKod) {
         if ((php?.bsy ?? '') !== bsyKod) continue
