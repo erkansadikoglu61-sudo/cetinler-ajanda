@@ -632,7 +632,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
   // kalan (adet 0) şubeler bulunur. Role göre kolonlanır:
   //   admin → her süpervizör bir kolon · sup/jr → kendi şubeleri ·
   //   bsy → kendine bağlı carilerin şubeleri (cari başına kolon).
-  interface SgColumn { title: string; subeler: { subeKod: string; subeAdi: string; cariAdi: string; adet: number; kayit: string }[] }
+  interface SgColumn { title: string; subeler: { subeKod: string; subeAdi: string; cariAdi: string; adet: number; kayit: string; cetinler: boolean }[] }
   const satisGirmeyenHesap = useMemo(() => {
     // Dönemde şube başına toplam satış adedi
     const adetBySube = new Map<string, number>()
@@ -720,14 +720,21 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       if (sk) kayitEkle(sk, `${ad} → ${[a.sup_adi, a.jr_adi].filter(Boolean).join(' / ')}`)
     })
 
+    // Çetinler Merch'i olan şubeler (B2B ataması) — tabloda yeşil kalın yazılır
+    const cetinlerSube = new Set(
+      merchDetayData
+        .filter(m => m.merch_grubu === 'Çetinler Merch' && m.merch_adi && (m.sube_kod || '').trim())
+        .map(m => m.sube_kod.trim()),
+    )
+
     // Atanmış tüm şubeler + dönem satış adedi (satışsız = 0)
     const assigned = [...subeMap.entries()]
-      .map(([sk, v]) => ({ ...v, subeKod: sk, adet: adetBySube.get(sk) ?? 0, kayit: (kayitBySube.get(sk) ?? []).join('\n') }))
+      .map(([sk, v]) => ({ ...v, subeKod: sk, adet: adetBySube.get(sk) ?? 0, kayit: (kayitBySube.get(sk) ?? []).join('\n'), cetinler: cetinlerSube.has(sk) }))
 
     // Satış adedine göre AZALAN (en çok satan üstte, satış girmeyenler = 0 en altta), sonra cari/şube
     const bySales = (a: { adet: number; cariAdi: string; subeAdi: string }, b: { adet: number; cariAdi: string; subeAdi: string }) =>
       b.adet - a.adet || a.cariAdi.localeCompare(b.cariAdi, 'tr') || a.subeAdi.localeCompare(b.subeAdi, 'tr')
-    const strip = (arr: typeof assigned) => arr.map(s => ({ subeKod: s.subeKod, subeAdi: s.subeAdi, cariAdi: s.cariAdi, adet: s.adet, kayit: s.kayit })).sort(bySales)
+    const strip = (arr: typeof assigned) => arr.map(s => ({ subeKod: s.subeKod, subeAdi: s.subeAdi, cariAdi: s.cariAdi, adet: s.adet, kayit: s.kayit, cetinler: s.cetinler })).sort(bySales)
     const cols: SgColumn[] = []
 
     if (isBsy) {
@@ -2068,6 +2075,9 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
               (satış girmeyenler = 0 en altta). Başlıkta: toplam şube · satışlı · girmeyen adedi.
               Atanmış şubeler /api/merch-detay’den, satışlar /api/sellout (export_merch_satis.php)’den otomatik hesaplanır — elle giriş yoktur.
             </p>
+            <p className="mb-2 px-1 text-[11px] text-gray-500">
+              <span className="font-bold text-brand-600">Yeşil kalın</span> şubelerde Çetinler Merch var.
+            </p>
             {sgCariOptions.length > 1 && (
               <div className="mb-2 px-1">
                 <select
@@ -2172,7 +2182,9 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                                       {acilir
                                         ? (acik ? <ChevronDown size={12} className="text-gray-400" /> : <ChevronRight size={12} className="text-gray-400" />)
                                         : <span className="w-3" />}
-                                      {[s.cariAdi.trim().split(/\s+/)[0], s.subeAdi].filter(Boolean).join(' ')}
+                                      <span className={s.cetinler ? 'font-bold text-brand-600' : undefined}>
+                                        {[s.cariAdi.trim().split(/\s+/)[0], s.subeAdi].filter(Boolean).join(' ')}
+                                      </span>
                                     </span>
                                   </td>
                                   <td className="border border-gray-200 px-2 py-1 text-right tabular-nums text-gray-600">{s.adet}</td>
