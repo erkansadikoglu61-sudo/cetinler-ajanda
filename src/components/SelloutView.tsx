@@ -720,7 +720,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
       if (sk) kayitEkle(sk, `${ad} → ${[a.sup_adi, a.jr_adi].filter(Boolean).join(' / ')}`)
     })
 
-    // Çetinler Merch'i olan şubeler (B2B ataması) — tabloda yeşil kalın yazılır
+    // Çetinler Merch'i olan şubeler (B2B ataması) — tabloda mavi kalın yazılır
     const cetinlerSube = new Set(
       merchDetayData
         .filter(m => m.merch_grubu === 'Çetinler Merch' && m.merch_adi && (m.sube_kod || '').trim())
@@ -2076,7 +2076,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
               Atanmış şubeler /api/merch-detay’den, satışlar /api/sellout (export_merch_satis.php)’den otomatik hesaplanır — elle giriş yoktur.
             </p>
             <p className="mb-2 px-1 text-[11px] text-gray-500">
-              <span className="font-bold text-brand-600">Yeşil kalın</span> şubelerde Çetinler Merch var.
+              <span className="font-bold text-blue-700">Mavi kalın</span> şubelerde Çetinler Merch var.
             </p>
             {sgCariOptions.length > 1 && (
               <div className="mb-2 px-1">
@@ -2182,7 +2182,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                                       {acilir
                                         ? (acik ? <ChevronDown size={12} className="text-gray-400" /> : <ChevronRight size={12} className="text-gray-400" />)
                                         : <span className="w-3" />}
-                                      <span className={s.cetinler ? 'font-bold text-brand-600' : undefined}>
+                                      <span className={s.cetinler ? 'font-bold text-blue-700' : undefined}>
                                         {[s.cariAdi.trim().split(/\s+/)[0], s.subeAdi].filter(Boolean).join(' ')}
                                       </span>
                                     </span>
