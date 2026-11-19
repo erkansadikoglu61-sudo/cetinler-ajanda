@@ -360,6 +360,17 @@ interface Props {
   active: boolean
 }
 
+/** Şube Takibi'nde cari kısaltması: ilk kelime; ilk kelime 2-3 harfliyse (ör. "ÖZ")
+ *  ikinci kelime de eklenir ("ÖZ ŞANAL"). Şube adı zaten bu kısaltmayla başlıyorsa tekrar edilmez. */
+function cariSubeKisa(cari: string, sube: string): string {
+  const w = (cari || '').trim().split(/\s+/).filter(Boolean).map(x => x.replace(/[.,]+$/, ''))
+  const kisa = w.length === 0 ? '' : (w[0].length >= 2 && w[0].length <= 3 && w[1] ? `${w[0]} ${w[1]}` : w[0])
+  const sb = (sube || '').trim()
+  if (!kisa) return sb
+  if (sb.toLocaleUpperCase('tr').startsWith(kisa.toLocaleUpperCase('tr') + ' ')) return sb
+  return [kisa, sb].filter(Boolean).join(' ')
+}
+
 export function SelloutView({ currentProfile, team, visibleIds, active }: Props) {
   const [donem, setDonem]         = useState(currentDonem)
   const [subTab, setSubTab]       = useState<SubTab>(() =>
@@ -2183,7 +2194,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                                         ? (acik ? <ChevronDown size={12} className="text-gray-400" /> : <ChevronRight size={12} className="text-gray-400" />)
                                         : <span className="w-3" />}
                                       <span className={s.cetinler ? 'font-bold text-blue-700' : undefined}>
-                                        {[s.cariAdi.trim().split(/\s+/)[0], s.subeAdi].filter(Boolean).join(' ')}
+                                        {cariSubeKisa(s.cariAdi, s.subeAdi)}
                                       </span>
                                     </span>
                                   </td>
@@ -2244,7 +2255,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                       const jrSecenek = supP ? jrsOf(supP.id) : visibleJrs
                       return (
                         <tr key={i} className="border-t border-amber-100 align-middle">
-                          <td className="py-1 pr-3 whitespace-nowrap">{x.cariAdi.trim().split(/\s+/)[0]} {x.subeAdi}</td>
+                          <td className="py-1 pr-3 whitespace-nowrap">{cariSubeKisa(x.cariAdi, x.subeAdi)}</td>
                           <td className="py-1 pr-3 text-amber-800/80">{x.neden}</td>
                           <td className="py-1 whitespace-nowrap">
                             {x.subeKod ? (
@@ -2275,7 +2286,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                     <ul>
                       {elleAtamalar.map(a => (
                         <li key={a.sube_kod} className="flex items-center gap-2 py-0.5">
-                          <span className="flex-1">{(a.cari_adi ?? '').trim().split(/\s+/)[0]} {a.sube_adi} → {[a.sup_adi, a.jr_adi].filter(Boolean).join(' / ')}</span>
+                          <span className="flex-1">{cariSubeKisa(a.cari_adi ?? '', a.sube_adi ?? '')} → {[a.sup_adi, a.jr_adi].filter(Boolean).join(' / ')}</span>
                           <button onClick={() => atamaKaldir(a.sube_kod)} className="text-red-600 hover:underline">kaldır</button>
                         </li>
                       ))}
