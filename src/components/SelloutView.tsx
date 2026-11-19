@@ -2145,7 +2145,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
             </p>
             <p className="mb-2 px-1 text-[11px] text-gray-500">
               <span className="font-bold text-blue-700">Mavi kalın</span> şubelerde seçili ayda Çetinler Merch satış girişi var (üzerine gelince kim, kaç adet).
-              {' '}<MapPin size={11} className="inline text-orange-500 -mt-0.5" /> seçili ayda ziyaret (check-in) edilen şube (üzerine gelince tarih ve kişi).
+              {' '}<MapPin size={11} className="inline text-orange-500 -mt-0.5" /> seçili ayda ziyaret (check-in) edilen şube (üzerine gelince tarih ve kişi). Dipteki oran = Kalan ÷ Satış; 3,00 üstü <span className="text-red-600 font-semibold">kırmızı</span>, altı <span className="text-green-600 font-semibold">yeşil</span>.
             </p>
             {sgCariOptions.length > 1 && (
               <div className="mb-2 px-1">
@@ -2298,6 +2298,22 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                             <td className="border border-gray-200 px-2 py-1.5 text-right tabular-nums">{stokluSube > 0 ? topBekleyen.toLocaleString('tr-TR') : '—'}</td>
                             <td className="border border-gray-200 px-2 py-1.5 text-right tabular-nums">{stokluSube > 0 ? topKalan.toLocaleString('tr-TR') : '—'}</td>
                           </tr>
+                          {stokluSube > 0 && (() => {
+                            const oran = topSatis > 0 ? topKalan / topSatis : null
+                            return (
+                              <tr className="bg-brand-50 font-semibold text-gray-800">
+                                <td className="border border-gray-200 px-2 py-1.5 text-center text-gray-500">%</td>
+                                <td colSpan={3} className="border border-gray-200 px-3 py-1.5 whitespace-nowrap"
+                                  title="Kalan toplamı ÷ Satış toplamı. 3,00 üstü kırmızı (stok, satışın 3 katından fazla), 3,00 ve altı yeşil.">
+                                  Kalan / Satış oranı
+                                </td>
+                                <td className={clsx('border border-gray-200 px-2 py-1.5 text-right tabular-nums',
+                                  oran === null ? 'text-gray-400' : oran > 3 ? 'text-red-600' : 'text-green-600')}>
+                                  {oran === null ? '—' : oran.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                              </tr>
+                            )
+                          })()}
                         </tfoot>
                       </table>
                     )
