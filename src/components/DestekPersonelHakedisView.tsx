@@ -191,23 +191,26 @@ export function DestekPersonelHakedisView({ currentUserName, currentUserRole }: 
         const effMerch = donemMerchOf(dp.sube_kod || '', dp.cari_adi, dp.sube_adi) || apiMerch
         const mk = effMerch.toLowerCase()
 
-        // Merch Hedefleri'nde "Destek Personeli var mı?" = true olmayanları filtrele
-        // Admin/Manager/BSY rolleri için flag kontrolü uygulanmaz — tüm satırları göster
-        const applyFlagFilter = currentUserRole === 'sup' || currentUserRole === 'jr'
-        // Devir (Eylül 2026): Atilla ekibinin bayrağı işaretlenmedi; bu satırları
-        // şubenin güncel süpervizörü görüp hakediş dağıtsın (bkz. lib/supDevir).
+        // Önce tam eşleşme, sonra cari+şube+destek, en son sadece merch_adi
+        const fk  = `${nk(dp.cari_adi)}||${nk(dp.sube_adi)}||${nk(effMerch)}||${nk(dp.merch_adi)}`
+        const csm = csmMap.get(`${nk(dp.cari_adi)}||${nk(dp.sube_adi)}||${nk(dp.merch_adi)}`)
+        const savedHakedis = fullMap.get(fk) ?? csm?.hakedis ?? merchMap.get(nk(dp.merch_adi)) ?? 0
+
+        // Destek personeli yalnızca o ay şubede Çetinler Merch varsa VE o merch'ün
+        // "Destek Personeli var mı?" seçeneği işaretliyse listelenir (tüm roller).
+        // Önceden yönetici/BSY için bu kontrol yapılmıyor, Çetinler Merch'i olmayan
+        // şubeler (ör. Ekim'de EVKUR BAĞCILAR) de geliyordu.
+        // İstisnalar: ayın hiç bayrağı girilmemişse bayrak şartı aranmaz; devir ayı
+        // (Eylül 2026) Atilla ekibi; daha önce hakediş girilmiş satır (kayıt kaybolmasın).
         const devirIstisnasi = donem === DEVIR_DONEMI && isDevirMerch(effMerch)
-        if (applyFlagFilter && !devirIstisnasi && destekFlagMap.size > 0 && mk && !destekFlagMap.get(mk)) continue
+        const bayrakTamam = destekFlagMap.size === 0 || !!destekFlagMap.get(mk) || devirIstisnasi
+        if ((!mk || !bayrakTamam) && !(savedHakedis > 0)) continue
 
         // Cari + Şube + Çetinler Merch + Destek Personeli aynıysa tek satır
         const dedup = `${nk(dp.cari_adi)}||${nk(dp.sube_adi)}||${mk}||${nk(dp.merch_adi)}`
         if (seen.has(dedup)) continue
         seen.add(dedup)
 
-        // Önce tam eşleşme, sonra cari+şube+destek, en son sadece merch_adi
-        const fk  = `${nk(dp.cari_adi)}||${nk(dp.sube_adi)}||${nk(effMerch)}||${nk(dp.merch_adi)}`
-        const csm = csmMap.get(`${nk(dp.cari_adi)}||${nk(dp.sube_adi)}||${nk(dp.merch_adi)}`)
-        const savedHakedis = fullMap.get(fk) ?? csm?.hakedis ?? merchMap.get(nk(dp.merch_adi)) ?? 0
         const displayMerch = effMerch || dp.cetinler_merch
         built.push({
           cari_adi:               dp.cari_adi,
