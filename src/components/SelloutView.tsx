@@ -2233,7 +2233,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
               </div>
             ) : (
               <div className="overflow-auto">
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2">
                   {satisGirmeyenColumns.map((c, ci) => {
                     const detaylar = c.subeler.map(s => sgStok.detay(s.subeKod))
                     const topSatis = c.subeler.reduce((t, s) => t + s.adet, 0)
@@ -2242,7 +2242,7 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                     const stokluSube = detaylar.filter(d => d.stokVar).length
                     const sayi = (n: number | null) => (n === null ? '—' : n.toLocaleString('tr-TR'))
                     return (
-                      <table key={ci} className="border-collapse text-xs shrink-0">
+                      <table key={ci} className="border-collapse text-[11px] shrink-0">
                         <thead>
                           <tr>
                             <th colSpan={5} className="border border-gray-200 bg-brand-700 text-white px-3 py-1.5 text-center font-semibold whitespace-nowrap">
@@ -2253,11 +2253,11 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                             </th>
                           </tr>
                           <tr>
-                            <th className="border border-gray-200 bg-gray-50 px-2 py-1 text-center text-gray-400 w-8">#</th>
-                            <th className="border border-gray-200 bg-gray-100 px-3 py-1 text-left font-medium text-gray-600 min-w-[200px]">Cari / Şube</th>
-                            <th className="border border-gray-200 bg-gray-100 px-2 py-1 text-right font-medium text-gray-600 w-16">Satış</th>
-                            <th className="border border-gray-200 bg-gray-100 px-2 py-1 text-right font-medium text-gray-600 w-16">Bekleyen</th>
-                            <th className="border border-gray-200 bg-gray-100 px-2 py-1 text-right font-medium text-gray-600 w-16">Kalan</th>
+                            <th className="border border-gray-200 bg-gray-50 px-1 py-1 text-center text-gray-400 w-6">#</th>
+                            <th className="border border-gray-200 bg-gray-100 px-2 py-1 text-left font-medium text-gray-600 min-w-[150px]">Cari / Şube</th>
+                            <th className="border border-gray-200 bg-gray-100 px-1.5 py-1 text-right font-medium text-gray-600 w-12">Satış</th>
+                            <th className="border border-gray-200 bg-gray-100 px-1.5 py-1 text-right font-medium text-gray-600 w-12">Bekleyen</th>
+                            <th className="border border-gray-200 bg-gray-100 px-1.5 py-1 text-right font-medium text-gray-600 w-12">Kalan</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2270,8 +2270,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                               <React.Fragment key={key}>
                                 <tr className={clsx(ri % 2 ? 'bg-gray-50/60' : '', acilir && 'cursor-pointer hover:bg-brand-50/50')}
                                   onClick={() => acilir && setSgAcik(prev => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n })}>
-                                  <td className="border border-gray-200 px-2 py-1 text-center text-gray-400 tabular-nums">{ri + 1}</td>
-                                  <td className="border border-gray-200 px-2 py-1 whitespace-nowrap"
+                                  <td className="border border-gray-200 px-1 py-1 text-center text-gray-400 tabular-nums">{ri + 1}</td>
+                                  <td className="border border-gray-200 px-1.5 py-1 whitespace-nowrap"
                                     title={s.kayit ? `B2B kaydı (şube kodu ${s.subeKod}):\n${s.kayit}` : undefined}>
                                     <span className="inline-flex items-center gap-1">
                                       {acilir
@@ -2293,20 +2293,20 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                                       })()}
                                     </span>
                                   </td>
-                                  <td className="border border-gray-200 px-2 py-1 text-right tabular-nums text-gray-600">{s.adet}</td>
-                                  <td className="border border-gray-200 px-2 py-1 text-right tabular-nums text-gray-600">{sayi(d.bekleyen)}</td>
-                                  <td className={clsx('border border-gray-200 px-2 py-1 text-right tabular-nums font-medium',
+                                  <td className="border border-gray-200 px-1.5 py-1 text-right tabular-nums text-gray-600">{s.adet}</td>
+                                  <td className="border border-gray-200 px-1.5 py-1 text-right tabular-nums text-gray-600">{sayi(d.bekleyen)}</td>
+                                  <td className={clsx('border border-gray-200 px-1.5 py-1 text-right tabular-nums font-medium',
                                     d.kalan !== null && d.kalan < 0 ? 'text-red-600' : 'text-gray-800')}>{sayi(d.kalan)}</td>
                                 </tr>
                                 {acik && d.urunler.map(u => (
                                   <tr key={`${key}|${u.stokKodu}`} className="bg-amber-50/40 text-[11px]">
                                     <td className="border border-gray-200" />
-                                    <td className="border border-gray-200 pl-7 pr-2 py-0.5 whitespace-nowrap" title={u.stokAdi || undefined}>
+                                    <td className="border border-gray-200 pl-6 pr-1.5 py-0.5 whitespace-nowrap" title={u.stokAdi || undefined}>
                                       <span className="font-mono text-gray-700">{u.stokKodu}</span>
                                     </td>
-                                    <td className="border border-gray-200 px-2 py-0.5 text-right tabular-nums text-gray-600">{u.satis || ''}</td>
-                                    <td className="border border-gray-200 px-2 py-0.5 text-right tabular-nums text-gray-600">{d.stokVar ? u.bekleyen : '—'}</td>
-                                    <td className={clsx('border border-gray-200 px-2 py-0.5 text-right tabular-nums',
+                                    <td className="border border-gray-200 px-1.5 py-0.5 text-right tabular-nums text-gray-600">{u.satis || ''}</td>
+                                    <td className="border border-gray-200 px-1.5 py-0.5 text-right tabular-nums text-gray-600">{d.stokVar ? u.bekleyen : '—'}</td>
+                                    <td className={clsx('border border-gray-200 px-1.5 py-0.5 text-right tabular-nums',
                                       d.stokVar && u.kalan < 0 ? 'text-red-600' : 'text-gray-700')}>{d.stokVar ? u.kalan : '—'}</td>
                                   </tr>
                                 ))}
@@ -2316,24 +2316,24 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                         </tbody>
                         <tfoot>
                           <tr className="bg-brand-50 font-semibold text-gray-800">
-                            <td className="border border-gray-200 px-2 py-1.5 text-center text-gray-500">Σ</td>
-                            <td className="border border-gray-200 px-3 py-1.5 whitespace-nowrap">
+                            <td className="border border-gray-200 px-1 py-1.5 text-center text-gray-500">Σ</td>
+                            <td className="border border-gray-200 px-2 py-1.5 whitespace-nowrap">
                               Toplam <span className="font-normal text-gray-500">({c.subeler.length} şube{stokluSube > 0 ? `, ${stokluSube} stoklu` : ''})</span>
                             </td>
-                            <td className="border border-gray-200 px-2 py-1.5 text-right tabular-nums">{topSatis.toLocaleString('tr-TR')}</td>
-                            <td className="border border-gray-200 px-2 py-1.5 text-right tabular-nums">{stokluSube > 0 ? topBekleyen.toLocaleString('tr-TR') : '—'}</td>
-                            <td className="border border-gray-200 px-2 py-1.5 text-right tabular-nums">{stokluSube > 0 ? topKalan.toLocaleString('tr-TR') : '—'}</td>
+                            <td className="border border-gray-200 px-1.5 py-1.5 text-right tabular-nums">{topSatis.toLocaleString('tr-TR')}</td>
+                            <td className="border border-gray-200 px-1.5 py-1.5 text-right tabular-nums">{stokluSube > 0 ? topBekleyen.toLocaleString('tr-TR') : '—'}</td>
+                            <td className="border border-gray-200 px-1.5 py-1.5 text-right tabular-nums">{stokluSube > 0 ? topKalan.toLocaleString('tr-TR') : '—'}</td>
                           </tr>
                           {stokluSube > 0 && (() => {
                             const oran = topSatis > 0 ? topKalan / topSatis : null
                             return (
                               <tr className="bg-brand-50 font-semibold text-gray-800">
-                                <td className="border border-gray-200 px-2 py-1.5 text-center text-gray-500">%</td>
-                                <td colSpan={3} className="border border-gray-200 px-3 py-1.5 whitespace-nowrap"
+                                <td className="border border-gray-200 px-1 py-1.5 text-center text-gray-500">%</td>
+                                <td colSpan={3} className="border border-gray-200 px-2 py-1.5 whitespace-nowrap"
                                   title="Kalan toplamı ÷ Satış toplamı. 3,00 üstü kırmızı (stok, satışın 3 katından fazla), 3,00 ve altı yeşil.">
                                   Kalan / Satış oranı
                                 </td>
-                                <td className={clsx('border border-gray-200 px-2 py-1.5 text-right tabular-nums',
+                                <td className={clsx('border border-gray-200 px-1.5 py-1.5 text-right tabular-nums',
                                   oran === null ? 'text-gray-400' : oran > 3 ? 'text-red-600' : 'text-green-600')}>
                                   {oran === null ? '—' : oran.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </td>
