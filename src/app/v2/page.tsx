@@ -188,6 +188,26 @@ export default function V2Page() {
         </div>
       </header>
 
+      {/* Yönetici başkasının gözünden bakarken: kimin gözünden bakıldığı */}
+      {profile.role === 'admin' && (() => {
+        const secili = gorunumAdaylari.find(p => p.id === gorunum)
+        if (!secili) return null
+        return (
+          <div className="sticky top-14 z-10 bg-amber-100 border-b border-amber-200 text-amber-900">
+            <div className={clsx('mx-auto px-4 py-1.5 flex items-center gap-2 text-sm', GENIS.includes(sekme) ? 'max-w-7xl' : 'max-w-3xl')}>
+              <Eye size={15} className="shrink-0" />
+              <span className="flex-1 min-w-0 truncate">
+                <b>{secili.full_name}</b>
+                <span className="text-amber-800"> ({V2_ROL_ADI[secili.role] ?? secili.role})</span> gözünden görüntülüyorsunuz
+              </span>
+              <button onClick={() => setGorunumAcik(true)} className="shrink-0 rounded-lg px-2 py-0.5 text-xs hover:bg-amber-200">Değiştir</button>
+              <button onClick={() => { setGorunum(''); setGorunumAcik(false) }}
+                className="shrink-0 rounded-lg bg-amber-600 px-2.5 py-0.5 text-xs font-medium text-white hover:bg-amber-700">Kendime dön</button>
+            </div>
+          </div>
+        )
+      })()}
+
       <main className={clsx('mx-auto px-4 py-4 space-y-4', GENIS.includes(sekme) ? 'max-w-7xl' : 'max-w-3xl')}>
         {/* Yönetici: kullanıcının gözünden bak */}
         {profile.role === 'admin' && gorunumAcik && (
