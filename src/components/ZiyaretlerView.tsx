@@ -13,6 +13,18 @@ import { Profile, Task } from '@/lib/supabase'
 // ─────────────────────────────────────────────────────
 // ZİYARET HARİTASI (Leaflet — CDN üzerinden dinamik yüklenir)
 // ─────────────────────────────────────────────────────
+// Türkiye il sınırları (public/geo/tr-iller.json — OpenStreetMap kaynaklı, ODbL); bir kez yüklenir
+let ilSinirCache: Promise<unknown | null> | null = null
+function ilSinirlari(): Promise<unknown | null> {
+  if (!ilSinirCache) {
+    ilSinirCache = fetch('/geo/tr-iller.json')
+      .then(r => (r.ok ? r.json() : null))
+      .catch(() => null)
+      .then(j => { if (!j) ilSinirCache = null; return j })
+  }
+  return ilSinirCache
+}
+
 function escapeHtml(s: string): string {
   return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
@@ -63,13 +75,22 @@ function VisitsMap({ markers, profileMap, doneCount, planCount }: {
         const L = (window as any).L
 
         if (mapObj.current) { mapObj.current.remove(); mapObj.current = null }
-        const map = L.map(mapRef.current, { scrollWheelZoom: true }).setView([39.0, 35.0], 6)
+        const map = L.map(mapRef.current, { scrollWheelZoom: true, zoomSnap: 0.25, maxZoom: 12 }).setView([39.0, 35.0], 6)
         mapObj.current = map
+        map.getContainer().style.background = '#ffffff'
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap katkıcıları',
-          maxZoom: 19,
-        }).addTo(map)
+        // Düz beyaz Türkiye haritası: yalnızca il sınırları (karo katmanı yok)
+        const iller = await ilSinirlari()
+        if (cancelled) return
+        if (iller) {
+          L.geoJSON(iller, {
+            style: { color: '#9ca3af', weight: 1, fillColor: '#ffffff', fillOpacity: 1 },
+            onEachFeature: (f: { properties?: { ad?: string } }, layer: { bindTooltip: (t: string, o: object) => void }) => {
+              if (f.properties?.ad) layer.bindTooltip(f.properties.ad, { sticky: true, direction: 'top', opacity: 0.85 })
+            },
+          }).addTo(map)
+          map.attributionControl.addAttribution('İl sınırları © OpenStreetMap katkıcıları (ODbL)')
+        }
 
         const latlngs: [number, number][] = []
         markers.forEach(m => {
@@ -106,7 +127,9 @@ function VisitsMap({ markers, profileMap, doneCount, planCount }: {
         })
 
         if (latlngs.length > 0) {
-          map.fitBounds(latlngs, { padding: [40, 40], maxZoom: 13 })
+          map.fitBounds(latlngs, { padding: [40, 40], maxZoom: 10 })
+        } else {
+          map.fitBounds([[35.8, 25.6], [42.1, 44.8]])
         }
         // Harita konteyneri sonradan boyutlandıysa yeniden hesapla
         setTimeout(() => { if (!cancelled && mapObj.current) mapObj.current.invalidateSize() }, 200)
