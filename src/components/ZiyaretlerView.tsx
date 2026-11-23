@@ -13,6 +13,31 @@ import { Profile, Task } from '@/lib/supabase'
 // ─────────────────────────────────────────────────────
 // ZİYARET HARİTASI (Leaflet — CDN üzerinden dinamik yüklenir)
 // ─────────────────────────────────────────────────────
+interface IlGeo {
+  features: { properties?: { ad?: string }; geometry: { type: string; coordinates: number[][][] | number[][][][] } }[]
+}
+
+/** İlin etiket noktası: en büyük poligonun alan ağırlıklı merkezi [lat, lng] */
+function ilMerkezi(g: IlGeo['features'][number]['geometry']): [number, number] | null {
+  const poligonlar = (g.type === 'MultiPolygon' ? g.coordinates : [g.coordinates]) as number[][][][]
+  let enIyi: { alan: number; x: number; y: number } | null = null
+  for (const pol of poligonlar) {
+    const halka = pol[0]
+    if (!halka || halka.length < 3) continue
+    let a = 0, cx = 0, cy = 0
+    for (let i = 0, j = halka.length - 1; i < halka.length; j = i++) {
+      const k = halka[j][0] * halka[i][1] - halka[i][0] * halka[j][1]
+      a += k
+      cx += (halka[j][0] + halka[i][0]) * k
+      cy += (halka[j][1] + halka[i][1]) * k
+    }
+    if (a === 0) continue
+    const alan = Math.abs(a / 2)
+    if (!enIyi || alan > enIyi.alan) enIyi = { alan, x: cx / (3 * a), y: cy / (3 * a) }
+  }
+  return enIyi ? [enIyi.y, enIyi.x] : null
+}
+
 // Türkiye il sınırları (public/geo/tr-iller.json — OpenStreetMap kaynaklı, ODbL); bir kez yüklenir
 let ilSinirCache: Promise<unknown | null> | null = null
 function ilSinirlari(): Promise<unknown | null> {
@@ -83,12 +108,34 @@ function VisitsMap({ markers, profileMap, doneCount, planCount }: {
         const iller = await ilSinirlari()
         if (cancelled) return
         if (iller) {
+          // Katmanlar: il alanları (altta) → il adları → ziyaret noktaları (üstte)
+          map.createPane('iller').style.zIndex = '300'
+          const etiketPane = map.createPane('ilAdlari')
+          etiketPane.style.zIndex = '350'
+          etiketPane.style.pointerEvents = 'none'
+          // Uzaktan bakınca il adları küçülür (81 il üst üste binmesin)
+          const etiketBoyu = () => { etiketPane.style.fontSize = map.getZoom() < 6 ? '8px' : map.getZoom() < 7 ? '9px' : '11px' }
+          etiketBoyu()
+          map.on('zoomend', etiketBoyu)
           L.geoJSON(iller, {
+            pane: 'iller',
+            interactive: false,
             style: { color: '#9ca3af', weight: 1, fillColor: '#ffffff', fillOpacity: 1 },
-            onEachFeature: (f: { properties?: { ad?: string } }, layer: { bindTooltip: (t: string, o: object) => void }) => {
-              if (f.properties?.ad) layer.bindTooltip(f.properties.ad, { sticky: true, direction: 'top', opacity: 0.85 })
-            },
           }).addTo(map)
+          for (const f of (iller as IlGeo).features) {
+            const merkez = ilMerkezi(f.geometry)
+            if (!merkez || !f.properties?.ad) continue
+            L.marker(merkez, {
+              pane: 'ilAdlari',
+              interactive: false,
+              keyboard: false,
+              icon: L.divIcon({
+                className: '',
+                iconSize: [0, 0],
+                html: `<div style="transform:translate(-50%,-50%);white-space:nowrap;font-weight:500;color:#6b7280;letter-spacing:.02em;text-shadow:0 0 2px #fff,0 0 2px #fff">${escapeHtml(f.properties.ad)}</div>`,
+              }),
+            }).addTo(map)
+          }
           map.attributionControl.addAttribution('İl sınırları © OpenStreetMap katkıcıları (ODbL)')
         }
 
