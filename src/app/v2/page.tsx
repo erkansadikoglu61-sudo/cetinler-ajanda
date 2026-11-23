@@ -43,6 +43,7 @@ export default function V2Page() {
   const { team, bsyLinks, visibleIds } = useTeam(profile)
   const [sekme, setSekme] = useState<Sekme>('hesabim')
   const [gorunum, setGorunum] = useState<string>('')
+  const [gorunumAcik, setGorunumAcik] = useState(false)
   const [veri, setVeri] = useState<V2Veri | null>(null)
   const [yukleniyor, setYukleniyor] = useState(false)
   const [hata, setHata] = useState('')
@@ -147,7 +148,7 @@ export default function V2Page() {
       {/* Üst bar */}
       <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-gray-200">
         <div className={clsx('mx-auto px-4 h-14 flex items-center gap-3', GENIS.includes(sekme) ? 'max-w-7xl' : 'max-w-3xl')}>
-          <span className="font-semibold text-brand-700">Çetinler Ajanda</span>
+          <span className="font-semibold text-brand-700 whitespace-nowrap">Çetinler Ajanda</span>
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-brand-100 text-brand-700">v2</span>
           <nav className="hidden md:flex items-center gap-1 ml-4">
             {sekmeler.map(s => (
@@ -162,6 +163,18 @@ export default function V2Page() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-1">
+            {profile.role === 'admin' && (() => {
+              const secili = gorunumAdaylari.find(p => p.id === gorunum)
+              return (
+                <button onClick={() => setGorunumAcik(a => !a)}
+                  title={secili ? `${secili.full_name} olarak görüntülüyorsunuz — değiştirmek için tıklayın` : 'Başka kullanıcının gözünden görüntüle'}
+                  className={clsx('relative p-2 rounded-lg hover:bg-gray-100',
+                    secili ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : gorunumAcik ? 'bg-gray-100 text-gray-700' : 'text-gray-500')}>
+                  <Eye size={16} />
+                  {secili && <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-amber-500" />}
+                </button>
+              )
+            })()}
             <button onClick={() => yukle(true)} title="B2B'den yenile"
               className="p-2 rounded-lg text-gray-500 hover:bg-gray-100">
               <RefreshCw size={16} className={clsx(yukleniyor && 'animate-spin')} />
@@ -177,11 +190,11 @@ export default function V2Page() {
 
       <main className={clsx('mx-auto px-4 py-4 space-y-4', GENIS.includes(sekme) ? 'max-w-7xl' : 'max-w-3xl')}>
         {/* Yönetici: kullanıcının gözünden bak */}
-        {profile.role === 'admin' && (
+        {profile.role === 'admin' && gorunumAcik && (
         <label className="flex items-center gap-2 rounded-xl border border-dashed border-gray-300 bg-white px-3 py-2 text-sm max-w-3xl mx-auto">
           <Eye size={15} className="text-gray-400 shrink-0" />
           <span className="text-gray-500 shrink-0">Görünüm:</span>
-          <select value={gorunum} onChange={e => setGorunum(e.target.value)}
+          <select value={gorunum} onChange={e => { setGorunum(e.target.value); setGorunumAcik(false) }}
             className="flex-1 min-w-0 bg-transparent focus:outline-none text-gray-800">
             <option value="">Kendim ({profile.full_name})</option>
             {gorunumAdaylari.map(p => (
