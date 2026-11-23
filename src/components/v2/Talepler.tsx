@@ -105,7 +105,11 @@ function tarih(iso: string) {
   return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-export function TaleplerListesi({ gorunum, yenile }: { gorunum: string; yenile: number }) {
+export function TaleplerListesi({ gorunum, yenile, baslik = 'Talepler', bosMetin = 'Talep yok.', bossaGizle = false }: {
+  gorunum: string; yenile: number; baslik?: string; bosMetin?: string
+  /** Açık talep yoksa hiç gösterme (Hesabım) */
+  bossaGizle?: boolean
+}) {
   const [talepler, setTalepler] = useState<Talep[] | null>(null)
   const [hata, setHata] = useState('')
   const [tabloYok, setTabloYok] = useState(false)
@@ -142,18 +146,19 @@ export function TaleplerListesi({ gorunum, yenile }: { gorunum: string; yenile: 
   }
   const liste = (talepler ?? []).filter(t => !sadeceAcik || t.durum === 'acik')
   const acikSayi = (talepler ?? []).filter(t => t.durum === 'acik').length
+  if (bossaGizle && sadeceAcik && !hata && (!talepler || acikSayi === 0)) return null
 
   return (
     <section className="rounded-xl border border-gray-200 bg-white overflow-hidden">
       <div className="px-4 py-2.5 flex items-center gap-2 border-b border-gray-100">
         <MessageSquareWarning size={15} className="text-brand-600" />
-        <span className="flex-1 text-sm font-medium text-gray-700">Talepler {acikSayi > 0 && <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-xs text-amber-800">{acikSayi} açık</span>}</span>
+        <span className="flex-1 text-sm font-medium text-gray-700">{baslik} {acikSayi > 0 && <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-xs text-amber-800">{acikSayi} açık</span>}</span>
         <button onClick={() => setSadeceAcik(s => !s)} className="text-xs text-brand-600">
           {sadeceAcik ? 'Tümünü göster' : 'Yalnızca açıklar'}
         </button>
       </div>
       {hata && <p className="px-4 py-2 text-xs text-red-600">{hata}</p>}
-      {talepler && liste.length === 0 && <p className="px-4 py-3 text-xs text-gray-400">Talep yok.</p>}
+      {talepler && liste.length === 0 && <p className="px-4 py-3 text-xs text-gray-400">{sadeceAcik ? bosMetin : 'Kayıt yok.'}</p>}
       <ul className="divide-y divide-gray-50">
         {liste.map(t => (
           <li key={t.id} className="px-4 py-3 space-y-1.5">

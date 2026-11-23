@@ -219,7 +219,7 @@ export default function V2Page() {
           </div>
         )}
 
-        {veri && sekme === 'hesabim' && <HesabimView veri={veri} gorunum={gorunum} onSubelerim={() => setSekme('subelerim')} />}
+        {veri && sekme === 'hesabim' && <HesabimView veri={veri} gorunum={gorunum} onSubelerim={() => setSekme('subelerim')} onVeriYenile={() => yukle()} />}
         {veri && sekme === 'subelerim' && <SubelerimView veri={veri} gorunum={gorunum} />}
         {veri && sekme === 'prim' && <PrimView key={gorunum} rol={veri.kullanici.rol} gorunum={gorunum} oturum={oturum!} />}
         {veri && sekme === 'ajanda' && (

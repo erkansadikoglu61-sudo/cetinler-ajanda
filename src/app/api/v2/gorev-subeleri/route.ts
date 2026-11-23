@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { gorunurNoktalar, altKullanicilar, cariyeGoreGrupla } from '@/lib/v2/nokta'
 import { noktaModeli } from '@/lib/v2/noktaModel'
+import { merchSubeSecimleri, merchSecimleriniUygula } from '@/lib/v2/merchSube'
 import { v2Istek } from '@/lib/v2/sunucu'
 
 // v2 Ajanda — görev penceresinin şube listesi.
@@ -23,8 +24,9 @@ export async function GET(req: Request) {
   if (!kisi) return NextResponse.json({ error: 'Profil bulunamadı' }, { status: 404 })
 
   try {
-    const model = await noktaModeli()
-    const gruplar = cariyeGoreGrupla(gorunurNoktalar(model.noktalar, kisi, ctx.profiller, ctx.links))
+    const [model, secimler] = await Promise.all([noktaModeli(), merchSubeSecimleri(ctx.sb)])
+    const noktalar = merchSecimleriniUygula(model.noktalar, secimler, ctx.profiller)
+    const gruplar = cariyeGoreGrupla(gorunurNoktalar(noktalar, kisi, ctx.profiller, ctx.links))
     return NextResponse.json({
       kisi: kisi.full_name,
       gruplar: gruplar.map(g => ({

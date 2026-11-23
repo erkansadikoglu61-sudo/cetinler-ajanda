@@ -1,17 +1,19 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Copy, Check, Store, Building2, Users, ChevronRight, Wallet, Clock, CheckCircle2, FlaskConical } from 'lucide-react'
+import { Copy, Check, Store, MapPin, Wallet, Clock, CheckCircle2, FlaskConical, Pencil } from 'lucide-react'
 import clsx from 'clsx'
 import { MONTHS_TR } from '@/lib/constants'
 import { V2Veri, V2Hesabim, V2_ROL_ADI, ibanBicimle, tl } from './types'
-import { TalepModal } from './Talepler'
+import { TalepModal, TaleplerListesi } from './Talepler'
+import { MerchSubeSecim, EkipMerchleri, subeEtiketi } from './MerchSubeSecim'
 import { BildirimKarti } from './BildirimKarti'
 
 interface Props {
   veri: V2Veri
   gorunum: string
   onSubelerim: () => void
+  onVeriYenile: () => void
 }
 
 function tarihTr(iso: string | null): string {
@@ -20,13 +22,15 @@ function tarihTr(iso: string | null): string {
   return `${d}.${m}.${y}`
 }
 
-export function HesabimView({ veri, gorunum, onSubelerim }: Props) {
+export function HesabimView({ veri, gorunum, onSubelerim, onVeriYenile }: Props) {
   const k = veri.kullanici
   const [kopyalandi, setKopyalandi] = useState(false)
   const [hesap, setHesap] = useState<V2Hesabim | null>(null)
   const [hesapHata, setHesapHata] = useState('')
   const [talep, setTalep] = useState(false)
   const [talepGitti, setTalepGitti] = useState(false)
+  const [talepSayac, setTalepSayac] = useState(0)
+  const [subeSec, setSubeSec] = useState(false)
 
   useEffect(() => {
     let iptal = false
@@ -53,10 +57,10 @@ export function HesabimView({ veri, gorunum, onSubelerim }: Props) {
     } catch { /* pano izni yok */ }
   }
 
-  // Görünen ilk birkaç şube (kendi şubeleri önce)
-  const ilkSubeler = [...veri.noktalar]
-    .sort((a, b) => (a.kapsam === b.kapsam ? 0 : a.kapsam === 'kendi' ? -1 : 1))
-    .slice(0, 4)
+  // Saha personeli (Çetinler Merch): görev şubeleri kimlik kartında
+  const sahaPersoneli = k.rol === 'merch'
+  const benimSubelerim = veri.noktalar.filter(n => n.kapsam === 'kendi')
+    .sort((a, b) => subeEtiketi(a).localeCompare(subeEtiketi(b), 'tr'))
 
   return (
     <div className="space-y-4">
@@ -85,20 +89,49 @@ export function HesabimView({ veri, gorunum, onSubelerim }: Props) {
           )}
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-xl bg-white/10 py-2">
-            <p className="text-lg font-semibold">{veri.ozet.cari}</p>
-            <p className="text-[11px] text-white/70">Cari</p>
+        {sahaPersoneli ? (
+          <div className="mt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] uppercase tracking-wider text-white/60">
+                {benimSubelerim.length > 1 ? `Görev şubelerim (${benimSubelerim.length})` : 'Görev şubem'}
+              </p>
+              <button onClick={() => setSubeSec(true)}
+                className="inline-flex items-center gap-1 rounded-lg bg-white/15 px-2 py-1 text-[11px] hover:bg-white/25">
+                <Pencil size={11} /> Şubelerimi seç
+              </button>
+            </div>
+            {benimSubelerim.length === 0 ? (
+              <p className="mt-1 text-sm text-white/70">Kayıtlı şube yok — &quot;Şubelerimi seç&quot; ile ekleyin.</p>
+            ) : (
+              <ul className="mt-2 space-y-1.5">
+                {benimSubelerim.map(n => (
+                  <li key={n.key} className="flex items-start gap-2 rounded-xl bg-white/10 px-3 py-2">
+                    <MapPin size={14} className="mt-0.5 shrink-0 text-white/70" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium truncate">{subeEtiketi(n)}</span>
+                      <span className="block text-[11px] text-white/60 truncate">{n.cariAdi}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-          <div className="rounded-xl bg-white/10 py-2">
-            <p className="text-lg font-semibold">{veri.ozet.nokta}</p>
-            <p className="text-[11px] text-white/70">Şube</p>
+        ) : (
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-xl bg-white/10 py-2">
+              <p className="text-lg font-semibold">{veri.ozet.cari}</p>
+              <p className="text-[11px] text-white/70">Cari</p>
+            </div>
+            <button onClick={onSubelerim} className="rounded-xl bg-white/10 py-2 hover:bg-white/20" title="Şubelerim">
+              <p className="text-lg font-semibold">{veri.ozet.nokta}</p>
+              <p className="text-[11px] text-white/70">Şube</p>
+            </button>
+            <div className="rounded-xl bg-white/10 py-2">
+              <p className="text-lg font-semibold">{k.altlar.length}</p>
+              <p className="text-[11px] text-white/70">Ekip</p>
+            </div>
           </div>
-          <div className="rounded-xl bg-white/10 py-2">
-            <p className="text-lg font-semibold">{k.altlar.length}</p>
-            <p className="text-[11px] text-white/70">Ekip</p>
-          </div>
-        </div>
+        )}
 
         <button onClick={() => setTalep(true)}
           className="mt-4 w-full rounded-xl border border-white/25 py-2 text-xs text-white/85 hover:bg-white/10">
@@ -106,7 +139,16 @@ export function HesabimView({ veri, gorunum, onSubelerim }: Props) {
         </button>
       </section>
       {talep && (
-        <TalepModal tip="hatali_bilgi" ilgiliId={k.id} onClose={() => setTalep(false)} onGonderildi={() => setTalepGitti(true)} />
+        <TalepModal tip="hatali_bilgi" ilgiliId={k.id} onClose={() => setTalep(false)}
+          onGonderildi={() => { setTalepGitti(true); setTalepSayac(x => x + 1) }} />
+      )}
+      {subeSec && (
+        <MerchSubeSecim merchId={k.id} gorunum={gorunum} onClose={() => setSubeSec(false)} onKaydedildi={onVeriYenile} />
+      )}
+
+      {/* Sup / Jr: ekibindeki merch'lerin görev şubeleri */}
+      {(k.rol === 'sup' || k.rol === 'jr') && (
+        <EkipMerchleri gorunum={gorunum} yenile={0} onDegisti={onVeriYenile} />
       )}
 
       {/* Bakiye kartı */}
@@ -159,30 +201,9 @@ export function HesabimView({ veri, gorunum, onSubelerim }: Props) {
 
       <BildirimKarti />
 
-      {/* Şubelerim özeti */}
-      <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
-        <button onClick={onSubelerim} className="w-full px-5 py-3 border-b border-gray-100 flex items-center justify-between text-sm font-medium text-gray-700 hover:bg-gray-50">
-          <span className="flex items-center gap-2"><Store size={16} /> Şubelerim</span>
-          <span className="flex items-center gap-1 text-brand-600 text-xs">Tümü <ChevronRight size={14} /></span>
-        </button>
-        {ilkSubeler.length === 0 ? (
-          <p className="px-5 py-4 text-sm text-gray-400">Bağlı şube bulunamadı.</p>
-        ) : (
-          <ul className="divide-y divide-gray-100">
-            {ilkSubeler.map(n => (
-              <li key={n.key} className="px-5 py-3 text-sm">
-                <p className="font-medium text-gray-800 truncate">{n.subeAdi || '—'}</p>
-                <p className="text-xs text-gray-500 flex items-center gap-1 truncate">
-                  <Building2 size={11} /> {n.cariAdi}
-                  {n.kapsam === 'ekip' && n.ekiptenKim && (
-                    <span className="ml-1 inline-flex items-center gap-0.5 text-gray-400"><Users size={11} /> {n.ekiptenKim}</span>
-                  )}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {/* Çözüm bekleyen notlar ve diğer kullanıcılardan gelen talepler */}
+      <TaleplerListesi gorunum={gorunum} yenile={talepSayac}
+        baslik="Çözüm bekleyen notlar ve talepler" bossaGizle />
     </div>
   )
 }

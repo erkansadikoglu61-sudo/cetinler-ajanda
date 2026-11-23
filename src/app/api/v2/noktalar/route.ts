@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { gorunurNoktalar, sadeAd, altKullanicilar } from '@/lib/v2/nokta'
 import { noktaModeli } from '@/lib/v2/noktaModel'
+import { merchSubeSecimleri, merchSecimleriniUygula } from '@/lib/v2/merchSube'
 import { v2Istek } from '@/lib/v2/sunucu'
 import { namesMatch } from '@/lib/sellout'
 
@@ -17,8 +18,8 @@ export async function GET(req: Request) {
   const { ben, profiller, links } = ctx
 
   try {
-    const model = await noktaModeli(yenile)
-    const noktalar = gorunurNoktalar(model.noktalar, ben, profiller, links)
+    const [model, secimler] = await Promise.all([noktaModeli(yenile), merchSubeSecimleri(ctx.sb)])
+    const noktalar = gorunurNoktalar(merchSecimleriniUygula(model.noktalar, secimler, profiller), ben, profiller, links)
 
     // Hesabım kimlik kartı
     const ust = ben.role === 'sup'
