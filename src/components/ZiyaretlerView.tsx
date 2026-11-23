@@ -352,7 +352,7 @@ export function CompletedVisitsView({
         <VisitsMap markers={mapMarkers} profileMap={profileMap} doneCount={doneCount} planCount={planCount} />
       ) : (
       <div className="flex-1 overflow-x-auto">
-      <table className="w-full text-sm border-collapse">
+      <table className="w-full min-w-[640px] table-fixed text-sm border-collapse">
         <thead className="bg-gray-50 sticky top-0">
           <tr className="border-b bg-gray-100">
             <th colSpan={5} className="text-left px-4 py-2">
@@ -372,11 +372,11 @@ export function CompletedVisitsView({
             </th>
           </tr>
           <tr className="border-b">
-            <th className="text-left px-4 py-3 font-medium text-gray-700">Ziyaret Edilen Cari / Şube</th>
-            <th className="text-left px-4 py-3 font-medium text-gray-700">Ziyaret Tarihi</th>
-            <th className="text-left px-4 py-3 font-medium text-gray-700">Ziyaret Nedeni</th>
-            <th className="text-left px-4 py-3 font-medium text-gray-700">Check-in Adresi</th>
-            <th className="text-left px-4 py-3 font-medium text-gray-700">Kişi</th>
+            <th className="text-left px-3 py-3 font-medium text-gray-700 w-[30%]">Ziyaret Edilen Cari / Şube</th>
+            <th className="text-left px-3 py-3 font-medium text-gray-700 w-24">Ziyaret Tarihi</th>
+            <th className="text-left px-3 py-3 font-medium text-gray-700 w-20">Ziyaret Nedeni</th>
+            <th className="text-left px-3 py-3 font-medium text-gray-700">Check-in Adresi</th>
+            <th className="text-left px-3 py-3 font-medium text-gray-700 w-28">Kişi</th>
           </tr>
         </thead>
         <tbody>
@@ -384,19 +384,19 @@ export function CompletedVisitsView({
             const profile = profileMap.get(t.pid)
             return (
               <tr key={t.id} className="border-b hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-gray-800">
+                <td className="px-3 py-3 font-medium text-gray-800 break-words">
                   {t.customer || '—'}
                 </td>
-                <td className="px-4 py-3 text-gray-600">
+                <td className="px-3 py-3 text-gray-600">
                   {t.checkin_ts ? format(new Date(t.checkin_ts), 'dd.MM.yyyy HH:mm', { locale: tr }) : '—'}
                 </td>
-                <td className="px-4 py-3 text-gray-600">
+                <td className="px-3 py-3 text-gray-600 break-words">
                   {t.type}
                 </td>
-                <td className="px-4 py-3 text-gray-600 max-w-xs truncate">
-                  {t.checkin_address || '—'}
+                <td className="px-3 py-3 text-gray-600 text-xs leading-snug break-words" title={t.checkin_address || undefined}>
+                  <span className="line-clamp-2">{t.checkin_address || '—'}</span>
                 </td>
-                <td className="px-4 py-3 text-gray-600">
+                <td className="px-3 py-3 text-gray-600 break-words">
                   {profile?.full_name || '—'}
                 </td>
               </tr>
