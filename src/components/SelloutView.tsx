@@ -824,6 +824,16 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
     // Çok kolonlu görünümde (admin/BSY) carinin şubesi olmayan kolonlar gizlenir
     return cols.length > 1 ? cols.filter(c => c.subeler.length > 0) : cols
   }, [satisGirmeyenBase, sgCari])
+  // Ekrandaki tablolardaki tekil şubelerin özeti (cari ve ay filtresiyle güncellenir)
+  const sgOzet = useMemo(() => {
+    const adet = new Map<string, number>()
+    satisGirmeyenColumns.forEach(c => c.subeler.forEach(x => {
+      const k = x.subeKod || `${x.cariAdi}||${x.subeAdi}`
+      adet.set(k, Math.max(adet.get(k) ?? 0, x.adet))
+    }))
+    const satisli = [...adet.values()].filter(a => a > 0).length
+    return { toplam: adet.size, satisli, girmeyen: adet.size - satisli }
+  }, [satisGirmeyenColumns])
 
   const sgGorunmeyen = useMemo(() => {
     if (!isAdmin) return []
@@ -2147,8 +2157,8 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
               <span className="font-bold text-blue-700">Mavi kalın</span> şubelerde seçili ayda Çetinler Merch satış girişi var (üzerine gelince kim, kaç adet).
               {' '}<MapPin size={11} className="inline text-orange-500 -mt-0.5" /> seçili ayda ziyaret (check-in) edilen şube (üzerine gelince tarih ve kişi). Dipteki oran = Kalan ÷ Satış; 3,00 üstü <span className="text-red-600 font-semibold">kırmızı</span>, altı <span className="text-green-600 font-semibold">yeşil</span>.
             </p>
-            {sgCariOptions.length > 1 && (
-              <div className="mb-2 px-1">
+            <div className="mb-2 px-1 flex flex-wrap items-center gap-x-6 gap-y-2">
+              {sgCariOptions.length > 1 && (
                 <select
                   value={sgCari}
                   onChange={e => setSgCari(e.target.value)}
@@ -2157,8 +2167,24 @@ export function SelloutView({ currentProfile, team, visibleIds, active }: Props)
                   <option value="">Tüm Cariler</option>
                   {sgCariOptions.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
-              </div>
-            )}
+              )}
+              {sgOzet.toplam > 0 && (
+                <div className="flex flex-wrap items-center gap-2 text-xs"
+                  title={`${sgCari || 'Tüm cariler'} · ${donemLabel(donem)} — aşağıdaki tablolardaki tekil şubeler (birden fazla kolonda olan şube bir kez sayılır)`}>
+                  <span className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-gray-700">
+                    Şube: <b className="tabular-nums">{sgOzet.toplam.toLocaleString('tr-TR')}</b>
+                  </span>
+                  <span className="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1 text-green-800">
+                    Satış giren: <b className="tabular-nums">{sgOzet.satisli.toLocaleString('tr-TR')}</b>
+                    <span className="ml-1 text-green-700/70">(%{Math.round(sgOzet.satisli / sgOzet.toplam * 100)})</span>
+                  </span>
+                  <span className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-rose-800">
+                    Girmeyen: <b className="tabular-nums">{sgOzet.girmeyen.toLocaleString('tr-TR')}</b>
+                    <span className="ml-1 text-rose-700/70">(%{Math.round(sgOzet.girmeyen / sgOzet.toplam * 100)})</span>
+                  </span>
+                </div>
+              )}
+            </div>
             {/* Stok bilgisi + yönetici yükleme düğmeleri */}
             <div className="mb-2 px-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
               {stokHata ? (
