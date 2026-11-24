@@ -139,7 +139,6 @@ function VisitsMap({ markers, profileMap, doneCount, planCount }: {
           map.attributionControl.addAttribution('İl sınırları © OpenStreetMap katkıcıları (ODbL)')
         }
 
-        const latlngs: [number, number][] = []
         markers.forEach(m => {
           const v = m.task
           const isDone = m.kind === 'done'
@@ -170,16 +169,14 @@ function VisitsMap({ markers, profileMap, doneCount, planCount }: {
               ${tarih ? `<div style="color:#888;margin-top:2px">${isDone ? '' : 'Plan: '}${tarih}</div>` : ''}
             </div>`
           )
-          latlngs.push([m.lat, m.lng])
         })
 
-        if (latlngs.length > 0) {
-          map.fitBounds(latlngs, { padding: [40, 40], maxZoom: 10 })
-        } else {
-          map.fitBounds([[35.8, 25.6], [42.1, 44.8]])
-        }
-        // Harita konteyneri sonradan boyutlandıysa yeniden hesapla
-        setTimeout(() => { if (!cancelled && mapObj.current) mapObj.current.invalidateSize() }, 200)
+        // Açılışta Türkiye'nin tamamı ortalanmış görünür
+        const turkiye = [[35.8, 25.6], [42.1, 44.8]]
+        const ortala = () => map.fitBounds(turkiye, { paddingTopLeft: [12, 12], paddingBottomRight: [12, 12] })
+        ortala()
+        // Harita konteyneri sonradan boyutlandıysa yeniden hesapla ve ortala
+        setTimeout(() => { if (!cancelled && mapObj.current) { mapObj.current.invalidateSize(); ortala() } }, 200)
         if (!cancelled) setStatus('ready')
       } catch {
         if (!cancelled) setStatus('error')
