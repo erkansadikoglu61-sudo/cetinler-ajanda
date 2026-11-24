@@ -130,7 +130,7 @@ export async function GET(req: Request) {
     //  - B2B cari-şube raporundaki süpervizör kolonları (eklenirse) ve elle atamalar (sube_yetki)
     //  - Supabase destek personeli kayıtları (şube adı B2B şube koduna eşlenir)
     try {
-      const { rows: csRows } = parseHtmlTableByHeader(await fetchPhpHtml(CARI_SUBE_URL))
+      const { rows: csRows } = parseHtmlTableByHeader(await fetchPhpHtml(CARI_SUBE_URL, { force: yenile }))
       for (const y of await subeYetkileri(csRows)) subeAtamalari.push({ ...y })
       const destekler = [...merchMap.values()].filter(m => m.merch_grubu === 'Destek Personeli' && !m.sube_kod && m.sube_adi && m.sup_adi)
       if (destekler.length) {
