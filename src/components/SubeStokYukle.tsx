@@ -23,7 +23,16 @@ interface Ozet {
   onizleme: boolean
 }
 
-export interface SevkYukleme { yukleme_id: string; created_at: string; satir: number; adet: number; ilkTarih: string; sonTarih: string }
+export interface SevkYukleme {
+  yukleme_id: string; created_at: string; satir: number; adet: number; ilkTarih: string; sonTarih: string
+  cariler?: string[]; subeler?: { sube: string; adet: number }[]; belgeler?: string[]
+}
+
+/** Cari kısaltması: ilk kelime (2–3 harfse ikinci kelime de) */
+function cariKisaAd(cari: string): string {
+  const w = cari.trim().split(/\s+/)
+  return (w[0]?.length ?? 0) <= 3 && w[1] ? `${w[0]} ${w[1]}` : (w[0] ?? '')
+}
 
 interface Kart {
   id: string
@@ -397,10 +406,21 @@ export function SubeStokYukle({ tip, cariler, varsayilanCari, yuklemeler, onClos
             <p className="text-xs font-medium text-gray-600">Önceki sevk yüklemeleri</p>
             <ul className="divide-y divide-gray-50">
               {yuklemeler.map(y => (
-                <li key={y.yukleme_id} className="flex items-center gap-2 py-1.5 text-xs">
-                  <span className="flex-1 text-gray-600">
-                    {trTarih(y.created_at)} yüklendi · {y.satir} satır · {y.adet.toLocaleString('tr-TR')} adet
-                    · sevk {trTarih(y.ilkTarih)}{y.sonTarih !== y.ilkTarih ? `–${trTarih(y.sonTarih)}` : ''}
+                <li key={y.yukleme_id} className="flex items-start gap-2 py-1.5 text-xs">
+                  <span className="flex-1 min-w-0">
+                    {(y.cariler?.length || y.subeler?.length) ? (
+                      <span className="block font-medium text-gray-800"
+                        title={[...(y.cariler ?? []), ...(y.subeler ?? []).map(x => `${x.sube}: ${x.adet} adet`)].join('\n')}>
+                        {(y.cariler ?? []).map(cariKisaAd).join(', ')}
+                        {(y.cariler?.length ?? 0) > 0 && ' · '}
+                        {(y.subeler ?? []).map(x => (y.subeler!.length > 1 ? `${x.sube} (${x.adet})` : x.sube)).join(', ')}
+                      </span>
+                    ) : null}
+                    <span className="block text-gray-500">
+                      {trTarih(y.created_at)} yüklendi · {y.satir} satır · {y.adet.toLocaleString('tr-TR')} adet
+                      · sevk {trTarih(y.ilkTarih)}{y.sonTarih !== y.ilkTarih ? `–${trTarih(y.sonTarih)}` : ''}
+                      {(y.belgeler?.length ?? 0) > 0 && ` · belge ${y.belgeler!.join(', ')}`}
+                    </span>
                   </span>
                   <button onClick={() => geriAl(y.yukleme_id)} className="text-red-500" title="Geri al"><Trash2 size={13} /></button>
                 </li>

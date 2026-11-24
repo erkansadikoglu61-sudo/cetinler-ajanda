@@ -50,9 +50,9 @@ export async function GET(req: Request) {
     hepsi(( b, s) => sb.from('sube_stok').select('sube_key, stok_kodu, stok_adi, kalan, bekleyen, milat').range(b, s)),
     (async () => {
       // sayimda kolonu henüz eklenmemişse onsuz oku (tüm sevkler açık sayılır)
-      const r = await hepsi((b, s) => sb.from('sube_sevk').select('yukleme_id, sube_key, stok_kodu, stok_adi, adet, tarih, created_at, sayimda').range(b, s))
-      if (r.error && /sayimda/.test(r.error.message)) {
-        return hepsi((b, s) => sb.from('sube_sevk').select('yukleme_id, sube_key, stok_kodu, stok_adi, adet, tarih, created_at').range(b, s))
+      const r = await hepsi((b, s) => sb.from('sube_sevk').select('yukleme_id, sube_key, cari_adi, sube_adi, belge_no, stok_kodu, stok_adi, adet, tarih, created_at, sayimda').range(b, s))
+      if (r.error && /sayimda|belge_no/.test(r.error.message)) {
+        return hepsi((b, s) => sb.from('sube_sevk').select('yukleme_id, sube_key, cari_adi, sube_adi, stok_kodu, stok_adi, adet, tarih, created_at').range(b, s))
       }
       return r
     })(),
@@ -60,10 +60,21 @@ export async function GET(req: Request) {
   if (stok.error) return tabloYok(stok.error.code) ? tabloHatasi() : NextResponse.json({ error: stok.error.message }, { status: 500 })
   if (sevk.error) return tabloYok(sevk.error.code) ? tabloHatasi() : NextResponse.json({ error: sevk.error.message }, { status: 500 })
 
-  const yuk = new Map<string, { yukleme_id: string; created_at: string; satir: number; adet: number; ilkTarih: string; sonTarih: string }>()
-  for (const r of sevk.data as { yukleme_id: string; created_at: string; adet: number; tarih: string }[]) {
-    const y = yuk.get(r.yukleme_id) ?? { yukleme_id: r.yukleme_id, created_at: r.created_at, satir: 0, adet: 0, ilkTarih: r.tarih, sonTarih: r.tarih }
+  type Yukleme = {
+    yukleme_id: string; created_at: string; satir: number; adet: number; ilkTarih: string; sonTarih: string
+    cariler: string[]; subeler: { sube: string; adet: number }[]; belgeler: string[]
+  }
+  const yuk = new Map<string, Yukleme>()
+  for (const r of sevk.data as { yukleme_id: string; created_at: string; adet: number; tarih: string; cari_adi?: string | null; sube_adi?: string | null; belge_no?: string | null }[]) {
+    const y = yuk.get(r.yukleme_id) ?? { yukleme_id: r.yukleme_id, created_at: r.created_at, satir: 0, adet: 0, ilkTarih: r.tarih, sonTarih: r.tarih, cariler: [], subeler: [], belgeler: [] }
     y.satir++; y.adet += r.adet
+    const cari = (r.cari_adi ?? '').trim()
+    if (cari && !y.cariler.includes(cari)) y.cariler.push(cari)
+    const subeAdi = (r.sube_adi ?? '').trim() || '—'
+    const sb2 = y.subeler.find(x => x.sube === subeAdi)
+    if (sb2) sb2.adet += r.adet; else y.subeler.push({ sube: subeAdi, adet: r.adet })
+    const belge = (r.belge_no ?? '').trim()
+    if (belge && !y.belgeler.includes(belge)) y.belgeler.push(belge)
     if (r.tarih < y.ilkTarih) y.ilkTarih = r.tarih
     if (r.tarih > y.sonTarih) y.sonTarih = r.tarih
     yuk.set(r.yukleme_id, y)
