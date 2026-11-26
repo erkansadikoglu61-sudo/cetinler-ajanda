@@ -7,7 +7,6 @@
 import type { ReactNode } from 'react'
 import type { Profile, BsySupervisor } from '@/lib/supabase'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
-import { BsyView } from '@/components/BsyView'
 import { AdetPrimTablosu, PrimAnalizView } from '@/components/AdetPrimView'
 import { SelloutView } from '@/components/SelloutView'
 import { KpiView } from '@/components/KpiView'
@@ -55,10 +54,6 @@ const bsyAdi = (o: Oturum) => (o.profile.role === 'bsy' ? o.profile.full_name : 
 
 /** Prim sekmesine eklenen v1 ekranları */
 export const PRIM_V1_BOLUMLERI: V1Bolum[] = [
-  {
-    key: 'ciro', label: 'Ciro ve Tahsilat', roller: ['admin', 'bsy'],
-    render: o => <BsyView isAdmin={o.profile.role === 'admin'} isBsy={o.profile.role === 'bsy'} bsyAdi={bsyAdi(o)} />,
-  },
   {
     key: 'adet-tablo', label: 'Adet Prim Tablosu', roller: ['admin', 'bsy', 'sup'],
     render: o => <AdetPrimTablosu isAdmin={o.profile.role === 'admin'} />,
