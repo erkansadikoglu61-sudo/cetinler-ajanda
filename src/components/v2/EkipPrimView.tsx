@@ -30,7 +30,9 @@ interface BsyYanit {
 }
 
 const TIPLER: Kisi['tip'][] = ['BSY', 'Süpervizör', 'Jr. Süpervizör', 'Çetinler Merch']
-const yuzde = (o: number | null) => (o === null ? '—' : `%${Math.round(o * 100)}`)
+const yuzde = (o: number | null) =>
+  o === null ? '—' : `%${(o * 100).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const adet = (n: number) => n.toLocaleString('tr-TR')
 
 /**
  * Süpervizör · Jr · Çetinler Merch adet primi (kategori hedef / gerçekleşme).
@@ -277,9 +279,9 @@ export function EkipPrimView({ gorunum, bsyDahil = false }: { gorunum: string; b
                                       <input inputMode="numeric" value={taslak[tk] ?? ''}
                                         onChange={e => setTaslak(t => ({ ...t, [tk]: e.target.value.replace(/\D/g, '') }))}
                                         className="w-16 rounded-md border border-gray-300 px-2 py-1 text-right text-sm" />
-                                    ) : (c.hedef || '—')}
+                                    ) : (c.hedef ? adet(c.hedef) : '—')}
                                   </td>
-                                  <td className="px-2 py-1.5 text-right tabular-nums">{c.gerc}</td>
+                                  <td className="px-2 py-1.5 text-right tabular-nums">{adet(c.gerc)}</td>
                                   <td className={clsx('px-2 py-1.5 text-right tabular-nums font-medium',
                                     c.oran === null ? 'text-gray-400'
                                       : k.tip === 'BSY' && bsy
