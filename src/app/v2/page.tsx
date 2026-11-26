@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Wallet, Store, CalendarDays, Award, BarChart2, RefreshCw, LogOut, Eye, Settings } from 'lucide-react'
+import { Wallet, Store, CalendarDays, Award, BarChart2, RefreshCw, LogOut, Eye, Settings, Target } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
@@ -13,6 +13,7 @@ import { useTeam } from '@/hooks/useTeam'
 import { HesabimView } from '@/components/v2/HesabimView'
 import { SubelerimView } from '@/components/v2/SubelerimView'
 import { PrimView } from '@/components/v2/PrimView'
+import { EkipPrimView } from '@/components/v2/EkipPrimView'
 import { AjandaView, type AjandaKisi } from '@/components/v2/AjandaView'
 import { RaporlarView } from '@/components/v2/RaporlarView'
 import { v2Erisimi } from '@/lib/v2/erisim'
@@ -24,13 +25,14 @@ import { V2Veri, V2_ROL_ADI } from '@/components/v2/types'
 // Geliştirme süresince yalnızca yönetici erişir; yönetici "Görünüm" ile
 // herhangi bir kullanıcının gözünden kontrol edebilir.
 
-type Sekme = 'hesabim' | 'subelerim' | 'ajanda' | 'prim' | 'raporlar' | 'yonetim'
+type Sekme = 'hesabim' | 'hedef' | 'subelerim' | 'ajanda' | 'prim' | 'raporlar' | 'yonetim'
 
 // v1'den taşınan geniş tablolar bu sekmelerde; içerik genişliği büyük
 const GENIS: Sekme[] = ['prim', 'raporlar', 'yonetim']
 
 const SEKMELER: { key: Sekme; label: string; icon: typeof Wallet }[] = [
   { key: 'hesabim',   label: 'Hesabım',   icon: Wallet },
+  { key: 'hedef',     label: 'Hedef Takip', icon: Target },
   { key: 'subelerim', label: 'Şubelerim', icon: Store },
   { key: 'ajanda',    label: 'Ajanda',    icon: CalendarDays },
   { key: 'prim',      label: 'Prim',      icon: Award },
@@ -120,7 +122,9 @@ export default function V2Page() {
   // Yönetim sekmesi: oturumdaki kullanıcının rolüne göre (v1 yetkileriyle aynı)
   const sekmeler = useMemo(() => {
     const yon = profile && yonetimBolumleri(profile.role).length > 0
-    return yon ? [...SEKMELER, { key: 'yonetim' as Sekme, label: 'Yönetim', icon: Settings }] : SEKMELER
+    // Çetinler Merch'in Prim sekmesinde bölüm kalmadı (kategori primi Hedef Takip'te)
+    const temel = profile?.role === 'merch' ? SEKMELER.filter(s => s.key !== 'prim') : SEKMELER
+    return yon ? [...temel, { key: 'yonetim' as Sekme, label: 'Yönetim', icon: Settings }] : temel
   }, [profile])
 
   if (loading || !profile) {
@@ -240,6 +244,7 @@ export default function V2Page() {
         )}
 
         {veri && sekme === 'hesabim' && <HesabimView veri={veri} gorunum={gorunum} onSubelerim={() => setSekme('subelerim')} onVeriYenile={() => yukle()} />}
+        {veri && sekme === 'hedef' && <div className="max-w-3xl mx-auto"><EkipPrimView key={gorunum} gorunum={gorunum} bsyDahil /></div>}
         {veri && sekme === 'subelerim' && <SubelerimView veri={veri} gorunum={gorunum} />}
         {veri && sekme === 'prim' && <PrimView key={gorunum} rol={veri.kullanici.rol} gorunum={gorunum} oturum={oturum!} />}
         {veri && sekme === 'ajanda' && (
@@ -255,7 +260,8 @@ export default function V2Page() {
       </main>
 
       {/* Mobil alt menü */}
-      <nav className={clsx('md:hidden fixed bottom-0 inset-x-0 z-20 bg-white border-t border-gray-200 grid', sekmeler.length > 5 ? 'grid-cols-6' : 'grid-cols-5')}>
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-white border-t border-gray-200 grid"
+        style={{ gridTemplateColumns: `repeat(${sekmeler.length}, minmax(0, 1fr))` }}>
         {sekmeler.map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setSekme(key)}
             className={clsx('relative flex flex-col items-center gap-0.5 py-2 text-[11px]',
