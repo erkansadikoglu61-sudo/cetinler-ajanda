@@ -14,6 +14,7 @@ import { HesabimView } from '@/components/v2/HesabimView'
 import { SubelerimView } from '@/components/v2/SubelerimView'
 import { PrimView } from '@/components/v2/PrimView'
 import { EkipPrimView } from '@/components/v2/EkipPrimView'
+import { SurumUyarisi } from '@/components/v2/SurumUyarisi'
 import { AjandaView, type AjandaKisi } from '@/components/v2/AjandaView'
 import { RaporlarView } from '@/components/v2/RaporlarView'
 import { v2Erisimi } from '@/lib/v2/erisim'
@@ -259,6 +260,8 @@ export default function V2Page() {
           <RaporlarView key={gorunum} rol={veri.kullanici.rol} gorunum={gorunum} kisiler={ajandaKisileri} oturum={oturum!} />
         )}
       </main>
+
+      <SurumUyarisi />
 
       {/* Mobil alt menü */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-white border-t border-gray-200 grid"
