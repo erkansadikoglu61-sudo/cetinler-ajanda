@@ -69,7 +69,8 @@ export async function GET(req: Request) {
       params: BSY_ADET_PARAMS,
       kategoriler: BSY_ADET_KATEGORILER,
       bsylar: sonuc,
-      hedefGirebilir: ctx.rol === 'admin',
+      // Bakılan kişinin yetkisi (yönetici başkasının gözünden bakarken düğme o kişi gibi görünür)
+      hedefGirebilir: ctx.ben.role === 'admin',
     })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

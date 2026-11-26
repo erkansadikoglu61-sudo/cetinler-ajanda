@@ -72,6 +72,11 @@ function hedefYetkisi(ctx: V2Istek): boolean {
   return ctx.rol === 'admin' || (ctx.rol === 'sup' && ctx.ben.id === ctx.kullaniciId)
 }
 
+/** Ekranda "Hedef gir" görünsün mü: bakılan kişinin yetkisi (yönetici başkasının gözünden bakarken o kişi gibi) */
+function hedefDugmesi(ctx: V2Istek): boolean {
+  return ctx.ben.role === 'admin' || ctx.ben.role === 'sup'
+}
+
 export async function GET(req: Request) {
   const ctx = await v2Istek(req)
   if (ctx instanceof NextResponse) return ctx
@@ -113,7 +118,7 @@ export async function GET(req: Request) {
         }
       })
       .sort((a, b) => (sira[a.tip] ?? 9) - (sira[b.tip] ?? 9) || a.ad.localeCompare(b.ad, 'tr'))
-    return NextResponse.json({ donem, gruplar: SELLOUT_GROUPS, kisiler: sonuc, hedefGirebilir: hedefYetkisi(ctx) })
+    return NextResponse.json({ donem, gruplar: SELLOUT_GROUPS, kisiler: sonuc, hedefGirebilir: hedefDugmesi(ctx) })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
