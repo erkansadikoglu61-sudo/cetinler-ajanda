@@ -5,7 +5,9 @@ import {
 } from '@/lib/sellout'
 import { computeSelloutPrimForMonth, type NPKisiPrim } from '@/lib/nihaiPrim'
 import type { Profile } from '@/lib/supabase'
-import { altKullanicilar } from '@/lib/v2/nokta'
+import { altKullanicilar, gorunurNoktalar } from '@/lib/v2/nokta'
+import { noktaModeli } from '@/lib/v2/noktaModel'
+import { merchSubeSecimleri, merchSecimleriniUygula } from '@/lib/v2/merchSube'
 import {
   v2Istek, donemSatirlari, merchDetay, donemGecerli, buDonem, HERKESI_GOREN, type V2Istek,
 } from '@/lib/v2/sunucu'
@@ -68,6 +70,29 @@ function gorunurKisiler(ctx: V2Istek, kisiler: NPKisiPrim[]): NPKisiPrim[] {
   })
 }
 
+/**
+ * BSY: ekibinden yalnızca kendi carilerinin şubelerinde görevli olanlar
+ * (şube kaydında süpervizör / Jr / Çetinler Merch olarak geçenler). Başka BSY'nin
+ * carisinde çalışan merch, aynı süpervizöre bağlı olsa da görünmez.
+ */
+async function bsyCariSuzgeci(ctx: V2Istek, kisiler: NPKisiPrim[]): Promise<NPKisiPrim[]> {
+  const [model, secimler] = await Promise.all([noktaModeli(), merchSubeSecimleri(ctx.sb)])
+  const noktalar = merchSecimleriniUygula(model.noktalar, secimler, ctx.profiller)
+  const benim = gorunurNoktalar(noktalar, ctx.ben, ctx.profiller, ctx.links).filter(n => n.kapsam === 'kendi')
+  const sups: string[] = [], jrs: string[] = [], merchler: string[] = []
+  for (const n of benim) {
+    sups.push(...n.sups)
+    jrs.push(...n.jrs)
+    merchler.push(...n.cetinlerMerch.map(k => k.ad))
+  }
+  const icinde = (ad: string, liste: string[]) => liste.some(x => namesMatch(x, ad))
+  return kisiler.filter(k =>
+    k.tip === 'Süpervizör' ? icinde(k.ad, sups)
+      : k.tip === 'Jr. Süpervizör' ? icinde(k.ad, jrs)
+        : k.tip === 'Çetinler Merch' ? icinde(k.ad, merchler)
+          : true)
+}
+
 function hedefYetkisi(ctx: V2Istek): boolean {
   return ctx.rol === 'admin' || (ctx.rol === 'sup' && ctx.ben.id === ctx.kullaniciId)
 }
@@ -87,7 +112,9 @@ export async function GET(req: Request) {
     const sira: Record<string, number> = { 'Süpervizör': 0, 'Jr. Süpervizör': 1, 'Çetinler Merch': 2 }
     // BSY ekibinin hedef / gerçekleşme / oranını görür, primlerini görmez
     const primGizli = ctx.ben.role === 'bsy'
-    const sonuc = gorunurKisiler(ctx, kisiler)
+    let gorunur = gorunurKisiler(ctx, kisiler)
+    if (ctx.ben.role === 'bsy') gorunur = await bsyCariSuzgeci(ctx, gorunur)
+    const sonuc = gorunur
       .map(k => {
         const kp = KATEGORI_PRIMI[k.tip]
         if (primGizli) {
