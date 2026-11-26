@@ -261,7 +261,7 @@ export default function V2Page() {
         )}
       </main>
 
-      <SurumUyarisi />
+      <SurumUyarisi tetik={sekme} />
 
       {/* Mobil alt menü */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-white border-t border-gray-200 grid"

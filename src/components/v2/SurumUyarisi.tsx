@@ -4,25 +4,32 @@ import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 
 // Açık v2 penceresi (masaüstü / telefon uygulaması) canlıya çıkan yeni sürümü
-// fark eder: 5 dakikada bir ve pencereye dönüldüğünde kontrol edilir.
+// fark eder: 2 dakikada bir, pencereye dönüldüğünde ve sekme değiştirildiğinde kontrol edilir.
 const BU_SURUM = process.env.YAPI_SURUMU ?? ''
-const ARALIK = 5 * 60 * 1000
+const ARALIK = 2 * 60 * 1000
+let sonKontrol = 0
 
-export function SurumUyarisi() {
+async function yeniSurumVarMi(): Promise<boolean> {
+  if (!BU_SURUM || Date.now() - sonKontrol < 20 * 1000) return false
+  sonKontrol = Date.now()
+  try {
+    const r = await fetch('/api/v2/surum', { cache: 'no-store' })
+    if (!r.ok) return false
+    const { surum } = await r.json() as { surum?: string }
+    return !!surum && surum !== BU_SURUM
+  } catch { return false }   // çevrimdışı vb. — sonra tekrar denenir
+}
+
+/** tetik: değiştiğinde (ör. sekme) ayrıca kontrol edilir */
+export function SurumUyarisi({ tetik }: { tetik?: string }) {
   const [yeni, setYeni] = useState(false)
+
+  useEffect(() => { yeniSurumVarMi().then(v => { if (v) setYeni(true) }) }, [tetik])
 
   useEffect(() => {
     if (!BU_SURUM) return
-    let son = 0
     const kontrol = async () => {
-      if (Date.now() - son < 30 * 1000) return
-      son = Date.now()
-      try {
-        const r = await fetch('/api/v2/surum', { cache: 'no-store' })
-        if (!r.ok) return
-        const { surum } = await r.json() as { surum?: string }
-        if (surum && surum !== BU_SURUM) setYeni(true)
-      } catch { /* çevrimdışı vb. — sonra tekrar denenir */ }
+      if (await yeniSurumVarMi()) setYeni(true)
     }
     const zamanlayici = setInterval(kontrol, ARALIK)
     const gorunur = () => { if (document.visibilityState === 'visible') kontrol() }
