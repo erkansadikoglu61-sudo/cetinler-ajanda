@@ -7,7 +7,8 @@ import { donemOptions, donemLabel, PRIM_ESIGI } from '@/lib/sellout'
 import { sadeAd } from '@/lib/v2/nokta'
 import { tl } from './types'
 
-interface Kategori { grup: string; hedef: number; gerc: number; prim: number; kategoriPrimi: number; oran: number | null }
+// prim / kategoriPrimi null: görüntüleyen bu kişinin primini göremez (BSY → ekibi)
+interface Kategori { grup: string; hedef: number; gerc: number; prim: number | null; kategoriPrimi: number | null; oran: number | null }
 interface Kisi {
   key: string
   tip: 'BSY' | 'Süpervizör' | 'Jr. Süpervizör' | 'Çetinler Merch'
@@ -15,7 +16,7 @@ interface Kisi {
   profileId: string | null
   ownerSupAd: string | null
   ownerJrAd: string | null
-  prim: number
+  prim: number | null
   kategoriler: Kategori[]
 }
 interface Yanit { donem: string; gruplar: string[]; kisiler: Kisi[]; hedefGirebilir: boolean }
@@ -212,12 +213,13 @@ export function EkipPrimView({ gorunum, bsyDahil = false }: { gorunum: string; b
         {TIPLER.map(tip => {
           const kisiler = filtreli.filter(k => k.tip === tip)
           if (kisiler.length === 0) return null
-          const toplam = kisiler.reduce((t, k) => t + k.prim, 0)
+          const primGizli = kisiler.every(k => k.prim === null)
+          const toplam = kisiler.reduce((t, k) => t + (k.prim ?? 0), 0)
           return (
             <section key={tip} className="space-y-2">
               <div className="flex items-baseline justify-between px-1">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">{tip} ({kisiler.length})</h3>
-                <span className="text-xs tabular-nums text-gray-500">{tl(toplam)}</span>
+                {!primGizli && <span className="text-xs tabular-nums text-gray-500">{tl(toplam)}</span>}
               </div>
               {kisiler.map(k => {
                 const isAcik = (duzenle && duzenlenebilir(k)) || acik.has(k.key)
@@ -231,7 +233,21 @@ export function EkipPrimView({ gorunum, bsyDahil = false }: { gorunum: string; b
                         <span className="block text-sm font-medium text-gray-800 truncate">{k.ad}</span>
                         {ust && <span className="block text-[11px] text-gray-400 truncate">{ust}</span>}
                       </span>
-                      <span className="text-sm font-semibold tabular-nums text-gray-900">{tl(k.prim)}</span>
+                      {k.prim !== null ? (
+                        <span className="text-sm font-semibold tabular-nums text-gray-900">{tl(k.prim)}</span>
+                      ) : (() => {
+                        // Prim gizli: toplam gerçekleşme oranı (hedefi olan kategoriler)
+                        const h = k.kategoriler.reduce((t, c) => t + (c.hedef > 0 ? c.hedef : 0), 0)
+                        const g = k.kategoriler.reduce((t, c) => t + (c.hedef > 0 ? c.gerc : 0), 0)
+                        const o = h > 0 ? g / h : null
+                        return (
+                          <span className={clsx('text-sm font-semibold tabular-nums',
+                            o === null ? 'text-gray-400' : o >= PRIM_ESIGI ? 'text-green-700' : 'text-red-600')}
+                            title="Toplam gerçekleşme oranı">
+                            {yuzde(o)}
+                          </span>
+                        )
+                      })()}
                     </button>
                     {isAcik && (
                       <div className="border-t border-gray-100 overflow-x-auto">
@@ -242,7 +258,7 @@ export function EkipPrimView({ gorunum, bsyDahil = false }: { gorunum: string; b
                               <th className="px-2 py-2 text-right font-medium">Hedef</th>
                               <th className="px-2 py-2 text-right font-medium">Gerç.</th>
                               <th className="px-2 py-2 text-right font-medium">Oran</th>
-                              <th className="px-4 py-2 text-right font-medium">Prim</th>
+                              {k.prim !== null && <th className="px-4 py-2 text-right font-medium">Prim</th>}
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-50">
@@ -252,7 +268,9 @@ export function EkipPrimView({ gorunum, bsyDahil = false }: { gorunum: string; b
                                 <tr key={c.grup}>
                                   <td className="px-4 py-1.5">
                                     <span className="block text-gray-800">{c.grup}</span>
-                                    <span className="block text-[11px] text-gray-400">{k.tip === 'BSY' ? 'Ana prim' : 'Kategori primi'} {tl(c.kategoriPrimi)}</span>
+                                    {c.kategoriPrimi !== null && (
+                                      <span className="block text-[11px] text-gray-400">{k.tip === 'BSY' ? 'Ana prim' : 'Kategori primi'} {tl(c.kategoriPrimi)}</span>
+                                    )}
                                   </td>
                                   <td className="px-2 py-1.5 text-right tabular-nums">
                                     {kDuzenle ? (
@@ -269,7 +287,7 @@ export function EkipPrimView({ gorunum, bsyDahil = false }: { gorunum: string; b
                                         : c.oran >= PRIM_ESIGI ? 'text-green-700' : 'text-red-600')}>
                                     {yuzde(c.oran)}
                                   </td>
-                                  <td className="px-4 py-1.5 text-right tabular-nums">{c.prim ? tl(c.prim) : '—'}</td>
+                                  {k.prim !== null && <td className="px-4 py-1.5 text-right tabular-nums">{c.prim ? tl(c.prim) : '—'}</td>}
                                 </tr>
                               )
                             })}

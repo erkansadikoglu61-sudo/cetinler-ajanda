@@ -9,6 +9,7 @@ import { altKullanicilar } from '@/lib/v2/nokta'
 import {
   v2Istek, donemSatirlari, merchDetay, donemGecerli, buDonem, HERKESI_GOREN, type V2Istek,
 } from '@/lib/v2/sunucu'
+import { kaliciOnbellek, imzala } from '@/lib/v2/onbellek'
 
 // v2 — Süpervizör / Jr. Süpervizör / Çetinler Merch adet primi (kategori detaylı).
 // Hesap v1 Sellout & Nihai Prim ile aynı motordan (lib/nihaiPrim).
@@ -28,20 +29,26 @@ interface Hesap {
 }
 
 async function hesapla(ctx: V2Istek, donem: string): Promise<Hesap> {
-  const [pRes, mRes, satirlar, md] = await Promise.all([
+  // Hedefler her istekte (hızlı) okunur; ağır kısım (satış satırları + B2B) önbellekli.
+  // Hedef değişirse imza değişir → hemen yeniden hesaplanır.
+  const [pRes, mRes] = await Promise.all([
     ctx.sb.from('sellout_targets_profile').select('profile_id, grup, hedef').eq('donem', donem),
     ctx.sb.from('sellout_targets_merch').select('merch_name, grup, hedef').eq('donem', donem),
-    donemSatirlari(donem),
-    merchDetay(),
   ])
-  const kisiler = computeSelloutPrimForMonth({
-    periodRows: satirlar,
-    profileTargets: (pRes.data ?? []) as { profile_id: string; grup: string; hedef: number }[],
-    merchTargets: (mRes.data ?? []) as { merch_name: string; grup: string; hedef: number }[],
-    merchDetay: md,
-    team: ctx.profiller as unknown as Profile[],
-    donem,
-  }).filter(k => donemdeAktif(k.ad, donem))
+  const profileTargets = (pRes.data ?? []) as { profile_id: string; grup: string; hedef: number }[]
+  const merchTargets = (mRes.data ?? []) as { merch_name: string; grup: string; hedef: number }[]
+  const imza = imzala([profileTargets, merchTargets, ctx.profiller.map(p => [p.id, p.full_name, p.role, p.manager_id])])
+  const kisiler = await kaliciOnbellek(`ekip-prim/${donem}`, imza, 10 * 60 * 1000, async () => {
+    const [satirlar, md] = await Promise.all([donemSatirlari(donem), merchDetay()])
+    return computeSelloutPrimForMonth({
+      periodRows: satirlar,
+      profileTargets,
+      merchTargets,
+      merchDetay: md,
+      team: ctx.profiller as unknown as Profile[],
+      donem,
+    }).filter(k => donemdeAktif(k.ad, donem))
+  })
   return { kisiler }
 }
 
@@ -73,9 +80,23 @@ export async function GET(req: Request) {
   try {
     const { kisiler } = await hesapla(ctx, donem)
     const sira: Record<string, number> = { 'Süpervizör': 0, 'Jr. Süpervizör': 1, 'Çetinler Merch': 2 }
+    // BSY ekibinin hedef / gerçekleşme / oranını görür, primlerini görmez
+    const primGizli = ctx.ben.role === 'bsy'
     const sonuc = gorunurKisiler(ctx, kisiler)
       .map(k => {
         const kp = KATEGORI_PRIMI[k.tip]
+        if (primGizli) {
+          return {
+            key: k.selfProfileId ? `p:${k.selfProfileId}` : `m:${k.ad}`,
+            tip: k.tip, ad: k.ad, profileId: k.selfProfileId ?? null,
+            ownerSupAd: k.ownerSupAd ?? null, ownerJrAd: k.ownerJrAd ?? null,
+            prim: null,
+            kategoriler: (k.kategoriler ?? []).map(c => ({
+              grup: c.grup, hedef: c.hedef, gerc: c.gerc, prim: null, kategoriPrimi: null,
+              oran: c.hedef > 0 ? c.gerc / c.hedef : null,
+            })),
+          }
+        }
         return {
           key: k.selfProfileId ? `p:${k.selfProfileId}` : `m:${k.ad}`,
           tip: k.tip,

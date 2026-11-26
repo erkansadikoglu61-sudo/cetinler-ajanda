@@ -237,14 +237,15 @@ export default function V2Page() {
         )}
         {hata && <p className="max-w-3xl mx-auto rounded-xl bg-red-50 text-red-700 text-sm px-4 py-3">{hata}</p>}
 
-        {!veri && yukleniyor && (
+        {!veri && yukleniyor && sekme !== 'hedef' && (
           <div className="flex items-center justify-center py-16">
             <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
           </div>
         )}
 
         {veri && sekme === 'hesabim' && <HesabimView veri={veri} gorunum={gorunum} onSubelerim={() => setSekme('subelerim')} onVeriYenile={() => yukle()} />}
-        {veri && sekme === 'hedef' && <div className="max-w-3xl mx-auto"><EkipPrimView key={gorunum} gorunum={gorunum} bsyDahil /></div>}
+        {/* Hedef Takip kendi verisini çeker; şube modelinin yüklenmesini beklemez */}
+        {sekme === 'hedef' && <div className="max-w-3xl mx-auto"><EkipPrimView key={gorunum} gorunum={gorunum} bsyDahil /></div>}
         {veri && sekme === 'subelerim' && <SubelerimView veri={veri} gorunum={gorunum} />}
         {veri && sekme === 'prim' && <PrimView key={gorunum} rol={veri.kullanici.rol} gorunum={gorunum} oturum={oturum!} />}
         {veri && sekme === 'ajanda' && (

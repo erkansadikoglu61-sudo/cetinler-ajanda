@@ -6,6 +6,7 @@ import {
   BSY_ADET_KATEGORILER, BSY_ADET_PARAMS, bsyAdetDurum, bsyAdetHesapla,
 } from '@/lib/v2/bsyAdetPrim'
 import { v2Istek, donemGecerli, buDonem, servisIstemcisi } from '@/lib/v2/sunucu'
+import { kaliciOnbellek } from '@/lib/v2/onbellek'
 import type { V2Profil } from '@/lib/v2/nokta'
 
 // v2 — BSY adet primi.
@@ -46,7 +47,12 @@ export async function GET(req: Request) {
             .eq('donem', donem).in('profile_id', bsylar.map(b => b.id))
         : Promise.resolve({ data: [] as { profile_id: string; grup: string; hedef: number }[] }),
       // Gerçekleşme: SAHA.xlsx satış adetleri (iade düşülür; Evkur dönem kuralı dahil)
-      bsylar.length ? bsyExcelAdetleri(servisIstemcisi(), donem) : Promise.resolve(new Map<string, Record<string, number>>()),
+      // (SAHA.xlsx okuması ağır → kalıcı önbellek; 15 dk sonra arka planda tazelenir)
+      bsylar.length
+        ? kaliciOnbellek(`bsy-gerc/${donem}`, '', 15 * 60 * 1000,
+            async () => [...(await bsyExcelAdetleri(servisIstemcisi(), donem)).entries()])
+            .then(e => new Map<string, Record<string, number>>(e))
+        : Promise.resolve(new Map<string, Record<string, number>>()),
     ])
 
     const hedefler = (hedefRes.data ?? []) as { profile_id: string; grup: string; hedef: number }[]
