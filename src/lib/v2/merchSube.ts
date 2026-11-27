@@ -67,43 +67,46 @@ export function merchSecimleriniUygula(
   })
 }
 
-/** Merch'in bağlı olduğu Jr / süpervizör adları (B2B şube kayıtlarından) */
-export function merchinUstleri(noktalar: V2Nokta[], merch: V2Profil): { sups: string[]; jrs: string[] } {
+/** B2B merch kaydı (merch-detay): merch adı → süpervizör / Jr */
+export interface MerchSahipKaydi { merch_adi: string; merch_grubu: string; sup_adi: string; jr_adi: string }
+
+/** Merch'in bağlı olduğu Jr / süpervizör adları — merch'in KENDİ B2B kaydından
+ *  (şubedeki diğer kayıtların süpervizörleri dahil değil) */
+export function merchinUstleri(kayitlar: MerchSahipKaydi[], merch: V2Profil): { sups: string[]; jrs: string[] } {
   const sups = new Set<string>()
   const jrs = new Set<string>()
-  for (const n of noktalar) {
-    if (!n.cetinlerMerch.some(k => namesMatch(k.ad, merch.full_name))) continue
-    n.sups.forEach(s => sups.add(s))
-    n.jrs.forEach(j => jrs.add(j))
+  for (const r of kayitlar) {
+    if (r.merch_grubu !== 'Çetinler Merch' || !namesMatch(r.merch_adi, merch.full_name)) continue
+    if (r.sup_adi) sups.add(r.sup_adi)
+    if (r.jr_adi) jrs.add(r.jr_adi)
   }
   return { sups: [...sups], jrs: [...jrs] }
 }
 
 /**
  * Bu kullanıcı (ben) bu merch'in şubelerini değiştirebilir mi?
- * Merch'in kendisi, bağlı olduğu Jr / süpervizör (B2B kaydı ya da manager_id zinciri).
- * (Yönetici kontrolü çağıran tarafta.)
+ * Merch'in kendisi; merch'in B2B kaydındaki Jr / süpervizör; manager_id zinciri
+ * (merch → Jr → süpervizör); kaydındaki Jr'ın süpervizörü. (Yönetici kontrolü çağıran tarafta.)
  */
 export function merchiYonetebilir(
   ben: V2Profil,
   merch: V2Profil,
   profiller: V2Profil[],
-  hamNoktalar: V2Nokta[],
-  uygulanmisNoktalar: V2Nokta[],
+  kayitlar: MerchSahipKaydi[],
 ): boolean {
   if (merch.role !== 'merch') return false
   if (ben.id === merch.id) return true
   if (ben.role !== 'sup' && ben.role !== 'jr') return false
-  // manager_id zinciri (merch → jr → sup)
   let p: V2Profil | undefined = merch
   for (let i = 0; i < 3 && p?.manager_id; i++) {
     if (p.manager_id === ben.id) return true
     p = profiller.find(x => x.id === p!.manager_id)
   }
-  // B2B şube kayıtları: merch'in (B2B'deki ya da seçtiği) şubelerinde sup / jr
-  for (const liste of [hamNoktalar, uygulanmisNoktalar]) {
-    const u = merchinUstleri(liste, merch)
-    if ((ben.role === 'sup' ? u.sups : u.jrs).some(a => namesMatch(a, ben.full_name))) return true
+  const u = merchinUstleri(kayitlar, merch)
+  if (ben.role === 'sup') {
+    if (u.sups.some(a => namesMatch(a, ben.full_name))) return true
+    // Kaydındaki Jr bana bağlıysa
+    return u.jrs.some(j => profiller.some(x => x.role === 'jr' && namesMatch(x.full_name, j) && x.manager_id === ben.id))
   }
-  return false
+  return u.jrs.some(a => namesMatch(a, ben.full_name))
 }

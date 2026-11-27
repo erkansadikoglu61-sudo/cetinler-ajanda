@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { gorunurNoktalar, type V2Nokta, type V2Profil } from '@/lib/v2/nokta'
 import { noktaModeli } from '@/lib/v2/noktaModel'
-import { v2Istek, type V2Istek } from '@/lib/v2/sunucu'
+import { v2Istek, merchDetay, type V2Istek } from '@/lib/v2/sunucu'
 import { namesMatch } from '@/lib/sellout'
 import {
   merchSubeSecimleri, merchSecimleriniUygula, merchiYonetebilir, merchinUstleri, merchSubeTabloYok,
@@ -23,11 +23,13 @@ const tabloHatasi = () => NextResponse.json(
 const kisa = (n: V2Nokta) => ({ key: n.key, subeKod: n.subeKod, cariAdi: n.cariAdi, subeAdi: n.subeAdi })
 
 async function hazirla(ctx: V2Istek) {
-  const [model, secimler] = await Promise.all([noktaModeli(), merchSubeSecimleri(ctx.sb)])
+  const [model, secimler, kayitlar] = await Promise.all([noktaModeli(), merchSubeSecimleri(ctx.sb), merchDetay()])
   const uygulanmis = merchSecimleriniUygula(model.noktalar, secimler, ctx.profiller)
-  const yonetebilir = (m: V2Profil) =>
-    m.role === 'merch' && (ctx.rol === 'admin' || merchiYonetebilir(ctx.ben, m, ctx.profiller, model.noktalar, uygulanmis))
-  return { model, secimler, uygulanmis, yonetebilir }
+  // Bakılan kişinin (ben) hakkı — yönetici başkasının gözünden bakarken o kişinin listesi görünür
+  const benimMerchim = (m: V2Profil) => m.role === 'merch' && merchiYonetebilir(ctx.ben, m, ctx.profiller, kayitlar)
+  // Değiştirme yetkisi: yönetici her zaman; diğerleri yalnızca kendi merch'leri
+  const yonetebilir = (m: V2Profil) => m.role === 'merch' && (ctx.rol === 'admin' || benimMerchim(m))
+  return { model, secimler, uygulanmis, kayitlar, benimMerchim, yonetebilir }
 }
 
 export async function GET(req: Request) {
@@ -35,12 +37,12 @@ export async function GET(req: Request) {
   if (ctx instanceof NextResponse) return ctx
   const merchId = new URL(req.url).searchParams.get('merch')
   try {
-    const { model, secimler, uygulanmis, yonetebilir } = await hazirla(ctx)
+    const { model, secimler, uygulanmis, kayitlar, benimMerchim, yonetebilir } = await hazirla(ctx)
 
     if (!merchId) {
-      // Yönetici kendi görünümündeyse tüm merch'ler; diğerleri yönetebildikleri
+      // Yönetici kendi görünümündeyse tüm merch'ler; diğerleri (ve yöneticinin baktığı kişi) kendi merch'leri
       const adaylar = ctx.profiller.filter(p => p.role === 'merch'
-        && (ctx.ben.role === 'admin' ? true : ctx.ben.id === p.id || (['sup', 'jr'].includes(ctx.ben.role) && yonetebilir(p))))
+        && (ctx.ben.role === 'admin' ? true : benimMerchim(p)))
       return NextResponse.json({
         merchler: adaylar.map(p => ({
           id: p.id,
@@ -56,7 +58,7 @@ export async function GET(req: Request) {
     if (!yonetebilir(merch)) return NextResponse.json({ error: 'Bu merch için yetkiniz yok' }, { status: 403 })
 
     // Öneri: merch'in Jr / süpervizörünün şubeleri
-    const ustler = merchinUstleri(model.noktalar, merch)
+    const ustler = merchinUstleri(kayitlar, merch)
     const ustProfiller = ctx.profiller.filter(p =>
       (p.role === 'sup' && ustler.sups.some(a => namesMatch(a, p.full_name)))
       || (p.role === 'jr' && ustler.jrs.some(a => namesMatch(a, p.full_name)))
