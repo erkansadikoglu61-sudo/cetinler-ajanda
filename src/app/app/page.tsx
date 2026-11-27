@@ -1814,11 +1814,15 @@ if (currentProfile.role === 'bsy') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-brand-700 px-6 text-center text-white safe-top safe-bottom">
         <div className="text-4xl">🔒</div>
-        <p className="text-lg font-semibold">Uygulamaya erişim geçici olarak kapalı</p>
-        <p className="max-w-sm text-sm text-white/80">Bilgi için yöneticinizle iletişime geçin.</p>
+        <p className="max-w-sm text-lg font-semibold leading-snug">
+          İlgili raporlarınıza bundan böyle{' '}
+          <a href="https://b2b.cetinlerltd.com.tr" target="_blank" rel="noopener noreferrer"
+            className="underline decoration-white/60 underline-offset-4 hover:decoration-white">b2b.cetinlerltd.com.tr</a>
+          &apos;den erişebilirsiniz.
+        </p>
         <button
           onClick={async () => { await signOut(); router.replace('/login') }}
-          className="min-h-[46px] rounded-xl bg-white px-6 py-3 font-semibold text-brand-700 btn-active"
+          className="text-sm text-white/70 underline"
         >
           Çıkış yap
         </button>
