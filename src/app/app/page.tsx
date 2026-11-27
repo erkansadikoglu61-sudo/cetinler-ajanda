@@ -23,6 +23,7 @@ import { BsyView } from '@/components/BsyView'
 import { TahsilatPlanimView } from '@/components/TahsilatPlanimView'
 import { BSY_NAME_TO_KOD } from '@/lib/bsy'
 import { namesMatch, normalizeName, donemdeAktif } from '@/lib/sellout'
+import { v1Erisimi } from '@/lib/v1Erisim'
 import { VISIT_TARGETS } from '@/lib/ziyaretHedef'
 import { GenelRaporlarView } from '@/components/GenelRaporlarView'
 import { KpiView } from '@/components/KpiView'
@@ -1803,6 +1804,23 @@ if (currentProfile.role === 'bsy') {
           className="text-sm text-white/70 underline"
         >
           Giriş ekranına dön
+        </button>
+      </div>
+    )
+  }
+
+  // v1 kapatıldı: yalnızca izinli kullanıcı girebilir (lib/v1Erisim)
+  if (!authLoading && currentProfile && !v1Erisimi(currentProfile)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-brand-700 px-6 text-center text-white safe-top safe-bottom">
+        <div className="text-4xl">🔒</div>
+        <p className="text-lg font-semibold">Uygulamaya erişim geçici olarak kapalı</p>
+        <p className="max-w-sm text-sm text-white/80">Bilgi için yöneticinizle iletişime geçin.</p>
+        <button
+          onClick={async () => { await signOut(); router.replace('/login') }}
+          className="min-h-[46px] rounded-xl bg-white px-6 py-3 font-semibold text-brand-700 btn-active"
+        >
+          Çıkış yap
         </button>
       </div>
     )
